@@ -43,7 +43,14 @@ export default function TeacherPage({ params }: Props) {
           كورسات وحصص مسجلة وامتحانات تدريبية — كل حاجة في مكان واحد.
           سجل من هنا وهتبعتلك بيانات الدخول على واتساب.
         </p>
-        <a href="#" className="btn-primary mt-8 inline-flex">سجّل في مجموعة جديدة</a>
+        <a
+          href={`https://wa.me/${process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP ?? "201200000000"}?text=${encodeURIComponent(`أهلاً، عايز أسجل في مجموعة عند أ. ${name}`)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn-primary mt-8 inline-flex"
+        >
+          سجّل في مجموعة جديدة
+        </a>
 
         <div className="mt-14 grid gap-5 sm:grid-cols-3">
           {[["🎬", "حصص مسجلة", "شاهدها في أي وقت من موبايلك"],
