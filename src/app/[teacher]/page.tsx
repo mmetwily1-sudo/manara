@@ -1,15 +1,23 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { getTenantContext } from "@/lib/tenant";
-
-type Props = { params: { teacher: string } };
 
 /**
  * صفحة المعلم العامة — Programmatic SEO
- * تُعرض على: ahmed.manara.app أو الدومين المخصص
- * البيانات حالياً placeholder — هترتبط بجدول tenants لما نشبك Supabase
+ * على الدومين الحقيقي بتشتغل تحت subdomain المعلم عبر middleware rewrite.
+ * في وضع التصدير الثابت (GitHub Pages preview) بتتبني كصفحات ثابتة معروفة.
  */
+
+type Props = { params: { teacher: string } };
+
+// TODO Phase 2: استعلام فعلي من tenants — حالياً الـtenants التجريبية فقط
+const KNOWN_SLUGS = ["demo"];
+
+export function generateStaticParams() {
+  return KNOWN_SLUGS.map((teacher) => ({ teacher }));
+}
+
+export const dynamicParams = false;
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: `أ. ${params.teacher} — منصة تعليمية على منارة`,
@@ -18,21 +26,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default function TeacherPage({ params }: Props) {
-  const tenant = getTenantContext();
-
-  // TODO Phase 2: استعلام فعلي من tenants حسب slug/custom_domain
-  // حالياً: الـtenants المعروفين فقط — أي رابط غلط ياخد 404 مرتبة بدل صفحة وهمية
-  const KNOWN_SLUGS = ["demo"];
   const name = decodeURIComponent(params.teacher);
-  if (!KNOWN_SLUGS.includes(name.toLowerCase())) notFound();
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-primary-light/30 to-bg">
       <header className="bg-white/80 backdrop-blur">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-4">
-          <span className="text-h2 font-extrabold" style={{ color: "var(--tenant-primary)" }}>
-            أ. {name}
-          </span>
+          <span className="text-h2 font-extrabold text-primary">أ. {name}</span>
           <Link href="/login" className="btn-secondary !px-4 !py-2 text-small">دخول الطلاب</Link>
         </div>
       </header>

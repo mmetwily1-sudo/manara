@@ -1,12 +1,19 @@
 /** @type {import('next').NextConfig} */
+// EXPORT_MODE=1 → تصدير ثابت للـGitHub Pages (معاينة لايف بدون سيرفر)
+const isExport = process.env.EXPORT_MODE === "1";
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
+
 const nextConfig = {
   reactStrictMode: true,
-  images: {
-    remotePatterns: [
-      { protocol: "https", hostname: "**.supabase.co" },
-      { protocol: "https", hostname: "cdn.manara.app" },
-    ],
-  },
+  ...(basePath ? { basePath, assetPrefix: basePath } : {}),
+  ...(isExport ? { output: "export", images: { unoptimized: true } } : {
+    images: {
+      remotePatterns: [
+        { protocol: "https", hostname: "**.supabase.co" },
+        { protocol: "https", hostname: "cdn.manara.app" },
+      ],
+    },
+  }),
 };
 
 export default nextConfig;
