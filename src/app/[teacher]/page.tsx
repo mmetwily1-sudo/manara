@@ -21,8 +21,10 @@ export default function TeacherPage({ params }: Props) {
   const tenant = getTenantContext();
 
   // TODO Phase 2: استعلام فعلي من tenants حسب slug/custom_domain
-  // لو مش موجود → notFound() + صفحة "المنصة غير موجودة"
+  // حالياً: الـtenants المعروفين فقط — أي رابط غلط ياخد 404 مرتبة بدل صفحة وهمية
+  const KNOWN_SLUGS = ["demo"];
   const name = decodeURIComponent(params.teacher);
+  if (!KNOWN_SLUGS.includes(name.toLowerCase())) notFound();
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-primary-light/30 to-bg">

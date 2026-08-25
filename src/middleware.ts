@@ -65,9 +65,24 @@ export function middleware(request: NextRequest) {
   const tenant = getTenantFromHost(host);
   const { pathname } = request.nextUrl;
 
+  let response: NextResponse;
+
+  // تصحيح حالة الأحرف (/Dashboard → /dashboard) — الـrouting حساس للحالة
+  const lower = pathname.toLowerCase();
+  const internalPrefixes = ["/dashboard", "/pricing", "/join", "/login", "/privacy", "/terms"];
+  if (
+    tenant.isRoot &&
+    lower !== pathname &&
+    !pathname.startsWith("/_next") &&
+    internalPrefixes.some((p) => lower === p || lower.startsWith(p + "/"))
+  ) {
+    const url = request.nextUrl.clone();
+    url.pathname = lower;
+    return NextResponse.redirect(url, 308);
+  }
+
   // Tenant host + "/" → rewrite داخلي لصفحة المعلم
   // (App Router بيفهم paths بس — فبنعيد كتابة الطلب لـ/{slug})
-  let response: NextResponse;
   if (!tenant.isRoot && (pathname === "/" || pathname === "")) {
     const url = request.nextUrl.clone();
     url.pathname = `/${tenant.slug ?? tenant.host}`;
