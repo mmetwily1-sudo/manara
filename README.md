@@ -30,13 +30,20 @@ manara/
 │       └── [teacher]/       ← صفحات المعلمين العامة (Programmatic SEO)
 ```
 
-## التشغيل المحلي
-
+### التشغيل
 ```bash
-npm install
-cp .env.example .env.local    # واملأ مفاتيح Supabase
+npm install        # أول مرة فقط (ممكن ياخد دقايق على شبكة بطيئة)
+npm run build      # بناء الإنتاج — الأسرع للمعاينة
+npm run start      # يخدم نسخة الـbuild على http://localhost:3000
+# أو للتطوير الحي (أول تحميل بياخد وقت للترجمة الباردة — استنى رسالة Ready):
 npm run dev
 ```
+
+### النشر على GitHub
+شغّل `push-to-github.ps1` مرة واحدة (زرار يمين → Run with PowerShell) — هيعمل تسجيل الدخول وإنشاء الريبو والرفع تلقائياً.
+
+### قاعدة البيانات
+انظر `docs/SUPABASE-SETUP.md` — لحد ما تتربط، التطبيق شغال ببيانات تجريبية من `src/lib/demo-data.ts`.
 
 ### اختبار الـSubdomains محلياً ⚠️
 متعملش `localhost` — استخدم:
