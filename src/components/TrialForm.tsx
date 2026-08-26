@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { WA_TRIAL_TEXT, waLink } from "@/lib/wa";
+import { createClient } from "@/lib/supabase";
 
 /**
  * نموذج تفعيل التجربة — مفيش نهاية عمياء أبداً:
  * 1) يبعت POST /api/trial
- * 2) لو السيرفر أنشأ الحساب → شاشة نجاح بلينك منصة المعلم الحقيقية
+ * 2) لو السيرفر أنشأ الحساب → دخول تلقائي + شاشة نجاح بلينك اللوحة
  * 3) لو وضع المعاينة/الشبكة فشلت → يفتح واتساب + تأكيد مرئي على الصفحة
  */
 
@@ -19,12 +20,26 @@ export function TrialForm() {
   const [phone, setPhone] = useState("");
   const [phase, setPhase] = useState<Phase>("idle");
   const [slug, setSlug] = useState<string | null>(null);
+  const [creds, setCreds] = useState<{ email: string; password: string } | null>(null);
+  const [signedIn, setSignedIn] = useState(false);
+  const [authErr, setAuthErr] = useState("");
+
+  async function enterDashboard() {
+    if (!creds) return;
+    const sb = createClient();
+    const { error } = await sb.auth.signInWithPassword({ email: creds.email, password: creds.password });
+    if (!error) {
+      setSignedIn(true);
+      window.location.href = "/dashboard";
+    } else {
+      setAuthErr("الدخول الآلي فشل — استخدم البيانات يدوياً في صفحة الدخول");
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setPhase("sending");
 
-    // الوضع الحقيقي: سيرفر ينشئ الحساب
     try {
       const res = await fetch("/api/trial", {
         method: "POST",
@@ -35,6 +50,7 @@ export function TrialForm() {
         const data = await res.json();
         if (data.ok && data.mode === "live" && data.slug) {
           setSlug(data.slug);
+          setCreds(data.creds ?? null);
           setPhase("done-live");
           return;
         }
@@ -43,7 +59,6 @@ export function TrialForm() {
       // الاستضافة الثابتة (GitHub Pages) — مفيش /api أصلاً
     }
 
-    // وضع المعاينة: واتساب + تأكيد مرئي (مش نهاية عمياء)
     window.open(
       waLink(`${WA_TRIAL_TEXT}\nسنتر/اسمي: ${centerName}\nموبايلي: ${phone}`),
       "_blank"
@@ -66,17 +81,24 @@ export function TrialForm() {
         <div className="text-h1">🎉</div>
         <h3 className="mt-2 text-h2 font-extrabold text-success">سنترك جاهز!</h3>
         <p className="mt-2 text-small text-slate-600">
-          تجربتك شغالة 7 أيام كاملة — منصتك على الرابط ده:
+          تجربتك شغالة 7 أيام كاملة — منصتك:
         </p>
-        <a
-          href={`https://${slug}.${ROOT_DOMAIN}`}
-          className="mt-4 inline-flex rounded-xl bg-success px-6 py-3 font-bold text-white transition hover:opacity-90"
-        >
-          ادخل منصتك: {slug}.{ROOT_DOMAIN}
-        </a>
-        <p className="mt-3 text-xs text-slate-400">
-          كلمة الدخول اتبعتت على واتساب رقم {phone || "المسجل"} — غيّرها أول دخول
-        </p>
+        <div className="mt-1 font-mono text-small font-bold" dir="ltr">{slug}.{ROOT_DOMAIN}</div>
+
+        {creds && (
+          <div className="mt-5 rounded-xl border border-slate-200 bg-white p-4 text-right">
+            <div className="text-xs font-bold text-slate-500 mb-2">بيانات دخولك (احتفظ بيها):</div>
+            <div className="text-small font-mono" dir="ltr">{creds.email}</div>
+            <div className="text-small font-mono" dir="ltr">{creds.password}</div>
+            {!signedIn && (
+              <button onClick={enterDashboard} className="btn-primary w-full mt-3 !py-2.5 text-small">
+                ادخل لوحة التحكم الآن
+              </button>
+            )}
+            {signedIn && <a href="/dashboard" className="btn-primary w-full mt-3 !py-2.5 text-small inline-block">افتح لوحة التحكم</a>}
+            {authErr && <p className="mt-2 text-xs text-danger">{authErr}</p>}
+          </div>
+        )}
       </div>
     );
   }
@@ -133,7 +155,7 @@ export function TrialForm() {
           className="w-full rounded-xl border-2 border-slate-200 px-4 py-3 text-right outline-none transition focus:border-primary"
         />
       </div>
-      <button type="submit" disabled={false} className="btn-primary w-full text-lg">
+      <button type="submit" className="btn-primary w-full text-lg">
         ابدأ دلوقتي مجاناً 🚀
       </button>
       <p className="text-center text-xs text-slate-400">

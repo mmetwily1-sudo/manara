@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { randomBytes } from "node:crypto";
 
 /**
  * POST /api/trial — تسجيل تجربة مجانية حقيقية
@@ -65,14 +66,41 @@ export async function POST(req: Request) {
         trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
         settings: { owner_phone: phone },
       })
-      .select("slug")
+      .select("id,slug")
       .single();
 
     if (!error && data) {
+      // حساب دخول فعلي للمعلم (بدون حاجة لإيميل خارجي في الـMVP)
+      const loginEmail = `${data.slug}@manara.app`;
+      const password = randomBytes(6).toString("base64url");
+      let creds: { email: string; password: string } | null = null;
+      try {
+        const { data: au, error: aue } = await admin.auth.admin.createUser({
+          email: loginEmail,
+          password,
+          email_confirm: true,
+          user_metadata: { full_name: centerName, role: "teacher_admin", phone },
+        });
+        if (!aue && au?.user) {
+          creds = { email: loginEmail, password };
+          await admin.from("tenants").update({ owner_user_id: au.user.id }).eq("id", data.id);
+          await admin.from("users").insert({
+            tenant_id: data.id,
+            auth_user_id: au.user.id,
+            role: "teacher_admin",
+            full_name: centerName,
+            phone,
+          });
+        }
+      } catch (e) {
+        console.error("auth user creation failed:", e);
+      }
+
       return NextResponse.json({
         ok: true,
         mode: "live",
         slug: data.slug,
+        creds,
       });
     }
 
