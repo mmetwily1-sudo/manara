@@ -136,6 +136,7 @@ create table exams (
 create table exam_questions (
   exam_id uuid references exams(id) on delete cascade,
   question_id uuid references questions(id),
+  tenant_id uuid not null references tenants(id) on delete cascade,
   position smallint,
   marks numeric(5,2),
   primary key (exam_id, question_id)
@@ -256,6 +257,7 @@ create table messages (
 create index idx_messages_thread on messages(thread_id, created_at desc);
 
 create table message_reads (
+  tenant_id uuid not null references tenants(id) on delete cascade,
   message_id uuid references messages(id) on delete cascade,
   user_id uuid references users(id) on delete cascade,
   read_at timestamptz not null default now(),
