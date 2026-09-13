@@ -205,32 +205,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section id="egypt" className="bg-white px-4 py-20">
-        <div className="mx-auto max-w-6xl text-center">
-          <h2 className="section-title">مبني لمصر — مش قالب مترجم من برّه</h2>
-          <div className="mt-12 grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
-            {[["عربي ١٠٠٪", "RTL من أول سطر كود، والعامية اللي بتتكلم بيها"],
-              ["بالجنيه المصري", "فلوسك وإيصالاتك وتقاريرك بالمصري"],
-              ["شغّال أوفلاين", "التحضير مستمر حتى لو النت قطع"],
-              ["وضع ليلي", "بتقفل حساباتك بعد آخر حصة؟ عينك مرتاحة"]].map(([t, d], i) => (
-              <div key={t}>
-                <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-primary-light font-mono text-sm font-bold text-primary">{`0${i + 1}`}</div>
-                <h3 className="font-bold">{t}</h3>
-                <p className="mx-auto mt-1 max-w-[220px] text-small leading-relaxed text-slate-500">{d}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
 
-      <section id="pricing" className="px-4 py-24 text-center">
-        <h2 className="section-title">سعر واحد واضح — من غير مفاجآت</h2>
-        <p className="section-sub">
-          تبدأ من 450 جنيه في الشهر. والسنوي فيه شهرين مجاناً.
-          وسعرك ثابت ما دمت مشترك — مهما زادت أسعارنا بعدين.
-        </p>
-        <Link href="/pricing" className="btn-primary">شوف الباقات</Link>
-      </section>
 
       <section id="faq" className="bg-white px-4 py-24">
         <div className="mx-auto max-w-3xl">
