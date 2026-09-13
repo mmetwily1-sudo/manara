@@ -246,7 +246,6 @@ export default function HomePage() {
         <div className="mt-5 flex justify-center gap-8">
           <Link href="/privacy" className="transition hover:text-primary">الخصوصية</Link>
           <Link href="/terms" className="transition hover:text-primary">الشروط</Link>
-          <a href="#" target="_blank" rel="noopener" className="transition hover:text-primary">فيسبوك</a>
         </div>
       </footer>
 
