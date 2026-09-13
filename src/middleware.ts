@@ -41,6 +41,15 @@ export function getTenantFromHost(host: string): TenantContext {
     return { isRoot: false, slug, host: hostname };
   }
 
+  // منصات الاستضافة المؤقتة — كلها تعتبر Root (التسويقي)
+  if (
+    hostname.endsWith(".vercel.app") ||
+    hostname.endsWith(".github.io") ||
+    hostname.endsWith(".pages.dev")
+  ) {
+    return { isRoot: true, slug: null, host: hostname };
+  }
+
   // الدومين الرئيسي نفسه (مع أو بدون www) = الموقع التسويقي
   if (hostname === ROOT_DOMAIN || hostname === `www.${ROOT_DOMAIN}`) {
     return { isRoot: true, slug: null, host: hostname };
