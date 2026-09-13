@@ -106,9 +106,8 @@ export async function POST(req: Request) {
 
     const code = (error as unknown as { code?: string })?.code;
     if (code !== "23505") {
-      // Ø®Ø·Ø£ ØºÙŠØ± Ø§Ù„ØªÙƒØ±Ø§Ø± â€” Ù†Ø³Ø¬Ù„ ÙˆÙ†Ø±Ø¬Ø¹ fallback Ø¹Ø´Ø§Ù† Ù…Ø§ Ù†Ø¶ÙŠØ¹Ø´ Ø§Ù„Ø¹Ù…ÙŠÙ„ Ø£Ø¨Ø¯Ø§Ù‹
-      console.error("trial insert failed:", error?.message);
-      return NextResponse.json({ ok: true, mode: "fallback" });
+      console.error("trial insert failed:", error?.message, error);
+      return NextResponse.json({ ok: false, error: error?.message ?? "insert_failed", code }, { status: 500 });
     }
     // ØªÙƒØ±Ø§Ø± slug â†’ Ù…Ø­Ø§ÙˆÙ„Ø© Ø£Ø®Ø±Ù‰ Ø¨Ù…ÙØªØ§Ø­ Ø¬Ø¯ÙŠØ¯
   }
