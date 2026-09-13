@@ -205,7 +205,14 @@ export default function HomePage() {
         </div>
       </section>
 
-
+      <section id="pricing" className="px-4 py-24 text-center">
+        <h2 className="section-title">سعر واحد واضح — من غير مفاجآت</h2>
+        <p className="section-sub">
+          تبدأ من 450 جنيه في الشهر. والسنوي فيه شهرين مجاناً.
+          وسعرك ثابت ما دمت مشترك — مهما زادت أسعارنا بعدين.
+        </p>
+        <Link href="/pricing" className="btn-primary">شوف الباقات</Link>
+      </section>
 
       <section id="faq" className="bg-white px-4 py-24">
         <div className="mx-auto max-w-3xl">
