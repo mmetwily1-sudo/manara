@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { FloatingWhatsApp } from "@/components/FloatingWhatsApp";
 
 export const metadata: Metadata = {
   title: "منارة — نظام تشغيل المعلم والسنتر",
@@ -32,7 +33,10 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="bg-bg font-sans text-slate-900 antialiased">{children}</body>
+      <body className="bg-bg font-sans text-slate-900 antialiased">
+        {children}
+        <FloatingWhatsApp />
+      </body>
     </html>
   );
 }
