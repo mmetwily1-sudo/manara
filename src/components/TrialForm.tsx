@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { WA_TRIAL_TEXT, waLink } from "@/lib/wa";
 import { createClient } from "@/lib/supabase";
 
@@ -35,6 +35,16 @@ export function TrialForm() {
       setAuthErr("الدخول الآلي فشل — استخدم البيانات يدوياً في صفحة الدخول");
     }
   }
+
+  // توجيه تلقائي مباشر لصفحته الجديدة بعد ثانية ونصف
+  useEffect(() => {
+    if (phase === "done-live" && slug) {
+      const t = setTimeout(() => {
+        window.location.href = `/${slug}`;
+      }, 1500);
+      return () => clearTimeout(t);
+    }
+  }, [phase, slug]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
