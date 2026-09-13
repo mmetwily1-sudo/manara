@@ -1,13 +1,13 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { randomBytes } from "node:crypto";
 
 /**
- * POST /api/trial — تسجيل تجربة مجانية حقيقية
+ * POST /api/trial â€” ØªØ³Ø¬ÙŠÙ„ ØªØ¬Ø±Ø¨Ø© Ù…Ø¬Ø§Ù†ÙŠØ© Ø­Ù‚ÙŠÙ‚ÙŠØ©
  *
- * وضعان تلقائيان:
- * - لو مفاتيح Supabase موجودة → ينشئ tenant فعلي بـ7 أيام تجربة ويرجع الـsubdomain
- * - لو مش موجودة (استضافة ثابتة/إعداد ناقص) → يرجع fallback والعميل يكمل واتساب مع تأكيد مرئي
+ * ÙˆØ¶Ø¹Ø§Ù† ØªÙ„Ù‚Ø§Ø¦ÙŠØ§Ù†:
+ * - Ù„Ùˆ Ù…ÙØ§ØªÙŠØ­ Supabase Ù…ÙˆØ¬ÙˆØ¯Ø© â†’ ÙŠÙ†Ø´Ø¦ tenant ÙØ¹Ù„ÙŠ Ø¨Ù€7 Ø£ÙŠØ§Ù… ØªØ¬Ø±Ø¨Ø© ÙˆÙŠØ±Ø¬Ø¹ Ø§Ù„Ù€subdomain
+ * - Ù„Ùˆ Ù…Ø´ Ù…ÙˆØ¬ÙˆØ¯Ø© (Ø§Ø³ØªØ¶Ø§ÙØ© Ø«Ø§Ø¨ØªØ©/Ø¥Ø¹Ø¯Ø§Ø¯ Ù†Ø§Ù‚Øµ) â†’ ÙŠØ±Ø¬Ø¹ fallback ÙˆØ§Ù„Ø¹Ù…ÙŠÙ„ ÙŠÙƒÙ…Ù„ ÙˆØ§ØªØ³Ø§Ø¨ Ù…Ø¹ ØªØ£ÙƒÙŠØ¯ Ù…Ø±Ø¦ÙŠ
  */
 
 const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -44,12 +44,12 @@ export async function POST(req: Request) {
     );
   }
 
-  // وضع المعاينة/الاستضافة الثابتة — بدون مفاتيح
+  // ÙˆØ¶Ø¹ Ø§Ù„Ù…Ø¹Ø§ÙŠÙ†Ø©/Ø§Ù„Ø§Ø³ØªØ¶Ø§ÙØ© Ø§Ù„Ø«Ø§Ø¨ØªØ© â€” Ø¨Ø¯ÙˆÙ† Ù…ÙØ§ØªÙŠØ­
   if (!SUPA_URL || !SUPA_KEY) {
     return NextResponse.json({ ok: true, mode: "fallback" });
   }
 
-  // الوضع الحقيقي — إنشاء سنتر التجربة في قاعدة البيانات
+  // Ø§Ù„ÙˆØ¶Ø¹ Ø§Ù„Ø­Ù‚ÙŠÙ‚ÙŠ â€” Ø¥Ù†Ø´Ø§Ø¡ Ø³Ù†ØªØ± Ø§Ù„ØªØ¬Ø±Ø¨Ø© ÙÙŠ Ù‚Ø§Ø¹Ø¯Ø© Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª
   const admin = createClient(SUPA_URL, SUPA_KEY, {
     auth: { persistSession: false },
   });
@@ -70,7 +70,7 @@ export async function POST(req: Request) {
       .single();
 
     if (!error && data) {
-      // حساب دخول فعلي للمعلم (بدون حاجة لإيميل خارجي في الـMVP)
+      // Ø­Ø³Ø§Ø¨ Ø¯Ø®ÙˆÙ„ ÙØ¹Ù„ÙŠ Ù„Ù„Ù…Ø¹Ù„Ù… (Ø¨Ø¯ÙˆÙ† Ø­Ø§Ø¬Ø© Ù„Ø¥ÙŠÙ…ÙŠÙ„ Ø®Ø§Ø±Ø¬ÙŠ ÙÙŠ Ø§Ù„Ù€MVP)
       const loginEmail = `${data.slug}@manara.app`;
       const password = randomBytes(6).toString("base64url");
       let creds: { email: string; password: string } | null = null;
@@ -106,12 +106,14 @@ export async function POST(req: Request) {
 
     const code = (error as unknown as { code?: string })?.code;
     if (code !== "23505") {
-      // خطأ غير التكرار — نسجل ونرجع fallback عشان ما نضيعش العميل أبداً
+      // Ø®Ø·Ø£ ØºÙŠØ± Ø§Ù„ØªÙƒØ±Ø§Ø± â€” Ù†Ø³Ø¬Ù„ ÙˆÙ†Ø±Ø¬Ø¹ fallback Ø¹Ø´Ø§Ù† Ù…Ø§ Ù†Ø¶ÙŠØ¹Ø´ Ø§Ù„Ø¹Ù…ÙŠÙ„ Ø£Ø¨Ø¯Ø§Ù‹
       console.error("trial insert failed:", error?.message);
       return NextResponse.json({ ok: true, mode: "fallback" });
     }
-    // تكرار slug → محاولة أخرى بمفتاح جديد
+    // ØªÙƒØ±Ø§Ø± slug â†’ Ù…Ø­Ø§ÙˆÙ„Ø© Ø£Ø®Ø±Ù‰ Ø¨Ù…ÙØªØ§Ø­ Ø¬Ø¯ÙŠØ¯
   }
 
   return NextResponse.json({ ok: true, mode: "fallback" });
 }
+
+

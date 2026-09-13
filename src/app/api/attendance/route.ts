@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { cookies, headers } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
@@ -49,14 +49,11 @@ export async function POST(req: Request) {
   const auth = sbUser ? await sbUser.auth.getUser() : { data: { user: null } };
   if (!auth.data.user) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
 
-  const slug = getSlugFromHost();
   const admin = createClient(SUPA_URL, SERVICE_KEY, { auth: { persistSession: false } });
 
-  // تحديد الـtenant من المستخدم
   const { data: urow } = await admin.from("users").select("tenant_id,role").eq("auth_user_id", auth.data.user.id).single();
   if (!urow?.tenant_id) return NextResponse.json({ ok: false, error: "no_tenant" }, { status: 403 });
 
-  // تحقق ملكية الجلسة لنفس السنتر (أمان متعدد المستأجرين)
   const { data: sess } = await admin.from("sessions").select("id,tenant_id,group_id").eq("id", sessionId).single();
   if (!sess || sess.tenant_id !== urow.tenant_id) return NextResponse.json({ ok: false, error: "bad_session" }, { status: 403 });
 
@@ -66,12 +63,11 @@ export async function POST(req: Request) {
     student_id: studentId,
     status,
     method: "manual",
-    recorded_by: urow.tenant_id, // مبسط: صاحب السنتر
+    recorded_by: urow.tenant_id,
   }, { onConflict: "session_id,student_id" });
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
-  // سجل تدقيق + إشعار (سيُفعّل لاحقاً لإرسال Push)
   await admin.from("audit_log").insert({
     tenant_id: urow.tenant_id, actor_id: urow.tenant_id,
     action: `attendance:${status}`, entity_type: "attendance", entity_id: sessionId,
