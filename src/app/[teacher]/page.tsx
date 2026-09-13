@@ -16,7 +16,7 @@ export function generateStaticParams() {
   return KNOWN_SLUGS.map((teacher) => ({ teacher }));
 }
 
-export const dynamicParams = false;
+export const dynamicParams = true;
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
@@ -44,7 +44,7 @@ export default function TeacherPage({ params }: Props) {
           سجل من هنا وهتبعتلك بيانات الدخول على واتساب.
         </p>
         <a
-          href={`https://wa.me/${process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP ?? "201200000000"}?text=${encodeURIComponent(`أهلاً، عايز أسجل في مجموعة عند أ. ${name}`)}`}
+          href={`https://wa.me/${process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP ?? "201025183569"}?text=${encodeURIComponent(`أهلاً، عايز أسجل في مجموعة عند أ. ${name}`)}`}
           target="_blank"
           rel="noopener noreferrer"
           className="btn-primary mt-8 inline-flex"
