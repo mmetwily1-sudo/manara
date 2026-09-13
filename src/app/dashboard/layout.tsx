@@ -1,5 +1,5 @@
 ﻿import Link from "next/link";
-import { getTenantInfo } from "@/lib/demo-data";
+import { getTenantInfoDB } from "@/lib/data";
 import { AuthGate, SignOutButton } from "@/components/AuthGate";
 
 const nav = [
@@ -18,8 +18,8 @@ const navMore = [
   { href: "#", label: "هويتي والإعدادات", key: "10" },
 ];
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const t = getTenantInfo();
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const t = await getTenantInfoDB();
   return (
     <AuthGate>
       <div className="min-h-screen bg-bg">

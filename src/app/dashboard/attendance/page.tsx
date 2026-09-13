@@ -1,9 +1,8 @@
 import { AttendanceGrid } from "@/components/AttendanceGrid";
-import { getGroups, getStudentsByGroup } from "@/lib/demo-data";
+import { getGroups, getStudentsByGroup } from "@/lib/data";
 
-export default function AttendancePage() {
-  const groups = getGroups();
-  const students = getStudentsByGroup("g1"); // المجموعة المحددة حالياً
+export default async function AttendancePage() {
+  const [groups, students] = await Promise.all([getGroups(), getStudentsByGroup("g1")]);
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">

@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { getEarlyWarning, getFeed, getGroups, getKpis } from "@/lib/demo-data";
+import { getKpis, getGroups } from "@/lib/data";
+import { getEarlyWarning, getFeed } from "@/lib/demo-data";
 
-export default function DashboardHome() {
-  const kpis = getKpis();
-  const groups = getGroups();
+export default async function DashboardHome() {
+  const [kpis, groups] = await Promise.all([getKpis(), getGroups()]);
   const warnings = getEarlyWarning();
   const feed = getFeed();
 
