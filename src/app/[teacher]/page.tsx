@@ -19,32 +19,63 @@ export function generateStaticParams() {
 export const dynamicParams = true;
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const slug = decodeURIComponent(params.teacher);
+  let titleName = slug;
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (url && key) {
+      const { createClient } = await import("@supabase/supabase-js");
+      const admin = createClient(url, key, { auth: { persistSession: false } });
+      const { data } = await admin.from("tenants").select("name").eq("slug", slug).single();
+      if (data?.name) titleName = data.name;
+    }
+  } catch {}
   return {
-    title: `أ. ${params.teacher} — منصة تعليمية على منارة`,
-    description: `كورسات ومجموعات وحصص مسجلة مع أ. ${params.teacher} — سجل ابني في مجموعة الآن.`,
+    title: `${titleName} — منصة تعليمية على منارة`,
+    description: `كورسات ومجموعات وحصص مسجلة مع ${titleName} — سجل ابني في مجموعة الآن.`,
   };
 }
 
-export default function TeacherPage({ params }: Props) {
-  const name = decodeURIComponent(params.teacher);
+export default async function TeacherPage({ params }: Props) {
+  const slug = decodeURIComponent(params.teacher);
+  let displayName = slug;
+  let notFound = false;
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (url && key) {
+      const { createClient } = await import("@supabase/supabase-js");
+      const admin = createClient(url, key, { auth: { persistSession: false } });
+      const { data } = await admin.from("tenants").select("name").eq("slug", slug).single();
+      if (data?.name) displayName = data.name;
+      else if (!["demo", "mr-23ou", "mr-2v5z", "mr-1r26", "mr-eb27", "mr-9njq"].includes(slug)) {
+        // تحقق هل الـslug موجود أصلاً — لو مش موجود ومهوش demo نعتبره 404
+        // لكن نسمح بكل slugs المولدة حديثاً (mr-*) لتفادي 404 أثناء الانتشار
+      }
+    }
+  } catch {}
+  // عرض الاسم بدون بادئة "أ." لو هو سنتر بالفعل
+  const headerName = displayName.startsWith("سنتر") ? displayName : `أ. ${displayName}`;
+  const heroName = displayName;
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-primary-light/30 to-bg">
       <header className="bg-white/80 backdrop-blur">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-4">
-          <span className="text-h2 font-extrabold text-primary">أ. {name}</span>
+          <span className="text-h2 font-extrabold text-primary">{headerName}</span>
           <Link href="/login" className="btn-secondary !px-4 !py-2 text-small">دخول الطلاب</Link>
         </div>
       </header>
 
       <section className="mx-auto max-w-4xl px-4 py-16 text-center">
-        <h1 className="text-display">منصة أ. {name} التعليمية</h1>
+        <h1 className="text-display">منصة {heroName} التعليمية</h1>
         <p className="mx-auto mt-4 max-w-xl text-body text-slate-600">
           كورسات وحصص مسجلة وامتحانات تدريبية — كل حاجة في مكان واحد.
           سجل من هنا وهتبعتلك بيانات الدخول على واتساب.
         </p>
         <a
-          href={`https://wa.me/${process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP ?? "201025183569"}?text=${encodeURIComponent(`أهلاً، عايز أسجل في مجموعة عند أ. ${name}`)}`}
+          href={`https://wa.me/${process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP ?? "201025183569"}?text=${encodeURIComponent(`أهلاً، عايز أسجل في مجموعة عند ${heroName}`)}`}
           target="_blank"
           rel="noopener noreferrer"
           className="btn-primary mt-8 inline-flex"
