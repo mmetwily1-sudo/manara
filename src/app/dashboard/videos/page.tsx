@@ -33,6 +33,50 @@ export default function VideosPage() {
   const [ytUrl, setYtUrl] = useState("");
   const [ytBusy, setYtBusy] = useState(false);
 
+  // نموذج التعديل
+  const [editing, setEditing] = useState<Video | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editVisibility, setEditVisibility] = useState("group");
+  const [editYtUrl, setEditYtUrl] = useState("");
+  const [editBusy, setEditBusy] = useState(false);
+
+  function openEdit(v: Video) {
+    setEditing(v);
+    setEditTitle(v.title);
+    setEditVisibility(v.visibility);
+    setEditYtUrl("");
+    setErr(""); setOkMsg("");
+  }
+
+  async function onEditSave(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editing) return;
+    if (editTitle.trim().length < 2) { setErr("العنوان قصير جداً (حرفان على الأقل)."); return; }
+    setEditBusy(true); setErr(""); setOkMsg("");
+    try {
+      const body: Record<string, unknown> = { title: editTitle.trim(), visibility: editVisibility };
+      if (editing.source === "youtube" && editYtUrl.trim()) body.youtubeUrl = editYtUrl.trim();
+      const r = await fetch(`/api/videos/${editing.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j?.ok) {
+        const msgMap: Record<string, string> = {
+          bad_youtube_url: "رابط يوتيوب غير صالح — الصق رابط مشاهدة أو Shorts صحيح.",
+          not_found: "الفيديو غير موجود.",
+          nothing_to_update: "لا يوجد ما يُحفظ.",
+        };
+        setErr(msgMap[j?.error] ?? `فشل الحفظ: ${j?.error ?? "خطأ غير معروف"}`);
+        return;
+      }
+      setOkMsg("تم حفظ التعديلات بنجاح.");
+      setEditing(null);
+      load();
+    } catch { setErr("تعذر الاتصال بالخادم."); }
+    finally { setEditBusy(false); }
+  }
+
   async function load() {
     try {
       const r = await fetch("/api/videos");
@@ -256,11 +300,52 @@ export default function VideosPage() {
                 </div>
                 <div className="mt-3 flex gap-2">
                   <a href={`/watch/${v.id}`} className="btn-primary !px-4 !py-1.5 text-xs">مشاهدة</a>
+                  <button onClick={() => openEdit(v)} className="btn-secondary !px-4 !py-1.5 text-xs">تعديل</button>
                 </div>
               </div>
             </li>
           ))}
         </ul>
+      )}
+
+      {editing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setEditing(null)}>
+          <form onSubmit={onEditSave} onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md space-y-3 rounded-2xl bg-white p-6 shadow-xl">
+            <h2 className="font-bold">تعديل الفيديو</h2>
+            <div>
+              <label className="mb-1 block text-xs font-bold text-slate-600">العنوان</label>
+              <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} required minLength={2}
+                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:border-primary" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-bold text-slate-600">الظهور</label>
+              <select value={editVisibility} onChange={(e) => setEditVisibility(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 px-4 py-2.5">
+                <option value="group">لمجموعة محددة</option>
+                <option value="free">مجاني للجميع</option>
+              </select>
+            </div>
+            {editing.source === "youtube" && (
+              <div>
+                <label className="mb-1 block text-xs font-bold text-slate-600">رابط يوتيوب (اتركه فارغاً للإبقاء الحالي)</label>
+                <input value={editYtUrl} onChange={(e) => setEditYtUrl(e.target.value)} dir="ltr" placeholder="https://www.youtube.com/watch?v=..."
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-left outline-none focus:border-primary" />
+              </div>
+            )}
+            {editing.source !== "youtube" && (
+              <p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
+                ملف الفيديو المرفوع لا يمكن استبداله من هنا — احذف الفيديو وارفع ملفاً جديداً عند الحاجة.
+              </p>
+            )}
+            <div className="flex gap-2">
+              <button className="btn-primary flex-1" disabled={editBusy}>
+                {editBusy ? "جاري الحفظ..." : "حفظ التعديلات"}
+              </button>
+              <button type="button" className="btn-secondary" onClick={() => setEditing(null)}>إلغاء</button>
+            </div>
+          </form>
+        </div>
       )}
 
       <div className="card bg-primary-light/40 p-4 text-small text-slate-600">
