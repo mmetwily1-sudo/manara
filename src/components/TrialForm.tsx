@@ -132,25 +132,11 @@ export function TrialForm() {
 
   if (phase === "done-fallback") {
     return (
-      <div className="mt-6 rounded-xl border-2 border-amber-300 bg-amber-50 p-6 text-center">
-        <div className="text-h1">📋</div>
-        <h3 className="mt-2 text-h2 font-extrabold text-amber-800">
-          تم استلام طلبك — هذه نسخة المعاينة
-        </h3>
-        <p className="mt-2 text-small leading-relaxed text-slate-700">
-          هذه الصفحة معاينة ثابتة (GitHub Pages) — لا تنشئ حساباً فورياً.<br />
-          <strong>للحصول على حساب فوري بلينك منصتك:</strong> سجّل من الرابط الحي:
-        </p>
-        <a
-          href="https://manara-mmetwily.vercel.app/join"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn-primary mt-4 inline-block w-full"
-        >
-          سجّل الآن على الموقع الحي — حساب فوري
-        </a>
-        <p className="mt-3 text-xs text-slate-500">
-          أو أكمل عبر واتساب وهنفعل حسابك يدوياً خلال ساعات العمل.
+      <div className="mt-6 rounded-xl border-2 border-success/30 bg-success/5 p-6 text-center">
+        <div className="text-h1">✅</div>
+        <h3 className="mt-2 text-h2 font-extrabold text-success">تم استلام طلبك بنجاح!</h3>
+        <p className="mt-2 text-small leading-relaxed text-slate-600">
+          سنتواصل معك خلال ساعات العمل لتفعيل منصتك الخاصة.
         </p>
         <button
           onClick={() => setPhase("idle")}
