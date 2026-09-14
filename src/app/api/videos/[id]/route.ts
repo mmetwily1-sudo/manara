@@ -2,7 +2,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
-import { getDemoHlsUrl, signPlaybackUrl, isBunnyLive } from "@/lib/bunny";
+import { deleteBunnyVideo, getDemoHlsUrl, signPlaybackUrl, isBunnyLive } from "@/lib/bunny";
 import { decodeSource, encodeYoutube, parseYoutubeId, youtubeEmbedUrl } from "@/lib/video-source";
 
 const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -108,4 +108,34 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       youtubeId: outSrc.kind === "youtube" ? outSrc.youtubeId : null,
     },
   });
+}
+
+/** DELETE /api/videos/[id] — حذف الفيديو (سجل القاعدة + كائن Bunny، والثاني best-effort) */
+export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+  const admin = SUPA_URL ? createClient(SUPA_URL, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } }) : null;
+  if (!admin) return NextResponse.json({ ok: false, error: "not_configured" }, { status: 500 });
+
+  const sbUser = supaUser();
+  const { data: { user } } = sbUser ? await sbUser.auth.getUser() : { data: { user: null } } as any;
+  if (!user) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
+
+  const { data: urow } = await admin.from("users").select("tenant_id").eq("auth_user_id", user.id).single();
+  if (!urow) return NextResponse.json({ ok: false, error: "no_tenant" }, { status: 403 });
+
+  const { data: vid } = await admin.from("videos")
+    .select("id,provider_video_id")
+    .eq("id", params.id).eq("tenant_id", urow.tenant_id).single();
+  if (!vid) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
+
+  const src = decodeSource(vid.provider_video_id);
+  if (src.kind === "bunny") {
+    // حذف كائن Bunny أولاً (best-effort) — ثم سجل القاعدة مضمون الحذف
+    await deleteBunnyVideo(src.guid);
+  }
+
+  const { error } = await admin.from("videos").delete().eq("id", params.id).eq("tenant_id", urow.tenant_id);
+  if (error) {
+    return NextResponse.json({ ok: false, error: error.message ?? "delete_failed" }, { status: 500 });
+  }
+  return NextResponse.json({ ok: true, deleted: params.id });
 }

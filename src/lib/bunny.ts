@@ -62,6 +62,20 @@ export function signTusUpload(videoGuid: string, ttlSec = 3600): {
   return { libraryId: LIB!, videoId: videoGuid, expires, signature };
 }
 
+/** حذف كائن فيديو من مكتبة Bunny — best-effort (لا يرمي عند غياب المفاتيح، يرجع false) */
+export async function deleteBunnyVideo(videoGuid: string): Promise<boolean> {
+  if (!isBunnyLive() || !videoGuid || videoGuid.startsWith("demo-")) return true;
+  try {
+    const res = await fetch(`${BUNNY_API}/videolibrary/${LIB}/videos/${videoGuid}`, {
+      method: "DELETE",
+      headers: { AccessKey: KEY! },
+    });
+    return res.ok || res.status === 404;
+  } catch {
+    return false;
+  }
+}
+
 /** التحقق من حالة الفيديو في مكتبة Bunny (بعد اكتمال الرفع من العميل) */
 export async function getBunnyVideoStatus(videoGuid: string): Promise<{
   ok: boolean;

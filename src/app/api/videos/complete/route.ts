@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
-import { getBunnyVideoStatus, isBunnyLive } from "@/lib/bunny";
+import { deleteBunnyVideo, getBunnyVideoStatus, isBunnyLive } from "@/lib/bunny";
 
 const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -16,12 +16,13 @@ function supaUser() {
 }
 
 /**
- * POST /api/videos/complete { videoId }
+ * POST /api/videos/complete { videoId, newProviderId? }
  * يُستدعى بعد انتهاء رفع tus من المتصفح.
  * يتحقق من وجود الفيديو فعلياً في مكتبة Bunny قبل اعتماده (لا نثق بإدعاء العميل وحده).
+ * وضع الاستبدال: newProviderId = الـ GUID الجديد → يتحقق منه، يبدّل السجل، ويحذف القديم.
  */
 export async function POST(req: Request) {
-  const { videoId } = await req.json().catch(() => ({} as any));
+  const { videoId, newProviderId } = await req.json().catch(() => ({} as any));
   if (!videoId) return NextResponse.json({ ok: false, error: "videoId" }, { status: 400 });
 
   const sbUser = supaUser();
@@ -38,6 +39,39 @@ export async function POST(req: Request) {
   if (!vid) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
 
   if (!isBunnyLive()) return NextResponse.json({ ok: true, video: { id: vid.id }, verified: false });
+
+  // وضع الاستبدال: تحقق من الجديد أولاً، ثم بدّل، ثم احذف القديم (ترتيب آمن ضد الفقد)
+  if (typeof newProviderId === "string" && newProviderId.length > 0) {
+    const { decodeSource } = await import("@/lib/video-source");
+    const cur = decodeSource(vid.provider_video_id);
+    if (cur.kind !== "bunny") {
+      return NextResponse.json({ ok: false, error: "not_bunny" }, { status: 400 });
+    }
+    try {
+      const st = await getBunnyVideoStatus(newProviderId);
+      if (!st?.ok) {
+        await deleteBunnyVideo(newProviderId);
+        return NextResponse.json({ ok: false, error: "upload_not_found", message: "لم يصل الملف الجديد إلى Bunny — حاول الرفع مجدداً" }, { status: 400 });
+      }
+      if (st.status === 5) {
+        await deleteBunnyVideo(newProviderId);
+        return NextResponse.json({ ok: false, error: "upload_failed", message: "فشل الرفع الجديد في Bunny — حاول مجدداً" }, { status: 400 });
+      }
+      const { error: upErr } = await admin.from("videos")
+        .update({ provider_video_id: newProviderId })
+        .eq("id", vid.id).eq("tenant_id", urow.tenant_id);
+      if (upErr) {
+        await deleteBunnyVideo(newProviderId);
+        return NextResponse.json({ ok: false, error: upErr.message ?? "swap_failed" }, { status: 500 });
+      }
+      // القديم يُحذف بعد نجاح التبديل — best-effort (فشله لا يفشل الطلب)
+      const oldDeleted = await deleteBunnyVideo(cur.guid);
+      return NextResponse.json({ ok: true, video: { id: vid.id }, verified: true, replaced: true, oldDeleted });
+    } catch (e: any) {
+      await deleteBunnyVideo(newProviderId);
+      return NextResponse.json({ ok: false, error: "verify_failed", details: String(e?.message ?? e).slice(0, 200) }, { status: 502 });
+    }
+  }
 
   try {
     const st = await getBunnyVideoStatus(vid.provider_video_id);

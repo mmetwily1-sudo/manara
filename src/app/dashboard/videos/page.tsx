@@ -39,12 +39,110 @@ export default function VideosPage() {
   const [editVisibility, setEditVisibility] = useState("group");
   const [editYtUrl, setEditYtUrl] = useState("");
   const [editBusy, setEditBusy] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // استبدال ملف الفيديو (لفيديوهات الرفع المباشر فقط)
+  const [replaceFile, setReplaceFile] = useState<File | null>(null);
+  const [replaceProgress, setReplaceProgress] = useState<number | null>(null);
+  const [replacePhase, setReplacePhase] = useState<"idle" | "authorizing" | "uploading" | "verifying" | "done" | "error">("idle");
+  const replaceUploadRef = useRef<Upload | null>(null);
+
+  async function onDelete(id: string, title: string) {
+    if (!confirm(`حذف "${title}" نهائياً؟ سيُحذف الملف والتسجيل معاً ولا يمكن التراجع.`)) return;
+    setDeletingId(id);
+    setErr(""); setOkMsg("");
+    try {
+      const r = await fetch(`/api/videos/${id}`, { method: "DELETE" });
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j?.ok) {
+        setErr(`فشل الحذف: ${j?.error ?? "خطأ غير معروف"}`);
+        return;
+      }
+      setOkMsg("تم حذف الفيديو بنجاح.");
+      if (editing?.id === id) setEditing(null);
+      load();
+    } catch { setErr("تعذر الاتصال بالخادم."); }
+    finally { setDeletingId(null); }
+  }
+
+  async function onReplace(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editing) return;
+    setErr(""); setOkMsg("");
+    if (!replaceFile) { setErr("اختر ملف الفيديو الجديد أولاً."); return; }
+    if (replaceFile.size > MAX_FILE_BYTES) { setErr("الملف أكبر من 2GB — قسّمه لأجزاء أصغر."); return; }
+    if (!replaceFile.type.startsWith("video/") && !/\.(mp4|mov|webm|mkv|avi)$/i.test(replaceFile.name)) {
+      setErr("اختر ملف فيديو صالح (mp4, mov, webm).");
+      return;
+    }
+    setReplacePhase("authorizing");
+    setReplaceProgress(0);
+    const file = replaceFile;
+    try {
+      const a = await fetch("/api/videos/upload-auth", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ replaceVideoId: editing.id }),
+      });
+      const aj = await a.json().catch(() => null);
+      if (!a.ok || !aj?.ok) {
+        const msg = aj?.error === "bunny_not_configured"
+          ? "الرفع المباشر غير مفعّل حالياً — تواصل مع الإدارة."
+          : aj?.error === "not_bunny"
+            ? "استبدال الملف متاح لفيديوهات الرفع المباشر فقط."
+            : `فشل تجهيز الاستبدال: ${aj?.error ?? aj?.message ?? "خطأ غير معروف"}`;
+        setErr(msg); setReplacePhase("error"); setReplaceProgress(null);
+        return;
+      }
+      setReplacePhase("uploading");
+      await new Promise<void>((resolve, reject) => {
+        const upload = new Upload(file, {
+          endpoint: aj.tusEndpoint,
+          retryDelays: [0, 1000, 3000, 5000, 10000],
+          chunkSize: 8 * 1024 * 1024,
+          metadata: { filename: file.name, filetype: file.type || "video/mp4" },
+          headers: {
+            AuthorizationSignature: aj.authSignature,
+            AuthorizationExpire: String(aj.authExpire),
+            VideoId: aj.videoGuid,
+            LibraryId: String(aj.libraryId),
+          },
+          onError: (err) => reject(err),
+          onProgress: (sent, total) => setReplaceProgress(total ? Math.round((sent / total) * 100) : null),
+          onSuccess: () => resolve(),
+        });
+        replaceUploadRef.current = upload;
+        upload.start();
+      });
+      setReplacePhase("verifying");
+      const c = await fetch("/api/videos/complete", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ videoId: editing.id, newProviderId: aj.videoGuid }),
+      });
+      const cj = await c.json().catch(() => null);
+      if (!c.ok || !cj?.ok) {
+        setErr(cj?.message ?? `فشل التأكيد: ${cj?.error ?? "خطأ غير معروف"}`);
+        setReplacePhase("error"); setReplaceProgress(null);
+        return;
+      }
+      setReplacePhase("done"); setReplaceProgress(100);
+      setOkMsg("تم استبدال ملف الفيديو بنجاح — القديم حُذف تلقائياً.");
+      setReplaceFile(null);
+      load();
+    } catch (err: any) {
+      const aborted = String(err?.message ?? err).toLowerCase().includes("abort");
+      setErr(aborted ? "تم إلغاء الاستبدال." : "انقطع الاتصال أثناء الرفع — أعد المحاولة.");
+      setReplacePhase("error"); setReplaceProgress(null);
+    }
+  }
 
   function openEdit(v: Video) {
     setEditing(v);
     setEditTitle(v.title);
     setEditVisibility(v.visibility);
     setEditYtUrl("");
+    setReplaceFile(null);
+    setReplaceProgress(null);
+    setReplacePhase("idle");
     setErr(""); setOkMsg("");
   }
 
@@ -298,9 +396,14 @@ export default function VideosPage() {
                   <span>·</span>
                   <span>{new Date(v.created_at).toLocaleDateString("ar-EG")}</span>
                 </div>
-                <div className="mt-3 flex gap-2">
+                <div className="mt-3 flex flex-wrap gap-2">
                   <a href={`/watch/${v.id}`} className="btn-primary !px-4 !py-1.5 text-xs">مشاهدة</a>
                   <button onClick={() => openEdit(v)} className="btn-secondary !px-4 !py-1.5 text-xs">تعديل</button>
+                  <button onClick={() => onDelete(v.id, v.title)}
+                    disabled={deletingId === v.id}
+                    className="rounded-lg px-4 py-1.5 text-xs font-bold text-danger transition hover:bg-danger/10 disabled:opacity-50">
+                    {deletingId === v.id ? "جاري الحذف..." : "حذف"}
+                  </button>
                 </div>
               </div>
             </li>
@@ -334,9 +437,43 @@ export default function VideosPage() {
               </div>
             )}
             {editing.source !== "youtube" && (
-              <p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
-                ملف الفيديو المرفوع لا يمكن استبداله من هنا — احذف الفيديو وارفع ملفاً جديداً عند الحاجة.
-              </p>
+              <div className="rounded-xl border border-slate-200 p-4">
+                <h3 className="text-small font-bold">استبدال ملف الفيديو</h3>
+                <p className="mt-1 text-xs text-slate-500">ارفع ملفاً جديداً ليحل محل الحالي (القديم يُحذف تلقائياً بعد نجاح الاستبدال).</p>
+                <form onSubmit={onReplace} className="mt-3 space-y-3">
+                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 px-4 py-3 text-small font-bold text-slate-600 transition hover:border-primary hover:text-primary">
+                    {replaceFile ? `📎 ${replaceFile.name} (${(replaceFile.size / 1048576).toFixed(1)}MB)` : "اختر الملف الجديد (حتى 2GB)"}
+                    <input type="file" accept="video/*,.mkv,.avi,.mov" className="hidden"
+                      onChange={(e) => setReplaceFile(e.target.files?.[0] ?? null)} />
+                  </label>
+                  {replaceProgress !== null && (
+                    <div>
+                      <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
+                        <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${replaceProgress}%` }} />
+                      </div>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {replacePhase === "authorizing" && "جاري تجهيز الاستبدال..."}
+                        {replacePhase === "uploading" && `جاري الرفع... ${replaceProgress}%`}
+                        {replacePhase === "verifying" && "تم الرفع — جاري التأكيد والتبديل..."}
+                        {replacePhase === "done" && "اكتمل الاستبدال ✓"}
+                        {replacePhase === "error" && "توقف — راجع الرسالة بالأعلى"}
+                      </p>
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <button className="btn-primary flex-1 !py-2 text-small"
+                      disabled={replacePhase === "uploading" || replacePhase === "authorizing" || replacePhase === "verifying"}>
+                      {replacePhase === "uploading" ? "جاري الرفع..." : "استبدال الملف"}
+                    </button>
+                    {replacePhase === "uploading" && (
+                      <button type="button" className="btn-secondary"
+                        onClick={() => { try { replaceUploadRef.current?.abort(); } catch {} }}>
+                        إلغاء
+                      </button>
+                    )}
+                  </div>
+                </form>
+              </div>
             )}
             <div className="flex gap-2">
               <button className="btn-primary flex-1" disabled={editBusy}>

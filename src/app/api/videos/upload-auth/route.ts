@@ -17,13 +17,17 @@ function supaUser() {
 
 /**
  * POST /api/videos/upload-auth
- * ينشئ سجل الفيديو + يرجع بيانات الرفع المباشر (tus) الموقعة.
+ * وضعان:
+ * - جديد: {title, visibility?, groupIds?} → ينشئ سجل الفيديو + يرجع بيانات الرفع (tus) الموقعة.
+ * - استبدال: {replaceVideoId} → يتحقق من الملكية وأن المصدر bunny، ثم يرجع توقيعاً لـ GUID جديد
+ *   دون إنشاء سجل جديد (التبديل يتم في /complete بعد التحقق).
  * الملف يُرفع من متصفح المعلم إلى Bunny مباشرة — لا يمر عبر سيرفرنا إطلاقاً
  * (مهم: Vercel يحد حجم الطلبات، فالتمرير عبره مستحيل للفيديو).
  */
 export async function POST(req: Request) {
-  const { title, visibility, groupIds } = await req.json().catch(() => ({} as any));
-  if (!title || String(title).trim().length < 2) {
+  const { title, visibility, groupIds, replaceVideoId } = await req.json().catch(() => ({} as any));
+  const isReplace = typeof replaceVideoId === "string" && replaceVideoId.length > 0;
+  if (!isReplace && (!title || String(title).trim().length < 2)) {
     return NextResponse.json({ ok: false, error: "title" }, { status: 400 });
   }
   if (!isBunnyLive()) {
@@ -41,34 +45,55 @@ export async function POST(req: Request) {
   const { data: urow } = await admin.from("users").select("tenant_id").eq("auth_user_id", user.id).single();
   if (!urow) return NextResponse.json({ ok: false, error: "no_tenant" }, { status: 403 });
 
+  // وضع الاستبدال: تحقق من الفيديو الحالي (ملكية + مصدر bunny) دون إنشاء سجل
+  if (isReplace) {
+    const { decodeSource } = await import("@/lib/video-source");
+    const { data: existing } = await admin.from("videos")
+      .select("id,provider_video_id")
+      .eq("id", replaceVideoId).eq("tenant_id", urow.tenant_id).single();
+    if (!existing) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
+    const src = decodeSource((existing as any).provider_video_id);
+    if (src.kind !== "bunny") {
+      return NextResponse.json({ ok: false, error: "not_bunny", message: "استبدال الملف متاح لفيديوهات الرفع المباشر فقط" }, { status: 400 });
+    }
+  }
+
   // 1) إنشاء كائن الفيديو في Bunny أولاً للحصول على GUID
   let guid: string;
   try {
-    const bv = await (await import("@/lib/bunny")).createBunnyVideo(String(title).trim());
+    const bv = await (await import("@/lib/bunny")).createBunnyVideo(isReplace ? "replacement" : String(title).trim());
     guid = bv.guid;
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: "bunny_create_failed", details: String(e?.message ?? e).slice(0, 200) }, { status: 502 });
   }
 
-  // 2) سجل قاعدة البيانات (بحالة uploading ضمنياً — لا عمود حالة، والتحقق يتم عند الاكتمال)
-  const { data: row, error } = await admin.from("videos").insert({
-    tenant_id: urow.tenant_id, title: String(title).trim(), provider_video_id: guid,
-    visibility: visibility ?? "group", group_ids: groupIds ?? [],
-  }).select("id,provider_video_id").single();
-  if (error || !row) {
-    return NextResponse.json({ ok: false, error: error?.message ?? "db_failed" }, { status: 500 });
+  let videoId: string;
+  if (isReplace) {
+    // لا سجل جديد — التبديل يتم في /complete بعد التحقق من وصول الملف
+    videoId = replaceVideoId as string;
+  } else {
+    // 2) سجل قاعدة البيانات (بحالة uploading ضمنياً — لا عمود حالة، والتحقق يتم عند الاكتمال)
+    const { data: row, error } = await admin.from("videos").insert({
+      tenant_id: urow.tenant_id, title: String(title).trim(), provider_video_id: guid,
+      visibility: visibility ?? "group", group_ids: groupIds ?? [],
+    }).select("id,provider_video_id").single();
+    if (error || !row) {
+      return NextResponse.json({ ok: false, error: error?.message ?? "db_failed" }, { status: 500 });
+    }
+    videoId = row.id;
   }
 
   // 3) توقيع الرفع (صالح لساعة — المفتاح السري لا يغادر السيرفر أبداً)
   const sig = signTusUpload(guid);
   if (!sig) {
-    await admin.from("videos").delete().eq("id", row.id);
+    if (!isReplace) await admin.from("videos").delete().eq("id", videoId);
     return NextResponse.json({ ok: false, error: "bunny_not_configured" }, { status: 503 });
   }
 
   return NextResponse.json({
     ok: true,
-    videoId: row.id,
+    videoId,
+    replace: isReplace,
     tusEndpoint: TUS_ENDPOINT,
     libraryId: sig.libraryId,
     videoGuid: guid,
