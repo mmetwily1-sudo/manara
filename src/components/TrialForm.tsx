@@ -39,15 +39,15 @@ export function TrialForm() {
     }
   }
 
-  // توجيه تلقائي مباشر لصفحته الجديدة بعد ثانية ونصف
+  // دخول تلقائي للوحة التحكم بعد ثانية (المعلم → الداشبورد مباشرة)
   useEffect(() => {
-    if (phase === "done-live" && slug) {
+    if (phase === "done-live" && slug && creds && !signedIn) {
       const t = setTimeout(() => {
-        window.location.href = `/${slug}`;
-      }, 1500);
+        enterDashboard();
+      }, 800);
       return () => clearTimeout(t);
     }
-  }, [phase, slug]);
+  }, [phase, slug, creds, signedIn]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
