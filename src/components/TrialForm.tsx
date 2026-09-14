@@ -18,11 +18,14 @@ const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "manara.app";
 export function TrialForm() {
   const [centerName, setCenterName] = useState("");
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [phase, setPhase] = useState<Phase>("idle");
   const [slug, setSlug] = useState<string | null>(null);
   const [creds, setCreds] = useState<{ email: string; password: string } | null>(null);
   const [signedIn, setSignedIn] = useState(false);
   const [authErr, setAuthErr] = useState("");
+  const [formError, setFormError] = useState("");
 
   async function enterDashboard() {
     if (!creds) return;
@@ -49,28 +52,42 @@ export function TrialForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setPhase("sending");
+    setFormError("");
 
     try {
       const res = await fetch("/api/trial", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ centerName, phone }),
+        body: JSON.stringify({ centerName, phone, email, password }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.ok && data.mode === "live" && data.slug) {
-          setSlug(data.slug);
-          setCreds(data.creds ?? null);
-          setPhase("done-live");
-          return;
-        }
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.ok && data.mode === "live" && data.slug) {
+        setSlug(data.slug);
+        setCreds(data.creds ?? { email, password });
+        setPhase("done-live");
+        return;
+      }
+      if (data?.error === "email_exists") {
+        setFormError("البريد الإلكتروني مسجل مسبقاً — جرّب بريداً آخر");
+        setPhase("idle");
+        return;
+      }
+      if (data?.error === "invalid_credentials") {
+        setFormError("تأكد من صحة البريد وكلمة السر (6 أحرف على الأقل)");
+        setPhase("idle");
+        return;
+      }
+      if (!res.ok && data?.error) {
+        setFormError(data.details ?? data.error);
+        setPhase("idle");
+        return;
       }
     } catch {
       // الاستضافة الثابتة (GitHub Pages) — مفيش /api أصلاً
     }
 
     window.open(
-      waLink(`${WA_TRIAL_TEXT}\nسنتر/اسمي: ${centerName}\nموبايلي: ${phone}`),
+      waLink(`${WA_TRIAL_TEXT}\nسنتر/اسمي: ${centerName}\nموبايلي: ${phone}\nبريد: ${email}`),
       "_blank"
     );
     setPhase("done-fallback");
@@ -176,6 +193,41 @@ export function TrialForm() {
           className="w-full rounded-xl border-2 border-slate-200 px-4 py-3 text-right outline-none transition focus:border-primary"
         />
       </div>
+      <div>
+        <label htmlFor="email" className="mb-1 block text-small font-bold">
+          بريدك الإلكتروني
+        </label>
+        <input
+          id="email"
+          type="email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="name@example.com"
+          dir="ltr"
+          className="w-full rounded-xl border-2 border-slate-200 px-4 py-3 text-left outline-none transition focus:border-primary"
+        />
+      </div>
+      <div>
+        <label htmlFor="password" className="mb-1 block text-small font-bold">
+          كلمة السر
+        </label>
+        <input
+          id="password"
+          type="password"
+          required
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="••••••••"
+          className="w-full rounded-xl border-2 border-slate-200 px-4 py-3 outline-none transition focus:border-primary"
+        />
+        <p className="mt-1 text-xs text-slate-400">6 أحرف على الأقل</p>
+      </div>
+      {formError && (
+        <div className="rounded-lg bg-danger/10 px-4 py-3 text-sm font-semibold text-danger">
+          {formError}
+        </div>
+      )}
       <button type="submit" className="btn-primary w-full text-lg">
         ابدأ دلوقتي مجاناً 🚀
       </button>

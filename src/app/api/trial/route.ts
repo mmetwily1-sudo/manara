@@ -27,7 +27,7 @@ function makeSlug(centerName: string): string {
 }
 
 export async function POST(req: Request) {
-  let body: { centerName?: string; phone?: string };
+  let body: { centerName?: string; phone?: string; email?: string; password?: string };
   try {
     body = await req.json();
   } catch {
@@ -36,10 +36,18 @@ export async function POST(req: Request) {
 
   const centerName = (body.centerName ?? "").trim();
   const phone = (body.phone ?? "").replace(/[^\d+]/g, "");
+  const emailInput = (body.email ?? "").trim().toLowerCase();
+  const passwordInput = (body.password ?? "").trim();
 
   if (centerName.length < 2 || phone.length < 8) {
     return NextResponse.json(
       { ok: false, error: "invalid_input" },
+      { status: 400 }
+    );
+  }
+  if (!emailInput || !emailInput.includes("@") || passwordInput.length < 6) {
+    return NextResponse.json(
+      { ok: false, error: "invalid_credentials" },
       { status: 400 }
     );
   }
@@ -70,9 +78,8 @@ export async function POST(req: Request) {
       .single();
 
     if (!error && data) {
-      // Ø­Ø³Ø§Ø¨ Ø¯Ø®ÙˆÙ„ ÙØ¹Ù„ÙŠ Ù„Ù„Ù…Ø¹Ù„Ù… (Ø¨Ø¯ÙˆÙ† Ø­Ø§Ø¬Ø© Ù„Ø¥ÙŠÙ…ÙŠÙ„ Ø®Ø§Ø±Ø¬ÙŠ ÙÙŠ Ø§Ù„Ù€MVP)
-      const loginEmail = `${data.slug}@manara.app`;
-      const password = randomBytes(6).toString("base64url");
+      const loginEmail = emailInput;
+      const password = passwordInput;
       let creds: { email: string; password: string } | null = null;
       try {
         const { data: au, error: aue } = await admin.auth.admin.createUser({
@@ -81,7 +88,15 @@ export async function POST(req: Request) {
           email_confirm: true,
           user_metadata: { full_name: centerName, role: "teacher_admin", phone },
         });
-        if (!aue && au?.user) {
+        if (aue) {
+          await admin.from("tenants").delete().eq("id", data.id);
+          const isDuplicate = aue.message?.includes("already registered") || aue.message?.includes("already exists");
+          return NextResponse.json(
+            { ok: false, error: isDuplicate ? "email_exists" : "auth_failed", details: aue.message },
+            { status: 400 }
+          );
+        }
+        if (au?.user) {
           creds = { email: loginEmail, password };
           await admin.from("tenants").update({ owner_user_id: au.user.id }).eq("id", data.id);
           await admin.from("users").insert({
