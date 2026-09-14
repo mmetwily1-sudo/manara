@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase";
+import { PasskeyLoginButton } from "@/components/PasskeyLoginButton";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -46,6 +47,9 @@ export default function LoginPage() {
       setErr("تعذر الاتصال بالخادم — حاول تاني");
       return;
     }
+    try {
+      localStorage.setItem("manara_last_email", email.trim().toLowerCase());
+    } catch {}
     window.location.href = "/dashboard";
   }
 
@@ -95,6 +99,13 @@ export default function LoginPage() {
             {busy ? "جاري الدخول..." : "دخول"}
           </button>
         </form>
+
+        <div className="my-4 flex items-center gap-3 text-xs text-slate-400">
+          <span className="h-px flex-1 bg-slate-200" />
+          أو
+          <span className="h-px flex-1 bg-slate-200" />
+        </div>
+        <PasskeyLoginButton email={email} />
 
         {needsSetup && (
           <form onSubmit={handleSetup} className="mt-6 space-y-4 rounded-xl border-2 border-primary/20 bg-primary-light/40 p-5">

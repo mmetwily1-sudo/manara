@@ -15,7 +15,7 @@ const navMore = [
   { href: "/dashboard/exams", label: "الامتحانات", key: "07" },
   { href: "/dashboard/videos", label: "الفيديوهات", key: "08" },
   { href: "/dashboard/certificates", label: "التقارير", key: "09" },
-  { href: "/dashboard", label: "هويتي والإعدادات", key: "10" },
+  { href: "/dashboard/settings", label: "هويتي والإعدادات", key: "10" },
 ];
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
