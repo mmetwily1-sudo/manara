@@ -162,7 +162,7 @@ create table videos (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references tenants(id) on delete cascade,
   title text not null,
-  provider_video_id text,                 -- Bunny video library id
+  provider_video_id text,                 -- Bunny video library id, or 'yt:VIDEOID' for YouTube (see lib/video-source.ts)
   visibility text not null default 'group'
     check (visibility in ('free','paid','group')),
   group_ids jsonb not null default '[]',

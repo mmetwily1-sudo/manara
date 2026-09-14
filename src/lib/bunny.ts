@@ -42,3 +42,43 @@ export function getDemoHlsUrl() {
   // فيديو تجريبي عام (Bunny sample) — يعمل بدون مفاتيح للمعاينة
   return "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8";
 }
+
+export const TUS_ENDPOINT = "https://video.bunnycdn.com/tusupload";
+
+/**
+ * توقيع رفع tus المصرّح به — يُولّد على السيرفر فقط (لا يُكشف AccessKey أبداً للعميل).
+ * الصيغة حسب توثيق Bunny: sha256(libraryId + apiKey + expiration + videoId) ثم base64.
+ */
+export function signTusUpload(videoGuid: string, ttlSec = 3600): {
+  libraryId: string;
+  videoId: string;
+  expires: number;
+  signature: string;
+} | null {
+  if (!isBunnyLive()) return null;
+  const expires = Math.floor(Date.now() / 1000) + ttlSec;
+  const raw = `${LIB}${KEY}${expires}${videoGuid}`;
+  const signature = crypto.createHash("sha256").update(raw).digest("base64");
+  return { libraryId: LIB!, videoId: videoGuid, expires, signature };
+}
+
+/** التحقق من حالة الفيديو في مكتبة Bunny (بعد اكتمال الرفع من العميل) */
+export async function getBunnyVideoStatus(videoGuid: string): Promise<{
+  ok: boolean;
+  status?: number;
+  statusText?: string;
+} | null> {
+  if (!isBunnyLive()) return null;
+  const res = await fetch(`${BUNNY_API}/videolibrary/${LIB}/videos/${videoGuid}`, {
+    headers: { AccessKey: KEY! },
+  });
+  if (res.status === 404) return { ok: false };
+  if (!res.ok) throw new Error(`Bunny status check failed: ${res.status}`);
+  const j = (await res.json()) as any;
+  // 0=Created, 1=Uploaded, 2=Processing, 3=Finished transcoding steps, 4=Finished, 5=Failed, 6=PartiallyUploaded
+  const names: Record<number, string> = {
+    0: "created", 1: "uploaded", 2: "processing", 3: "transcoding",
+    4: "finished", 5: "failed", 6: "partial",
+  };
+  return { ok: true, status: j.status, statusText: names[j.status] ?? String(j.status) };
+}
