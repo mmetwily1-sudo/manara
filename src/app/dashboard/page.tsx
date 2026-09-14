@@ -1,18 +1,16 @@
 import Link from "next/link";
-import { getKpis, getGroups } from "@/lib/data";
-import { getEarlyWarning, getFeed } from "@/lib/demo-data";
+import { getKpis, getGroups, getEarlyWarning, getFeed } from "@/lib/data";
 
 export default async function DashboardHome() {
-  const [kpis, groups] = await Promise.all([getKpis(), getGroups()]);
-  const warnings = getEarlyWarning();
-  const feed = getFeed();
+  const [kpis, groups, warnings, feed] = await Promise.all([getKpis(), getGroups(), getEarlyWarning(), getFeed()]);
+  const todayStr = new Date().toLocaleDateString("ar-EG", { weekday: "long", day: "numeric", month: "long" });
 
   return (
     <div className="mx-auto max-w-5xl space-y-8">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-h1">يومك في شاشة واحدة</h1>
-          <p className="mt-1 text-small text-slate-500">الأحد 30 أغسطس — 3 جلسات النهاردة</p>
+          <p className="mt-1 text-small text-slate-500">{todayStr} — {groups.length} {groups.length === 1 ? "جلسة" : "جلسات"} النهاردة</p>
         </div>
         <Link href="/dashboard/attendance" className="btn-primary text-small">ابدأ التحضير</Link>
       </header>
@@ -63,38 +61,50 @@ export default async function DashboardHome() {
         {/* جلسات النهاردة */}
         <section>
           <h2 className="mb-4 font-bold">جلسات النهاردة</h2>
-          <ul className="space-y-3">
-            {groups.map((g) => (
-              <li key={g.id} className="card flex items-center justify-between p-4">
-                <div>
-                  <div className="text-small font-bold">{g.name}</div>
-                  <div className="mt-0.5 text-xs text-slate-500">{g.grade} · {g.subject}</div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="rounded-full bg-primary-light px-3 py-1 text-xs font-bold text-primary">{g.todaySlot}</span>
-                  <Link href="/dashboard/attendance" className="btn-secondary !px-4 !py-1.5 text-xs">تحضير</Link>
-                </div>
-              </li>
-            ))}
-          </ul>
+          {groups.length === 0 ? (
+            <div className="card p-8 text-center">
+              <p className="text-small text-slate-500">لا توجد مجموعات بعد</p>
+              <p className="mt-1 text-xs text-slate-400">أنشئ مجموعتك الأولى من الإعدادات لبدء التحضير</p>
+              <Link href="/dashboard/students" className="btn-secondary mt-3 inline-block !px-4 !py-1.5 text-xs">إضافة مجموعة</Link>
+            </div>
+          ) : (
+            <ul className="space-y-3">
+              {groups.map((g) => (
+                <li key={g.id} className="card flex items-center justify-between p-4">
+                  <div>
+                    <div className="text-small font-bold">{g.name}</div>
+                    <div className="mt-0.5 text-xs text-slate-500">{g.grade} · {g.subject}</div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="rounded-full bg-primary-light px-3 py-1 text-xs font-bold text-primary">{g.todaySlot}</span>
+                    <Link href="/dashboard/attendance" className="btn-secondary !px-4 !py-1.5 text-xs">تحضير</Link>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
 
-        {/* Feed آخر الأحداث (نمط Edsby) */}
+        {/* Feed آخر الأحداث */}
         <section>
           <h2 className="mb-4 font-bold">آخر الأحداث</h2>
-          <ul className="card divide-y divide-slate-100">
-            {feed.map((e) => (
-              <li key={e.id} className="p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-small font-bold">{e.title}</div>
-                    <div className="mt-0.5 text-xs leading-relaxed text-slate-500">{e.detail}</div>
+          {feed.length === 0 ? (
+            <div className="card p-8 text-center text-small text-slate-400">لا توجد أحداث بعد — سجل حضورك الأول وستظهر هنا</div>
+          ) : (
+            <ul className="card divide-y divide-slate-100">
+              {feed.map((e) => (
+                <li key={e.id} className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-small font-bold">{e.title}</div>
+                      <div className="mt-0.5 text-xs leading-relaxed text-slate-500">{e.detail}</div>
+                    </div>
+                    <span className="whitespace-nowrap text-[11px] text-slate-400">{e.time}</span>
                   </div>
-                  <span className="whitespace-nowrap text-[11px] text-slate-400">{e.time}</span>
-                </div>
-              </li>
-            ))}
-          </ul>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       </div>
     </div>

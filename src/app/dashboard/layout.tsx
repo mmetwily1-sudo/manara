@@ -10,12 +10,12 @@ const nav = [
 ];
 
 const navMore = [
-  { href: "#", label: "المجموعات والجدول", key: "05" },
-  { href: "#", label: "بنك الأسئلة", key: "06" },
-  { href: "#", label: "الامتحانات", key: "07" },
-  { href: "#", label: "الفيديوهات", key: "08" },
-  { href: "#", label: "التقارير", key: "09" },
-  { href: "#", label: "هويتي والإعدادات", key: "10" },
+  { href: "/dashboard/students", label: "المجموعات والجدول", key: "05" },
+  { href: "/dashboard/questions", label: "بنك الأسئلة", key: "06" },
+  { href: "/dashboard/exams", label: "الامتحانات", key: "07" },
+  { href: "/dashboard/videos", label: "الفيديوهات", key: "08" },
+  { href: "/dashboard/certificates", label: "التقارير", key: "09" },
+  { href: "/dashboard", label: "هويتي والإعدادات", key: "10" },
 ];
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
