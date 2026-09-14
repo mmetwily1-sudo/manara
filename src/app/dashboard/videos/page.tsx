@@ -2,6 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Upload } from "tus-js-client";
+import { VideoPlayer } from "@/components/VideoPlayer";
+
+type PreviewPayload =
+  | { ok: true; source: "bunny"; hls: string; live: boolean }
+  | { ok: true; source: "youtube"; youtubeId: string; embedUrl: string; title?: string }
+  | { ok: false; error?: string };
 
 type Video = {
   id: string; title: string; visibility: string; group_ids: string[];
@@ -32,6 +38,37 @@ export default function VideosPage() {
   const [ytTitle, setYtTitle] = useState("");
   const [ytUrl, setYtUrl] = useState("");
   const [ytBusy, setYtBusy] = useState(false);
+
+  // المعاينة المضمّنة داخل البطاقة
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  const [previewData, setPreviewData] = useState<Record<string, PreviewPayload>>({});
+  const [previewLoading, setPreviewLoading] = useState<string | null>(null);
+
+  async function togglePreview(v: Video) {
+    if (previewId === v.id) {
+      setPreviewId(null);
+      return;
+    }
+    if (previewData[v.id]?.ok) {
+      setPreviewId(v.id);
+      return;
+    }
+    setPreviewId(v.id);
+    setPreviewLoading(v.id);
+    try {
+      const r = await fetch(`/api/videos/${v.id}`);
+      const j = (await r.json().catch(() => null)) as PreviewPayload | null;
+      if (j && j.ok) {
+        setPreviewData((prev) => ({ ...prev, [v.id]: j }));
+      } else {
+        setPreviewData((prev) => ({ ...prev, [v.id]: { ok: false, error: (j as any)?.error ?? "load_failed" } }));
+      }
+    } catch {
+      setPreviewData((prev) => ({ ...prev, [v.id]: { ok: false, error: "network" } }));
+    } finally {
+      setPreviewLoading(null);
+    }
+  }
 
   // نموذج التعديل
   const [editing, setEditing] = useState<Video | null>(null);
@@ -383,9 +420,39 @@ export default function VideosPage() {
         <ul className="grid gap-4 md:grid-cols-2">
           {visible.map((v) => (
             <li key={v.id} className="card overflow-hidden p-0">
-              <div className="flex aspect-video items-center justify-center bg-slate-900 text-4xl text-white/80">
-                {v.source === "youtube" ? "▶️" : "▶"}
-              </div>
+              {previewId === v.id ? (
+                <div className="relative bg-black">
+                  {previewLoading === v.id || !previewData[v.id] ? (
+                    <div className="flex aspect-video items-center justify-center text-sm text-white/70">جاري تحميل المعاينة...</div>
+                  ) : previewData[v.id].ok && (previewData[v.id] as any).source === "youtube" ? (
+                    <iframe
+                      src={(previewData[v.id] as any).embedUrl}
+                      title={v.title}
+                      className="aspect-video w-full"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  ) : previewData[v.id].ok ? (
+                    <VideoPlayer src={(previewData[v.id] as any).hls} watermark="" onProgress={() => {}} />
+                  ) : (
+                    <div className="flex aspect-video items-center justify-center p-4 text-center text-sm text-danger">
+                      تعذر تشغيل المعاينة — جرّب صفحة المشاهدة الكاملة
+                    </div>
+                  )}
+                  <button onClick={() => setPreviewId(null)} aria-label="إغلاق المعاينة"
+                    className="absolute left-2 top-2 rounded-full bg-black/60 px-2.5 py-1 text-xs font-bold text-white transition hover:bg-black/80">✕</button>
+                </div>
+              ) : (
+                <button onClick={() => togglePreview(v)} aria-label={`تشغيل معاينة: ${v.title}`}
+                  className="group relative flex aspect-video w-full items-center justify-center bg-slate-900 transition hover:bg-slate-800">
+                  <span className="text-4xl text-white/80 transition group-hover:scale-110 group-hover:text-white" aria-hidden>
+                    {v.source === "youtube" ? "▶️" : "▶"}
+                  </span>
+                  <span className="absolute bottom-2 right-2 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-bold text-white opacity-0 transition group-hover:opacity-100">
+                    اضغط للتشغيل ▶
+                  </span>
+                </button>
+              )}
               <div className="p-4">
                 <div className="text-small font-bold">{v.title}</div>
                 <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
