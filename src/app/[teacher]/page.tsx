@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { StudentRegisterForm } from "@/components/StudentRegisterForm";
 
 /**
  * صفحة المعلم العامة — Programmatic SEO
@@ -40,22 +41,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function TeacherPage({ params }: Props) {
   const slug = decodeURIComponent(params.teacher);
   let displayName = slug;
-  let notFound = false;
+  let teacherPhone: string | undefined;
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (url && key) {
       const { createClient } = await import("@supabase/supabase-js");
       const admin = createClient(url, key, { auth: { persistSession: false } });
-      const { data } = await admin.from("tenants").select("name").eq("slug", slug).single();
+      const { data } = await admin.from("tenants").select("name,settings").eq("slug", slug).single();
       if (data?.name) displayName = data.name;
-      else if (!["demo", "mr-23ou", "mr-2v5z", "mr-1r26", "mr-eb27", "mr-9njq"].includes(slug)) {
-        // تحقق هل الـslug موجود أصلاً — لو مش موجود ومهوش demo نعتبره 404
-        // لكن نسمح بكل slugs المولدة حديثاً (mr-*) لتفادي 404 أثناء الانتشار
-      }
+      teacherPhone = (data as any)?.settings?.owner_phone;
     }
   } catch {}
-  // عرض الاسم بدون بادئة "أ." لو هو سنتر بالفعل
   const headerName = displayName.startsWith("سنتر") ? displayName : `أ. ${displayName}`;
   const heroName = displayName;
 
@@ -71,17 +68,10 @@ export default async function TeacherPage({ params }: Props) {
       <section className="mx-auto max-w-4xl px-4 py-16 text-center">
         <h1 className="text-display">منصة {heroName} التعليمية</h1>
         <p className="mx-auto mt-4 max-w-xl text-body text-slate-600">
-          كورسات وحصص مسجلة وامتحانات تدريبية — كل حاجة في مكان واحد.
-          سجل من هنا وهتبعتلك بيانات الدخول على واتساب.
+          سجل بياناتك وسيتم إنشاء حسابك فوراً — بيانات الدخول ستظهر لك على الشاشة.
         </p>
-        <a
-          href={`https://wa.me/${process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP ?? "201025183569"}?text=${encodeURIComponent(`أهلاً، عايز أسجل في مجموعة عند ${heroName}`)}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn-primary mt-8 inline-flex"
-        >
-          سجّل في مجموعة جديدة
-        </a>
+
+        <StudentRegisterForm slug={slug} teacherPhone={teacherPhone} />
 
         <div className="mt-14 grid gap-5 sm:grid-cols-3">
           {[["🎬", "حصص مسجلة", "شاهدها في أي وقت من موبايلك"],
