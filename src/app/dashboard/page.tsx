@@ -65,7 +65,7 @@ export default async function DashboardHome() {
             <div className="card p-8 text-center">
               <p className="text-small text-slate-500">لا توجد مجموعات بعد</p>
               <p className="mt-1 text-xs text-slate-400">أنشئ مجموعتك الأولى من الإعدادات لبدء التحضير</p>
-              <Link href="/dashboard/students" className="btn-secondary mt-3 inline-block !px-4 !py-1.5 text-xs">إضافة مجموعة</Link>
+              <Link href="/dashboard/groups" className="btn-secondary mt-3 inline-block !px-4 !py-1.5 text-xs">إضافة مجموعة</Link>
             </div>
           ) : (
             <ul className="space-y-3">

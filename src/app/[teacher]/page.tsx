@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { StudentRegisterForm } from "@/components/StudentRegisterForm";
 
 /**
@@ -40,7 +41,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function TeacherPage({ params }: Props) {
   const slug = decodeURIComponent(params.teacher);
-  let displayName = slug;
+  let displayName: string | null = null;
   let teacherPhone: string | undefined;
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -53,6 +54,7 @@ export default async function TeacherPage({ params }: Props) {
       teacherPhone = (data as any)?.settings?.owner_phone;
     }
   } catch {}
+  if (!displayName) notFound();
   const headerName = displayName.startsWith("سنتر") ? displayName : `أ. ${displayName}`;
   const heroName = displayName;
 

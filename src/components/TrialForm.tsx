@@ -77,6 +77,11 @@ export function TrialForm() {
         setPhase("idle");
         return;
       }
+      if (data?.error === "phone_exists") {
+        setFormError("رقم الهاتف مسجل مسبقاً — سجّل الدخول بحسابك الحالي من صفحة الدخول");
+        setPhase("idle");
+        return;
+      }
       if (!res.ok && data?.error) {
         setFormError(data.details ?? data.error);
         setPhase("idle");

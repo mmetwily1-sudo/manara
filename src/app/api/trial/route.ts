@@ -72,7 +72,7 @@ export async function POST(req: Request) {
         plan: "trial",
         status: "active",
         trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        settings: { owner_phone: phone },
+        settings: { owner_phone: phone, owner_auth_id: null },
       })
       .select("id,slug")
       .single();
@@ -80,7 +80,6 @@ export async function POST(req: Request) {
     if (!error && data) {
       const loginEmail = emailInput;
       const password = passwordInput;
-      let creds: { email: string; password: string } | null = null;
       try {
         const { data: au, error: aue } = await admin.auth.admin.createUser({
           email: loginEmail,
@@ -96,27 +95,45 @@ export async function POST(req: Request) {
             { status: 400 }
           );
         }
-        if (au?.user) {
-          creds = { email: loginEmail, password };
-          await admin.from("tenants").update({ owner_user_id: au.user.id }).eq("id", data.id);
-          await admin.from("users").insert({
-            tenant_id: data.id,
-            auth_user_id: au.user.id,
-            role: "teacher_admin",
-            full_name: centerName,
-            phone,
-          });
+        if (!au?.user) {
+          await admin.from("tenants").delete().eq("id", data.id);
+          return NextResponse.json({ ok: false, error: "auth_failed" }, { status: 500 });
         }
-      } catch (e) {
-        console.error("auth user creation failed:", e);
-      }
+        // إنشاء صف المستخدم (مطلوب لسياسات RLS) — أي فشل هنا = إلغاء كل شيء
+        const { data: userRow, error: uErr } = await admin.from("users").insert({
+          tenant_id: data.id,
+          auth_user_id: au.user.id,
+          role: "teacher_admin",
+          full_name: centerName,
+          phone,
+        }).select("id").single();
+        if (uErr || !userRow) {
+          await admin.auth.admin.deleteUser(au.user.id);
+          await admin.from("tenants").delete().eq("id", data.id);
+          const isPhoneDup = uErr?.message?.includes("users_phone_key") || uErr?.message?.includes("duplicate key");
+          return NextResponse.json(
+            { ok: false, error: isPhoneDup ? "phone_exists" : "profile_failed", details: uErr?.message },
+            { status: 400 }
+          );
+        }
+        // ربط المالك بصف users (وليس auth id — القيد fk_owner يشير لـ users.id)
+        // + حفظ owner_auth_id في settings للشفاء الذاتي لاحقاً
+        await admin.from("tenants").update({
+          owner_user_id: userRow.id,
+          settings: { owner_phone: phone, owner_auth_id: au.user.id },
+        }).eq("id", data.id);
 
-      return NextResponse.json({
-        ok: true,
-        mode: "live",
-        slug: data.slug,
-        creds,
-      });
+        return NextResponse.json({
+          ok: true,
+          mode: "live",
+          slug: data.slug,
+          creds: { email: loginEmail, password },
+        });
+      } catch (e: any) {
+        console.error("trial failed:", e?.message);
+        await admin.from("tenants").delete().eq("id", data.id);
+        return NextResponse.json({ ok: false, error: "server_error" }, { status: 500 });
+      }
     }
 
     const code = (error as unknown as { code?: string })?.code;

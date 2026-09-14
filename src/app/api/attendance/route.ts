@@ -51,7 +51,7 @@ export async function POST(req: Request) {
 
   const admin = createClient(SUPA_URL, SERVICE_KEY, { auth: { persistSession: false } });
 
-  const { data: urow } = await admin.from("users").select("tenant_id,role").eq("auth_user_id", auth.data.user.id).single();
+  const { data: urow } = await admin.from("users").select("id,tenant_id,role").eq("auth_user_id", auth.data.user.id).single();
   if (!urow?.tenant_id) return NextResponse.json({ ok: false, error: "no_tenant" }, { status: 403 });
 
   const { data: sess } = await admin.from("sessions").select("id,tenant_id,group_id").eq("id", sessionId).single();
@@ -63,13 +63,13 @@ export async function POST(req: Request) {
     student_id: studentId,
     status,
     method: "manual",
-    recorded_by: urow.tenant_id,
+    recorded_by: urow.id,
   }, { onConflict: "session_id,student_id" });
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
   await admin.from("audit_log").insert({
-    tenant_id: urow.tenant_id, actor_id: urow.tenant_id,
+    tenant_id: urow.tenant_id, actor_id: urow.id,
     action: `attendance:${status}`, entity_type: "attendance", entity_id: sessionId,
     details: { studentId, status },
   });

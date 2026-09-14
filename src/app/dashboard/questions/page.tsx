@@ -8,16 +8,47 @@ export default function QuestionsPage() {
   const [qs, setQs] = useState<Q[] | null>(null);
   const [filter, setFilter] = useState({ subject: "", difficulty: "" });
   const [importing, setImporting] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
+  const [err, setErr] = useState("");
+  const [form, setForm] = useState({ body: "", subject: "", lesson: "", difficulty: "2", qtype: "mcq", options: "", correct: "", marks: "1" });
+  const [busy, setBusy] = useState(false);
 
   async function load() {
-    const p = new URLSearchParams();
-    if (filter.subject) p.set("subject", filter.subject);
-    if (filter.difficulty) p.set("difficulty", filter.difficulty);
-    const r = await fetch(`/api/questions?${p.toString()}`);
-    const j = await r.json();
-    setQs(j.questions ?? []);
+    try {
+      const p = new URLSearchParams();
+      if (filter.subject) p.set("subject", filter.subject);
+      if (filter.difficulty) p.set("difficulty", filter.difficulty);
+      const r = await fetch(`/api/questions?${p.toString()}`);
+      const j = await r.json().catch(() => null);
+      setQs(r.ok && j?.ok ? (j.questions ?? []) : []);
+      if (!r.ok) setErr("تعذر تحميل الأسئلة.");
+    } catch { setErr("تعذر الاتصال بالخادم."); }
   }
   useEffect(() => { load(); }, [filter]);
+
+  async function onAdd(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true); setErr("");
+    const options = form.options.split("\n").map((s) => s.trim()).filter(Boolean);
+    try {
+      const r = await fetch("/api/questions", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          body: form.body, subject: form.subject || "عام", lesson: form.lesson || null,
+          difficulty: Number(form.difficulty) || 2, qtype: form.qtype,
+          options: options.length ? options : null,
+          correct_answer: form.correct || null, marks: Number(form.marks) || 1,
+        }),
+      });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) {
+        setForm({ body: "", subject: "", lesson: "", difficulty: "2", qtype: "mcq", options: "", correct: "", marks: "1" });
+        setShowAdd(false);
+        load();
+      } else setErr("فشل الحفظ: " + (j?.error ?? "خطأ غير معروف"));
+    } catch { setErr("تعذر الاتصال بالخادم."); }
+    finally { setBusy(false); }
+  }
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
@@ -30,10 +61,7 @@ export default function QuestionsPage() {
     setImporting(false); load();
   }
 
-  const demo: Q[] = qs && qs.length > 0 ? qs : [
-    { id: "d1", subject: "فيزياء", lesson: "الحركة", difficulty: 2, qtype: "mcq", body: "ما وحدة قياس القوة؟ $F=ma$", marks: 1 },
-    { id: "d2", subject: "فيزياء", lesson: "نيوتن", difficulty: 3, qtype: "true_false", body: "الجاذبية تتناسب عكسياً مع مربع المسافة.", marks: 1 },
-  ];
+
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -47,9 +75,35 @@ export default function QuestionsPage() {
             {importing ? "جاري..." : "استيراد Excel/CSV"}
             <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={onFile} disabled={importing} />
           </label>
-          <button className="btn-primary text-small">سؤال جديد</button>
+          <button onClick={() => setShowAdd((v) => !v)} className="btn-primary text-small">سؤال جديد</button>
         </div>
       </header>
+
+      {err && <div className="card border-danger/20 bg-danger/5 p-4 text-small font-bold text-danger">{err}</div>}
+
+      {showAdd && (
+        <form onSubmit={onAdd} className="card grid gap-3 p-5 sm:grid-cols-2">
+          <textarea value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} placeholder="نص السؤال (يدعم $LaTeX$)" required rows={2} className="rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:border-primary sm:col-span-2" />
+          <input value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} placeholder="المادة" className="rounded-xl border border-slate-200 px-4 py-2.5 outline-none" />
+          <input value={form.lesson} onChange={(e) => setForm({ ...form, lesson: e.target.value })} placeholder="الدرس (اختياري)" className="rounded-xl border border-slate-200 px-4 py-2.5 outline-none" />
+          <select value={form.qtype} onChange={(e) => setForm({ ...form, qtype: e.target.value })} className="rounded-xl border border-slate-200 px-4 py-2.5">
+            <option value="mcq">اختيار من متعدد</option>
+            <option value="true_false">صح / خطأ</option>
+            <option value="short_answer">إجابة قصيرة</option>
+          </select>
+          <div className="flex items-center gap-2">
+            <select value={form.difficulty} onChange={(e) => setForm({ ...form, difficulty: e.target.value })} className="rounded-xl border border-slate-200 px-4 py-2.5">
+              <option value="1">1 سهل</option>
+              <option value="2">2 متوسط</option>
+              <option value="3">3 صعب</option>
+            </select>
+            <input value={form.marks} onChange={(e) => setForm({ ...form, marks: e.target.value })} placeholder="الدرجات" inputMode="decimal" className="w-24 rounded-xl border border-slate-200 px-4 py-2.5 outline-none" />
+          </div>
+          <textarea value={form.options} onChange={(e) => setForm({ ...form, options: e.target.value })} placeholder="الاختيارات — سطر لكل اختيار (لـ mcq)" rows={3} className="rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:border-primary sm:col-span-2" dir="ltr" style={{ textAlign: "right" }} />
+          <input value={form.correct} onChange={(e) => setForm({ ...form, correct: e.target.value })} placeholder="الإجابة الصحيحة (نص مطابق لأحد الاختيارات)" className="rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:border-primary sm:col-span-2" />
+          <button className="btn-primary sm:col-span-2" disabled={busy}>{busy ? "جاري الحفظ..." : "حفظ السؤال"}</button>
+        </form>
+      )}
 
       <div className="card flex flex-wrap gap-2 p-3 text-xs">
         <input placeholder="المادة" value={filter.subject} onChange={(e) => setFilter({ ...filter, subject: e.target.value })} className="rounded-lg border border-slate-200 px-3 py-1.5 outline-none" />
@@ -62,8 +116,13 @@ export default function QuestionsPage() {
         <span className="ml-auto text-slate-400">القالب: subject | lesson | difficulty | qtype | body | options | correct_answer | marks</span>
       </div>
 
+      {qs === null ? (
+        <div className="card p-8 text-center text-slate-400">جاري تحميل الأسئلة...</div>
+      ) : qs.length === 0 ? (
+        <div className="card p-8 text-center text-small text-slate-500">لا توجد أسئلة بعد — أضف أول سؤال بالزر بالأعلى أو استورد ملف Excel.</div>
+      ) : (
       <ul className="space-y-3">
-        {demo.map((q) => (
+        {qs.map((q) => (
           <li key={q.id} className="card p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="text-small font-bold">{q.body}</div>
@@ -77,6 +136,7 @@ export default function QuestionsPage() {
           </li>
         ))}
       </ul>
+      )}
     </div>
   );
 }

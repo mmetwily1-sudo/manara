@@ -10,7 +10,7 @@ const nav = [
 ];
 
 const navMore = [
-  { href: "/dashboard/students", label: "المجموعات والجدول", key: "05" },
+  { href: "/dashboard/groups", label: "المجموعات والجدول", key: "05" },
   { href: "/dashboard/questions", label: "بنك الأسئلة", key: "06" },
   { href: "/dashboard/exams", label: "الامتحانات", key: "07" },
   { href: "/dashboard/videos", label: "الفيديوهات", key: "08" },

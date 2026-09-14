@@ -1,37 +1,75 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import type { Student, StudentStatus } from "@/lib/demo-data";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-/**
- * Tap-Grid التحضير — الهدف: 200 طالب في أقل من 3 دقايق
- * نمط حاضر: "تحضير الكل" ثم ضغط الغايبين بس
- * Offline-first: كل تغيير يتسجل في localStorage ويتزامن لما النت يرجع (stub)
- */
+export type StudentStatus = "present" | "absent" | "pending";
+export type Student = { id: string; name: string; groupId: string; parentPhone: string | null; status: StudentStatus };
 
 const STORAGE_KEY = "manara.attendance.queue";
-
-type QueueItem = { studentId: string; status: StudentStatus; at: number };
+type QueueItem = { sessionId: string; studentId: string; status: Exclude<StudentStatus, "pending"> };
 
 function loadQueue(): QueueItem[] {
   if (typeof window === "undefined") return [];
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "[]");
-  } catch {
-    return [];
-  }
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "[]"); }
+  catch { return []; }
+}
+function saveQueue(q: QueueItem[]) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(q)); } catch {}
 }
 
-export function AttendanceGrid({ students }: { students: Student[] }) {
-  const [statuses, setStatuses] = useState<Record<string, StudentStatus>>(
+/**
+ * Tap-Grid التحضير — الهدف: 200 طالب في أقل من 3 دقايق
+ * كل تغيير يُرسل فوراً لـ /api/attendance، وعند انقطاع النت يُحفظ في طابور محلي ويُزامَن تلقائياً
+ */
+export function AttendanceGrid({ students, sessionId }: { students: Student[]; sessionId: string | null }) {
+  const [statuses, setStatuses] = useState<Record<string, StudentStatus>>(() =>
     Object.fromEntries(students.map((s) => [s.id, s.status]))
   );
   const [queueLen, setQueueLen] = useState(0);
   const [online, setOnline] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [codeMode, setCodeMode] = useState(false);
+  const [code, setCode] = useState("");
+  const sessionRef = useRef(sessionId);
+  sessionRef.current = sessionId;
+
+  // تصفير الحالات عند تبديل المجموعة/الطلاب + مسح طابور الجلسة القديمة
+  const studentsKey = students.map((s) => s.id).join(",");
+  useEffect(() => {
+    setStatuses(Object.fromEntries(students.map((s) => [s.id, s.status])));
+    setCode("");
+    setCodeMode(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studentsKey]);
+
+  async function flushQueue(items?: QueueItem[]) {
+    const sid = sessionRef.current;
+    const q = items ?? loadQueue().filter((i) => i.sessionId === sid);
+    if (!sid || !q.length || !navigator.onLine) { setQueueLen(loadQueue().length); return; }
+    setSyncing(true);
+    const remaining: QueueItem[] = [];
+    for (const item of q) {
+      try {
+        const r = await fetch("/api/attendance", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId: item.sessionId, studentId: item.studentId, status: item.status }),
+        });
+        if (!r.ok) remaining.push(item);
+      } catch { remaining.push(item); }
+    }
+    const others = loadQueue().filter((i) => i.sessionId !== sid);
+    saveQueue([...others, ...remaining]);
+    setQueueLen(loadQueue().length);
+    setSyncing(false);
+  }
 
   useEffect(() => {
-    setQueueLen(loadQueue().length);
-    const update = () => setOnline(navigator.onLine);
+    flushQueue();
+    const update = () => {
+      const on = navigator.onLine;
+      setOnline(on);
+      if (on) flushQueue();
+    };
     update();
     window.addEventListener("online", update);
     window.addEventListener("offline", update);
@@ -39,31 +77,52 @@ export function AttendanceGrid({ students }: { students: Student[] }) {
       window.removeEventListener("online", update);
       window.removeEventListener("offline", update);
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId]);
 
-  function enqueue(studentId: string, status: StudentStatus) {
-    // TODO(Phase 1.2): POST /api/attendance — لو فشل الشبكة يفضل في الـqueue
-    const q = loadQueue().filter((i) => i.studentId !== studentId);
-    q.push({ studentId, status, at: Date.now() });
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(q));
+  function record(studentId: string, status: Exclude<StudentStatus, "pending">) {
+    const sid = sessionRef.current;
+    setStatuses((prev) => ({ ...prev, [studentId]: status }));
+    if (!sid) return;
+    const q = loadQueue().filter((i) => !(i.sessionId === sid && i.studentId === studentId));
+    q.push({ sessionId: sid, studentId, status });
+    saveQueue(q);
     setQueueLen(q.length);
+    flushQueue(q.filter((i) => i.sessionId === sid));
   }
 
   function toggle(id: string) {
     setStatuses((prev) => {
-      const next: StudentStatus = prev[id] === "absent" ? "present" : "absent";
-      enqueue(id, next);
+      const next = prev[id] === "absent" ? "present" : "absent";
+      record(id, next);
       return { ...prev, [id]: next };
     });
   }
 
   function markAllPresent() {
     const all: Record<string, StudentStatus> = {};
-    students.forEach((s) => {
-      all[s.id] = "present";
-      enqueue(s.id, "present");
-    });
+    students.forEach((s) => { all[s.id] = "present"; });
     setStatuses(all);
+    const sid = sessionRef.current;
+    if (!sid) return;
+    const others = loadQueue().filter((i) => i.sessionId !== sid);
+    const batch: QueueItem[] = students.map((s) => ({ sessionId: sid, studentId: s.id, status: "present" as const }));
+    saveQueue([...others, ...batch]);
+    setQueueLen(loadQueue().length);
+    flushQueue(batch);
+  }
+
+  function submitCode(e: React.FormEvent) {
+    e.preventDefault();
+    const q = code.trim().replace(/\D/g, "");
+    if (!q) return;
+    const hit = students.find((s) => (s.parentPhone ?? "").replace(/\D/g, "").endsWith(q) || s.name.includes(code.trim()));
+    if (hit) {
+      record(hit.id, "present");
+      setCode("");
+    } else {
+      alert("لا يوجد طالب بهذا الرقم/الاسم في المجموعة");
+    }
   }
 
   const counts = useMemo(() => {
@@ -77,10 +136,14 @@ export function AttendanceGrid({ students }: { students: Student[] }) {
 
   return (
     <div className="space-y-5">
-      {/* حالة الأوفلاين — واضحة دايماً */}
       {!online && (
         <div className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-small font-semibold text-warning">
           شغّال أوفلاين — التحضير بيتسجل عندك وهيتتبعت تلقائياً أول ما النت يرجع
+        </div>
+      )}
+      {!sessionId && (
+        <div className="rounded-xl border border-danger/20 bg-danger/5 px-4 py-3 text-small font-semibold text-danger">
+          تعذر إنشاء جلسة اليوم — تحقق من الاتصال ثم حدّث الصفحة.
         </div>
       )}
 
@@ -103,14 +166,28 @@ export function AttendanceGrid({ students }: { students: Student[] }) {
           <button className="btn-primary !px-5 !py-2 text-small" onClick={markAllPresent}>
             تحضير الكل ✓
           </button>
-          <button className="btn-secondary !px-5 !py-2 text-small">مسح QR</button>
+          <button className="btn-secondary !px-5 !py-2 text-small" onClick={() => setCodeMode((v) => !v)}>
+            {codeMode ? "إغلاق" : "تحضير بكود"}
+          </button>
         </div>
       </div>
 
-      {/* الشبكة — touch targets سخية، الغايب بيتباكن فوراً */}
+      {codeMode && (
+        <form onSubmit={submitCode} className="card flex gap-2 p-4">
+          <input
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            placeholder="اكتب آخر أرقام موبايل الطالب أو اسمه ثم Enter"
+            className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:border-primary"
+            autoFocus
+          />
+          <button className="btn-primary !px-5 !py-2 text-small">تحضير</button>
+        </form>
+      )}
+
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {students.map((s) => {
-          const st = statuses[s.id];
+          const st = statuses[s.id] ?? "pending";
           const isAbsent = st === "absent";
           const isPending = st === "pending";
           return (
@@ -140,8 +217,9 @@ export function AttendanceGrid({ students }: { students: Student[] }) {
       </div>
 
       <p className="text-center text-xs text-slate-400">
-        اضغط على الطالب = يتحول غايب · الإشعار لولي الأمر بيبعت لوحده لحظة التسجيل
-        {queueLen > 0 && ` · ${queueLen} تسجيل مستنيين المزامنة`}
+        اضغط على الطالب = يتحول غايب · يُحفظ في قاعدة البيانات فوراً
+        {syncing && " · جاري المزامنة..."}
+        {queueLen > 0 && !syncing && ` · ${queueLen} تسجيل مستنيين المزامنة`}
       </p>
     </div>
   );

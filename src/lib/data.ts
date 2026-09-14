@@ -41,11 +41,23 @@ export async function getStudentsByGroup(groupId?: string) {
   const sb = supaServer();
   if (!sb) return demo.getStudentsByGroup(groupId);
   try {
-    let q = sb.from("users").select("id,full_name,phone").eq("role", "student").limit(100);
+    let ids: string[] | null = null;
+    if (groupId) {
+      const { data: enr, error: eErr } = await sb
+        .from("enrollments")
+        .select("student_id")
+        .eq("group_id", groupId)
+        .eq("status", "active");
+      if (eErr) throw eErr;
+      ids = (enr ?? []).map((e: any) => e.student_id);
+      if (!ids.length) return [];
+    }
+    let q = sb.from("users").select("id,full_name,phone").eq("role", "student").limit(200);
+    if (ids) q = q.in("id", ids);
     const { data, error } = await q;
     if (error) throw error;
     if (!data || data.length === 0) return [];
-    return data.map((u: any) => ({ id: u.id, name: u.full_name, groupId: groupId ?? "g1", parentPhone: u.phone, status: "pending" as const }));
+    return data.map((u: any) => ({ id: u.id, name: u.full_name, groupId: groupId ?? "", parentPhone: u.phone, status: "pending" as const }));
   } catch { return []; }
 }
 

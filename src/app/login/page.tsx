@@ -15,13 +15,31 @@ export default function LoginPage() {
     setBusy(true); setErr("");
     const sb = createClient();
     const { error } = await sb.auth.signInWithPassword({ email: email.trim(), password });
-    setBusy(false);
     if (error) {
+      setBusy(false);
       setErr(
         error.message.includes("Invalid login")
           ? "البريد أو كلمة السر غير صحيحة"
           : "حدث خطأ — حاول تاني أو كلمنا على واتساب"
       );
+      return;
+    }
+    // مزامنة الحساب مع سنتره (شفاء ذاتي لو الصف مفقود) ثم الدخول
+    try {
+      const r = await fetch("/api/auth/sync");
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j?.ok) {
+        setBusy(false);
+        setErr(
+          j?.error === "no_tenant"
+            ? "حسابك موجود لكن غير مربوط بأي سنتر — سجّل سنتراً جديداً من صفحة التجربة"
+            : "تعذر تجهيز حسابك — حاول تاني"
+        );
+        return;
+      }
+    } catch {
+      setBusy(false);
+      setErr("تعذر الاتصال بالخادم — حاول تاني");
       return;
     }
     window.location.href = "/dashboard";
