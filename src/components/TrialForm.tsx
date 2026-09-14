@@ -68,7 +68,12 @@ export function TrialForm() {
         return;
       }
       if (data?.error === "email_exists") {
-        setFormError("البريد الإلكتروني مسجل مسبقاً — جرّب بريداً آخر");
+        setFormError("هذا البريد مسجل لحساب آخر — سجّل الدخول به أو جرّب بريداً آخر");
+        setPhase("idle");
+        return;
+      }
+      if (data?.error === "already_have_account") {
+        setFormError("عندك حساب بالفعل بهذا البريد — سجّل الدخول مباشرة");
         setPhase("idle");
         return;
       }
@@ -217,6 +222,11 @@ export function TrialForm() {
       {formError && (
         <div className="rounded-lg bg-danger/10 px-4 py-3 text-sm font-semibold text-danger">
           {formError}
+          {formError.includes("سجّل الدخول") && (
+            <a href="/login" className="mt-2 inline-block font-bold text-primary underline">
+              الذهاب لصفحة الدخول
+            </a>
+          )}
         </div>
       )}
       <button type="submit" className="btn-primary w-full text-lg">

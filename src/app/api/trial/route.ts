@@ -1,6 +1,5 @@
 ﻿import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { randomBytes } from "node:crypto";
 
 /**
  * POST /api/trial â€” ØªØ³Ø¬ÙŠÙ„ ØªØ¬Ø±Ø¨Ø© Ù…Ø¬Ø§Ù†ÙŠØ© Ø­Ù‚ÙŠÙ‚ÙŠØ©
@@ -11,9 +10,70 @@ import { randomBytes } from "node:crypto";
  */
 
 const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPA_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const SUPA_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY ??
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+/**
+ * إكمال الإعداد لحساب auth موجود مسبقاً (يتيم بدون صف users).
+ * يثبت الملكية بتسجيل الدخول بكلمة السر المُدخلة، ثم يربط الحساب بالسنتر الجديد.
+ * يرجع Response جاهزاً عند النجاح/الحساب المكتمل، أو null عند فشل إثبات الملكية.
+ */
+async function completeSetupForExistingAuth(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  admin: any,
+  email: string,
+  password: string,
+  tenantId: string,
+  slug: string,
+  centerName: string,
+  phone: string
+): Promise<ReturnType<typeof NextResponse.json> | null> {
+  if (!SUPA_URL || !SUPA_ANON) return null;
+  const anon = createClient(SUPA_URL, SUPA_ANON, { auth: { persistSession: false } });
+  const { data: sess, error: se } = await anon.auth.signInWithPassword({ email, password });
+  if (se || !sess.session) return null; // ليست كلمة سره → بريد يخص شخصاً آخر
+  const uid = sess.session.user.id;
+
+  const { data: existingRow } = await admin.from("users").select("id,tenant_id").eq("auth_user_id", uid).maybeSingle();
+  const existing = existingRow as { id: string; tenant_id: string } | null;
+  if (existing?.tenant_id) {
+    await admin.from("tenants").delete().eq("id", tenantId);
+    return NextResponse.json({ ok: false, error: "already_have_account" }, { status: 400 });
+  }
+
+  const { data: userRow, error: uErr } = await admin.from("users").insert({
+    tenant_id: tenantId,
+    auth_user_id: uid,
+    role: "teacher_admin",
+    full_name: centerName,
+    phone,
+  }).select("id").single();
+  if (uErr || !userRow) {
+    await admin.from("tenants").delete().eq("id", tenantId);
+    const isPhoneDup = uErr?.message?.includes("users_phone_key") || uErr?.message?.includes("duplicate key");
+    return NextResponse.json(
+      { ok: false, error: isPhoneDup ? "phone_exists" : "profile_failed", details: uErr?.message },
+      { status: 400 }
+    );
+  }
+
+  await admin.from("tenants").update({
+    owner_user_id: userRow.id,
+    settings: { owner_phone: phone, owner_auth_id: uid },
+  }).eq("id", tenantId);
+  await admin.auth.admin.updateUserById(uid, {
+    user_metadata: { full_name: centerName, role: "teacher_admin", phone },
+  });
+
+  return NextResponse.json({
+    ok: true,
+    mode: "live",
+    slug,
+    creds: { email, password },
+  });
+}
 
 function makeSlug(centerName: string): string {
   const latin = centerName
@@ -88,10 +148,17 @@ export async function POST(req: Request) {
           user_metadata: { full_name: centerName, role: "teacher_admin", phone },
         });
         if (aue) {
+          const isDuplicate = (aue.message ?? "").toLowerCase().includes("already");
+          if (isDuplicate) {
+            // البريد مسجل من قبل — تحقق من الملكية بتسجيل الدخول بنفس كلمة السر
+            const owned = await completeSetupForExistingAuth(admin, loginEmail, password, data.id, data.slug, centerName, phone);
+            if (owned) return owned;
+            await admin.from("tenants").delete().eq("id", data.id);
+            return NextResponse.json({ ok: false, error: "email_exists" }, { status: 400 });
+          }
           await admin.from("tenants").delete().eq("id", data.id);
-          const isDuplicate = aue.message?.includes("already registered") || aue.message?.includes("already exists");
           return NextResponse.json(
-            { ok: false, error: isDuplicate ? "email_exists" : "auth_failed", details: aue.message },
+            { ok: false, error: "auth_failed", details: aue.message },
             { status: 400 }
           );
         }
