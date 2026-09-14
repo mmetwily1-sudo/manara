@@ -35,19 +35,48 @@ export function StudentRegisterForm({ slug, teacherPhone }: { slug: string; teac
     }
   }
 
+  const [sentVia, setSentVia] = useState<"" | "email" | "whatsapp">("");
+
+  async function sendViaEmail() {
+    setSentVia("email");
+    // Supabase سيرسل رابط دخول على البريد تلقائياً (Magic Link)
+    try {
+      const { createClient } = await import("@/lib/supabase");
+      const sb = createClient();
+      await sb.auth.signInWithOtp({ email });
+    } catch {}
+  }
+
+  function sendViaWhatsapp() {
+    setSentVia("whatsapp");
+    const text = `مرحباً ${name}، بيانات دخولك لمنصة ${slug}:\nالبريد: ${email}\nكلمة السر: ${password}\nرابط الدخول: ${window.location.origin}/login`;
+    window.open(`https://wa.me/${phone.replace(/\D/g, "") || "201025183569"}?text=${encodeURIComponent(text)}`, "_blank");
+  }
+
   if (phase === "done") {
     return (
       <div className="rounded-xl border-2 border-success/30 bg-success/5 p-6 text-center">
         <div className="text-2xl">🎉</div>
         <h3 className="mt-2 font-bold text-success">تم تسجيلك بنجاح!</h3>
         <p className="mt-2 text-small text-slate-600">
-          بيانات دخولك: <span className="font-mono" dir="ltr">{email}</span>
-          <br />
-          يمكنك الآن تسجيل الدخول من صفحة الدخول.
+          اختر كيف تريد استلام بيانات الدخول:
         </p>
-        <a href="/login" className="btn-primary mt-4 inline-block">
-          تسجيل الدخول
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <button onClick={sendViaEmail} className="rounded-xl border-2 border-primary bg-white px-4 py-3 text-small font-bold text-primary transition hover:bg-primary-light">
+            📧 عبر البريد الإلكتروني
+            <span className="block text-xs font-normal text-slate-500">{email}</span>
+          </button>
+          <button onClick={sendViaWhatsapp} className="rounded-xl border-2 border-[#25D366] bg-white px-4 py-3 text-small font-bold text-[#25D366] transition hover:bg-green-50">
+            💬 عبر واتساب
+            <span className="block text-xs font-normal text-slate-500">{phone || "رقمك"}</span>
+          </button>
+        </div>
+        {sentVia === "email" && <p className="mt-3 text-xs font-semibold text-success">✓ تم الإرسال على بريدك — تفقد صندوق الوارد</p>}
+        {sentVia === "whatsapp" && <p className="mt-3 text-xs font-semibold text-success">✓ تم فتح واتساب — أرسل الرسالة</p>}
+        <a href="/login" className="btn-primary mt-5 inline-block w-full">
+          تسجيل الدخول الآن
         </a>
+        <p className="mt-2 text-xs text-slate-400">بياناتك: <span className="font-mono" dir="ltr">{email}</span></p>
       </div>
     );
   }
