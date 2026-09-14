@@ -63,3 +63,27 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     questions,
   });
 }
+
+/** DELETE /api/exams/[id] — حذف الامتحان وروابطه ومحاولاته وشهاداتها */
+export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+  const sbUser = supaUser();
+  const { data: { user } } = sbUser ? await sbUser.auth.getUser() : { data: { user: null } } as any;
+  if (!user) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
+
+  const sb = admin();
+  const { data: urow } = await sb.from("users").select("tenant_id").eq("auth_user_id", user.id).single();
+  if (!urow) return NextResponse.json({ ok: false, error: "no_tenant" }, { status: 403 });
+
+  const { data: exam } = await sb.from("exams").select("id").eq("id", params.id).eq("tenant_id", urow.tenant_id).single();
+  if (!exam) return NextResponse.json({ ok: false, error: "exam_not_found" }, { status: 404 });
+
+  // الشهادات أولاً (لا يوجد cascade عليها)، ثم الامتحان (الباقي cascade تلقائياً)
+  const { data: attempts } = await sb.from("exam_attempts").select("id").eq("exam_id", params.id);
+  const attemptIds = (attempts ?? []).map((a: any) => a.id);
+  if (attemptIds.length) {
+    await sb.from("certificates").delete().in("attempt_id", attemptIds);
+  }
+  const { error } = await sb.from("exams").delete().eq("id", params.id).eq("tenant_id", urow.tenant_id);
+  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true, removedAttempts: attemptIds.length });
+}

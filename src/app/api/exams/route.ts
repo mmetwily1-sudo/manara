@@ -33,5 +33,24 @@ export async function GET() {
     .order("created_at", { ascending: false })
     .limit(50);
 
-  return NextResponse.json({ ok: true, exams: exams ?? [] });
+  const ids = (exams ?? []).map((e: any) => e.id);
+  let qCounts: Record<string, number> = {};
+  let aCounts: Record<string, number> = {};
+  if (ids.length) {
+    const [{ data: links }, { data: attempts }] = await Promise.all([
+      sb.from("exam_questions").select("exam_id").in("exam_id", ids),
+      sb.from("exam_attempts").select("exam_id").in("exam_id", ids),
+    ]);
+    for (const l of (links ?? []) as any[]) qCounts[l.exam_id] = (qCounts[l.exam_id] ?? 0) + 1;
+    for (const a of (attempts ?? []) as any[]) aCounts[a.exam_id] = (aCounts[a.exam_id] ?? 0) + 1;
+  }
+
+  return NextResponse.json({
+    ok: true,
+    exams: (exams ?? []).map((e: any) => ({
+      ...e,
+      questions_count: qCounts[e.id] ?? 0,
+      attempts_count: aCounts[e.id] ?? 0,
+    })),
+  });
 }
