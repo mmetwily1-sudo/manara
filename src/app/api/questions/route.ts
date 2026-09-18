@@ -42,12 +42,30 @@ export async function POST(req: Request) {
   const admin = res.ctx.admin;
   const urow = { tenant_id: res.ctx.tenantId };
 
-  const { data, error } = await admin.from("questions").insert({
+  // ربط المنهج (اختياري): كود درس + كتاب موجود فعلاً
+  const lessonCode = typeof body.lesson_code === "string" && body.lesson_code.trim() ? body.lesson_code.trim().slice(0, 40) : null;
+  let bookId: string | null = null;
+  if (typeof body.book_id === "string" && body.book_id) {
+    const { data: bk } = await admin.from("curriculum_books").select("id").eq("id", body.book_id).single();
+    if (!bk) return NextResponse.json({ ok: false, error: "bad_book" }, { status: 400 });
+    bookId = (bk as any).id;
+  }
+  const source = bookId ? "book" : ["teacher", "moe", "azhar"].includes(body.source) ? body.source : "teacher";
+
+  const base: any = {
     tenant_id: urow.tenant_id, subject: body.subject ?? "عام", lesson: body.lesson ?? null,
     difficulty: Number(body.difficulty ?? 2), qtype: body.qtype ?? "mcq",
     body: body.body, options: body.options ?? null, correct_answer: body.correct_answer ?? null,
     marks: Number(body.marks ?? 1),
+  };
+  let { data, error } = await admin.from("questions").insert({
+    ...base, lesson_code: lessonCode, book_id: bookId, source,
   }).select("id").single();
+  // قبل ترحيل 004 (لا أعمدة ربط) — احفظ بدونها بدل الفشل
+  if (error && /lesson_code|book_id|source/.test(error.message ?? "")) {
+    const retry = await admin.from("questions").insert(base).select("id").single();
+    data = retry.data; error = retry.error;
+  }
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true, id: data.id });
 }

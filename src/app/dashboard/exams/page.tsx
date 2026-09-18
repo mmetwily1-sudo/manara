@@ -32,6 +32,15 @@ export default function ExamsListPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [form, setForm] = useState({ title: "", easy: 2, mid: 2, hard: 1, duration: 30 });
+  // المنهج المرجعي (وضع curriculum) — اختياري: بدونه يعمل التوليد القديم
+  const [tracks, setTracks] = useState<{ code: string; system: string; grade_ar: string; stream_ar: string | null }[]>([]);
+  const [currReady, setCurrReady] = useState<boolean | null>(null);
+  const [trackCode, setTrackCode] = useState("");
+  const [subjects, setSubjects] = useState<string[]>([]);
+  const [subject, setSubject] = useState("");
+  const [units, setUnits] = useState<{ subject: string; unit_no: number; unit_title: string; lessons: { code: string; lesson_title: string; weight: number; bank_count: number }[] }[]>([]);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [coverage, setCoverage] = useState<Record<string, { title: string; wanted: number; picked: number; available: number }> | null>(null);
 
   async function loadAll() {
     try {
@@ -46,6 +55,40 @@ export default function ExamsListPage() {
 
   useEffect(() => { loadAll(); }, []);
 
+  useEffect(() => {
+    apiFetch("/api/curriculum/tracks").then(({ r, j }) => {
+      if (r.ok && j?.ok) { setTracks(j.tracks ?? []); setCurrReady(true); }
+      else setCurrReady(false);
+    }).catch(() => setCurrReady(false));
+  }, []);
+
+  async function onTrack(code: string) {
+    setTrackCode(code); setSubject(""); setSubjects([]); setUnits([]); setPicked(new Set()); setCoverage(null);
+    if (!code) return;
+    const { r, j } = await apiFetch(`/api/curriculum/outline?trackCode=${encodeURIComponent(code)}`);
+    if (r.ok && j?.ok) setSubjects(j.subjects ?? []);
+  }
+
+  async function onSubject(s: string) {
+    setSubject(s); setUnits([]); setPicked(new Set()); setCoverage(null);
+    if (!s) return;
+    const { r, j } = await apiFetch(`/api/curriculum/outline?trackCode=${encodeURIComponent(trackCode)}&subject=${encodeURIComponent(s)}`);
+    if (r.ok && j?.ok) {
+      setUnits(j.units ?? []);
+      const all = new Set<string>();
+      (j.units ?? []).forEach((u: any) => u.lessons.forEach((l: any) => all.add(l.code)));
+      setPicked(all);
+    }
+  }
+
+  function toggleLesson(code: string) {
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(code)) next.delete(code); else next.add(code);
+      return next;
+    });
+  }
+
   async function onGenerate(e: React.FormEvent) {
     e.preventDefault();
     if (!form.title.trim()) {
@@ -59,7 +102,9 @@ export default function ExamsListPage() {
     }
     setGenerating(true);
     setNotice(null);
+    setCoverage(null);
     try {
+      const useCurr = trackCode && subject;
       const { r, j } = await apiFetch("/api/exams/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -67,17 +112,21 @@ export default function ExamsListPage() {
           title: form.title.trim(),
           duration: form.duration,
           distribution: { 1: form.easy, 2: form.mid, 3: form.hard },
+          ...(useCurr ? { trackCode, subject, lessonCodes: Array.from(picked) } : {}),
         }),
       });
       if (r.ok && j?.ok) {
-        const parts = Object.entries(j.pickedCount ?? {})
-          .filter(([, n]) => Number(n) > 0)
-          .map(([d, n]) => `${n} ${LEVEL_LABELS[d] ?? ""}`)
-          .join(" + ");
+        if (j.mode === "curriculum" && j.coverage) setCoverage(j.coverage);
+        const parts = useCurr
+          ? `${j.picked} سؤال من منهج ${subject}`
+          : Object.entries(j.pickedCount ?? {})
+              .filter(([, n]) => Number(n) > 0)
+              .map(([d, n]) => `${n} ${LEVEL_LABELS[d] ?? ""}`)
+              .join(" + ");
         setNotice({
           kind: j.shortfall ? "warn" : "ok",
           text: j.shortfall
-            ? `تم إنشاء الامتحان بـ ${j.picked} أسئلة فقط (${parts}) — بنك الأسئلة يحتاج أسئلة أكثر.`
+            ? `تم إنشاء الامتحان بـ ${j.picked} أسئلة فقط (${parts}) — بنك الأسئلة يحتاج أسئلة أكثر في الدروس الناقصة.`
             : `تم إنشاء الامتحان بنجاح (${parts || j.picked + " أسئلة"}).`,
         });
         setForm((f) => ({ ...f, title: "" }));
@@ -189,11 +238,76 @@ export default function ExamsListPage() {
               </div>
             ))}
           </div>
+          {currReady && (
+            <div className="rounded-xl border border-primary/20 bg-primary-light/30 p-4">
+              <div className="mb-2 text-xs font-bold text-primary">التوليد من المنهج 📚 (اختياري — يوزع الأسئلة على الدروس بأوزانها)</div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-bold text-slate-600">المسار الدراسي</label>
+                  <select value={trackCode} onChange={(e) => onTrack(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5">
+                    <option value="">بدون منهج (عشوائي من البنك)</option>
+                    {tracks.map((t) => (
+                      <option key={t.code} value={t.code}>
+                        {t.system === "azhar" ? "أزهر" : "عام"} · {t.grade_ar}{t.stream_ar ? ` · ${t.stream_ar}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {trackCode && (
+                  <div>
+                    <label className="mb-1 block text-xs font-bold text-slate-600">المادة</label>
+                    <select value={subject} onChange={(e) => onSubject(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5">
+                      <option value="">اختر المادة…</option>
+                      {subjects.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                )}
+              </div>
+              {units.length > 0 && (
+                <div className="mt-3 space-y-3">
+                  {units.map((u) => (
+                    <div key={`${u.subject}-${u.unit_no}`}>
+                      <div className="mb-1 text-xs font-bold text-slate-600">الوحدة {u.unit_no}: {u.unit_title}</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {u.lessons.map((l) => {
+                          const on = picked.has(l.code);
+                          return (
+                            <button key={l.code} type="button" onClick={() => toggleLesson(l.code)}
+                              title={`الوزن ${l.weight}% · في بنكك: ${l.bank_count}`}
+                              className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${on ? "bg-primary text-white" : "bg-slate-100 text-slate-400 line-through"}`}>
+                              {l.lesson_title} <span className="opacity-75">({l.bank_count})</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                  <p className="text-[11px] text-slate-400">الرقم بين القوسين = أسئلة هذا الدرس في بنكك — الدرس الفارغ سيُتجاهل تلقائياً.</p>
+                </div>
+              )}
+            </div>
+          )}
           <button className="btn-primary w-full sm:w-auto sm:px-10" disabled={generating || bankEmpty}>
             {generating ? "جاري التوليد... (قد يستغرق ثواني)" : "توليد الامتحان الآن"}
           </button>
         </form>
       </div>
+
+      {coverage && (
+        <div className="card space-y-2 p-5">
+          <h3 className="font-bold">تغطية الدروس 📊</h3>
+          <ul className="space-y-1.5">
+            {Object.entries(coverage).map(([code, c]) => (
+              <li key={code} className="flex items-center justify-between gap-3 text-small">
+                <span className={c.picked < c.wanted ? "font-bold text-warning" : ""}>{c.title}</span>
+                <span className="text-xs text-slate-500">اختير {c.picked}/{c.wanted} · متاح {c.available}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {exams === null ? (
         <div className="card p-8 text-center text-slate-400">جاري تحميل الامتحانات...</div>

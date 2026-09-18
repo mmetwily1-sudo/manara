@@ -16,6 +16,15 @@ export default function QuestionsPage() {
   const [okMsg, setOkMsg] = useState("");
   const [form, setForm] = useState({ body: "", subject: "", lesson: "", difficulty: "2", qtype: "mcq", options: "", correct: "", marks: "1" });
   const [busy, setBusy] = useState(false);
+  // ربط المنهج (اختياري)
+  const [tracks, setTracks] = useState<{ code: string; system: string; grade_ar: string; stream_ar: string | null }[]>([]);
+  const [linkTrack, setLinkTrack] = useState("");
+  const [linkSubjects, setLinkSubjects] = useState<string[]>([]);
+  const [linkSubject, setLinkSubject] = useState("");
+  const [linkLessons, setLinkLessons] = useState<{ code: string; lesson_title: string; unit_title: string }[]>([]);
+  const [linkLesson, setLinkLesson] = useState("");
+  const [linkBooks, setLinkBooks] = useState<{ id: string; name: string }[]>([]);
+  const [linkBook, setLinkBook] = useState("");
 
   async function load() {
     try {
@@ -33,11 +42,35 @@ export default function QuestionsPage() {
     fetch("/api/questions/stats").then((r) => r.json()).then((j) => {
       if (j?.ok) setStats({ total: j.total, byLevel: j.byLevel });
     }).catch(() => {});
+    fetch("/api/curriculum/tracks").then((r) => r.json()).then((j) => {
+      if (j?.ok) setTracks(j.tracks ?? []);
+    }).catch(() => {});
   }, []);
+
+  async function onLinkTrack(code: string) {
+    setLinkTrack(code); setLinkSubject(""); setLinkSubjects([]); setLinkLesson(""); setLinkLessons([]); setLinkBook(""); setLinkBooks([]);
+    if (!code) return;
+    const j = await fetch(`/api/curriculum/outline?trackCode=${encodeURIComponent(code)}`).then((r) => r.json()).catch(() => null);
+    if (j?.ok) setLinkSubjects(j.subjects ?? []);
+  }
+
+  async function onLinkSubject(s: string) {
+    setLinkSubject(s); setLinkLesson(""); setLinkLessons([]); setLinkBook(""); setLinkBooks([]);
+    if (linkTrack && s) {
+      if (!form.subject) setForm((f) => ({ ...f, subject: s }));
+      const j = await fetch(`/api/curriculum/outline?trackCode=${encodeURIComponent(linkTrack)}&subject=${encodeURIComponent(s)}`).then((r) => r.json()).catch(() => null);
+      if (j?.ok) {
+        const ls: { code: string; lesson_title: string; unit_title: string }[] = [];
+        (j.units ?? []).forEach((u: any) => u.lessons.forEach((l: any) => ls.push({ code: l.code, lesson_title: l.lesson_title, unit_title: u.unit_title })));
+        setLinkLessons(ls);
+        setLinkBooks(j.books ?? []);
+      }
+    }
+  }
 
   async function onAdd(e: React.FormEvent) {
     e.preventDefault();
-    setBusy(true); setErr("");
+    setBusy(true); setErr(""); setOkMsg("");
     const options = form.options.split("\n").map((s) => s.trim()).filter(Boolean);
     try {
       const r = await fetch("/api/questions", {
@@ -47,12 +80,17 @@ export default function QuestionsPage() {
           difficulty: Number(form.difficulty) || 2, qtype: form.qtype,
           options: options.length ? options : null,
           correct_answer: form.correct || null, marks: Number(form.marks) || 1,
+          lesson_code: linkLesson || null,
+          book_id: linkBook || null,
+          source: linkBook ? "book" : "teacher",
         }),
       });
       const j = await r.json().catch(() => null);
       if (r.ok && j?.ok) {
         setForm({ body: "", subject: "", lesson: "", difficulty: "2", qtype: "mcq", options: "", correct: "", marks: "1" });
+        setLinkLesson(""); setLinkBook("");
         setShowAdd(false);
+        setOkMsg("تم حفظ السؤال.");
         load();
       } else setErr("فشل الحفظ: " + (j?.error ?? "خطأ غير معروف"));
     } catch { setErr("تعذر الاتصال بالخادم."); }
@@ -174,6 +212,29 @@ export default function QuestionsPage() {
           </div>
           <textarea value={form.options} onChange={(e) => setForm({ ...form, options: e.target.value })} placeholder="الاختيارات — سطر لكل اختيار (لـ mcq)" rows={3} className="rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:border-primary sm:col-span-2" dir="ltr" style={{ textAlign: "right" }} />
           <input value={form.correct} onChange={(e) => setForm({ ...form, correct: e.target.value })} placeholder="الإجابة الصحيحة (نص مطابق لأحد الاختيارات)" className="rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:border-primary sm:col-span-2" />
+          {tracks.length > 0 && (
+            <div className="grid gap-3 rounded-xl border border-primary/20 bg-primary-light/20 p-3 sm:col-span-2 sm:grid-cols-3">
+              <div className="sm:col-span-3 text-xs font-bold text-primary">ربط بالمنهج والكتاب (اختياري — يدخل السؤال في التوليد المرجعي)</div>
+              <select value={linkTrack} onChange={(e) => onLinkTrack(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-small">
+                <option value="">المسار…</option>
+                {tracks.map((t) => <option key={t.code} value={t.code}>{t.system === "azhar" ? "أزهر" : "عام"} · {t.grade_ar}{t.stream_ar ? ` · ${t.stream_ar}` : ""}</option>)}
+              </select>
+              <select value={linkSubject} onChange={(e) => onLinkSubject(e.target.value)} disabled={!linkTrack} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-small">
+                <option value="">المادة…</option>
+                {linkSubjects.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+              <select value={linkLesson} onChange={(e) => setLinkLesson(e.target.value)} disabled={!linkLessons.length} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-small">
+                <option value="">الدرس…</option>
+                {linkLessons.map((l) => <option key={l.code} value={l.code}>{l.unit_title} — {l.lesson_title}</option>)}
+              </select>
+              {linkBooks.length > 0 && (
+                <select value={linkBook} onChange={(e) => setLinkBook(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-small sm:col-span-3">
+                  <option value="">تأليف المعلم (بدون كتاب)</option>
+                  {linkBooks.map((b) => <option key={b.id} value={b.id}>من كتاب: {b.name}</option>)}
+                </select>
+              )}
+            </div>
+          )}
           <button className="btn-primary sm:col-span-2" disabled={busy}>{busy ? "جاري الحفظ..." : "حفظ السؤال"}</button>
         </form>
       )}
