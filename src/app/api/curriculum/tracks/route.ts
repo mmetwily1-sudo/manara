@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireTeacher } from "@/lib/server-auth";
+import { requireTeacher, isMissingTable } from "@/lib/server-auth";
 
 /** GET /api/curriculum/tracks — المسارات الدراسية النشطة (عام/أزهر) */
 export async function GET() {
@@ -12,7 +12,7 @@ export async function GET() {
     .order("system", { ascending: true })
     .order("grade_ar", { ascending: true });
   if (error) {
-    if ((error as any).code === "42P01") {
+    if (isMissingTable(error)) {
       return NextResponse.json({ ok: false, error: "curriculum_not_ready", message: "طبقة المنهج غير منشأة بعد — نفّذ ترحيل 004" }, { status: 500 });
     }
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });

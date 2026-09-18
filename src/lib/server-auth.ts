@@ -35,6 +35,15 @@ export async function getSessionUser() {
   return user;
 }
 
+/** هل الخطأ = جدول غير موجود (ترحيل لم يُنفذ بعد)؟ يغطي 42P01 وPGRST204 */
+export function isMissingTable(err: any): boolean {
+  if (!err) return false;
+  const code = String(err.code ?? "");
+  if (code === "42P01" || code === "PGRST204") return true;
+  const msg = String(err.message ?? "");
+  return /Could not find the table/i.test(msg) || /relation .* does not exist/i.test(msg);
+}
+
 export type TeacherContext = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   admin: any;

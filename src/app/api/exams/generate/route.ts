@@ -1,4 +1,5 @@
 ﻿import { NextResponse } from "next/server";
+import { isMissingTable } from "@/lib/server-auth";
 
 /**
  * POST /api/exams/generate — توليد امتحان بضغطة، بوضعين:
@@ -134,7 +135,7 @@ async function generateCurriculum(admin: any, tenantId: string, examId: string, 
   // المسار + الدروس
   const { data: track, error: tErr } = await admin
     .from("curriculum_tracks").select("id,grade_ar,stream_ar").eq("code", o.trackCode).single();
-  if ((tErr as any)?.code === "42P01") throw new Error("curriculum_not_ready");
+  if (isMissingTable(tErr)) throw new Error("curriculum_not_ready");
   if (tErr || !track) throw new Error("track_not_found");
 
   let lq = admin
@@ -146,7 +147,7 @@ async function generateCurriculum(admin: any, tenantId: string, examId: string, 
     .order("lesson_no", { ascending: true });
   if (o.lessonCodes?.length) lq = lq.in("code", o.lessonCodes);
   const { data: lessons, error: lErr } = await lq;
-  if ((lErr as any)?.code === "42P01") throw new Error("curriculum_not_ready");
+  if (isMissingTable(lErr)) throw new Error("curriculum_not_ready");
   if (!lessons?.length) throw new Error("no_lessons");
 
   // الأسئلة المستخدمة حديثاً (آخر 10 امتحانات للسنتر) — تُستبعد

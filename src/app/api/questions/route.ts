@@ -2,6 +2,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
+import { isMissingTable } from "@/lib/server-auth";
 
 const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -46,7 +47,10 @@ export async function POST(req: Request) {
   const lessonCode = typeof body.lesson_code === "string" && body.lesson_code.trim() ? body.lesson_code.trim().slice(0, 40) : null;
   let bookId: string | null = null;
   if (typeof body.book_id === "string" && body.book_id) {
-    const { data: bk } = await admin.from("curriculum_books").select("id").eq("id", body.book_id).single();
+    const { data: bk, error: bkErr } = await admin.from("curriculum_books").select("id").eq("id", body.book_id).single();
+    if (isMissingTable(bkErr)) {
+      return NextResponse.json({ ok: false, error: "curriculum_not_ready", message: "ربط الكتب يتطلب ترحيل 004" }, { status: 400 });
+    }
     if (!bk) return NextResponse.json({ ok: false, error: "bad_book" }, { status: 400 });
     bookId = (bk as any).id;
   }
