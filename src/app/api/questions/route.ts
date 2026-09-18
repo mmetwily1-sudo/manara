@@ -26,12 +26,24 @@ export async function GET(req: Request) {
   const admin = res.ctx.admin;
   const urow = { tenant_id: res.ctx.tenantId };
 
-  let q = admin.from("questions").select("id,subject,lesson,difficulty,qtype,body,options,marks,usage_count").eq("tenant_id", urow.tenant_id).order("created_at", { ascending: false }).limit(100);
+  const cols = "id,subject,lesson,lesson_code,difficulty,qtype,body,options,marks,usage_count,visibility,status";
+  let q = admin.from("questions").select(cols).eq("tenant_id", urow.tenant_id).order("created_at", { ascending: false }).limit(100);
   if (subject) q = q.eq("subject", subject);
   if (difficulty) q = q.eq("difficulty", Number(difficulty));
   if (qtype) q = q.eq("qtype", qtype);
   const { data } = await q;
-  return NextResponse.json({ ok: true, questions: data ?? [] });
+  // البنك المركزي: أسئلة عامة معتمدة (للقراءة فقط من جهة المعلم)
+  let shared: any[] = [];
+  try {
+    let sq = admin.from("questions").select(cols).is("tenant_id", null).eq("visibility", "shared").eq("status", "approved").order("created_at", { ascending: false }).limit(100);
+    if (subject) sq = sq.eq("subject", subject);
+    if (difficulty) sq = sq.eq("difficulty", Number(difficulty));
+    if (qtype) sq = sq.eq("qtype", qtype);
+    const { data: sd } = await sq;
+    shared = (sd ?? []).map((r: any) => ({ ...r, shared: true }));
+  } catch {}
+  const own = (data ?? []).map((r: any) => ({ ...r, shared: false }));
+  return NextResponse.json({ ok: true, questions: [...own, ...shared] });
 }
 
 export async function POST(req: Request) {
@@ -62,16 +74,22 @@ export async function POST(req: Request) {
     body: body.body, options: body.options ?? null, correct_answer: body.correct_answer ?? null,
     marks: Number(body.marks ?? 1),
   };
-  let { data, error } = await admin.from("questions").insert({
+  // مشاركة مع البنك المركزي؟ → تُنشأ بلا ربط عام، وحالة بانتظار المراجعة
+  const wantShare = body.share === true;
+  const sourceDetail = typeof body.source_detail === "string" ? body.source_detail.trim().slice(0, 200) : null;
+  const full: any = {
     ...base, lesson_code: lessonCode, book_id: bookId, source,
-  }).select("id").single();
-  // قبل ترحيل 004 (لا أعمدة ربط) — احفظ بدونها بدل الفشل
-  if (error && /lesson_code|book_id|source/.test(error.message ?? "")) {
+    source_detail: sourceDetail,
+    visibility: "private", status: wantShare ? "pending" : "approved",
+  };
+  let { data, error } = await admin.from("questions").insert(full).select("id").single();
+  // قبل ترحيل 004/005 (لا أعمدة ربط/مشاركة) — احفظ الأساسي بدل الفشل
+  if (error && /lesson_code|book_id|source|visibility|status/.test(error.message ?? "")) {
     const retry = await admin.from("questions").insert(base).select("id").single();
     data = retry.data; error = retry.error;
   }
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true, id: data.id });
+  return NextResponse.json({ ok: true, id: (data as any).id, pending_review: wantShare && !error });
 }
 
 /** DELETE /api/questions?id= — حذف سؤال من البنك (معلم فقط) */

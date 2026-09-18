@@ -75,10 +75,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, examId: (exam as any).id, mode: "curriculum", ...out });
     }
 
-    // ---------- الوضع القديم (توافق) ----------
+    // ---------- الوضع القديم (توافق): بنكي الخاص + المركزي المشترك ----------
+    const sharedOr = `tenant_id.eq.${tenantId},and(tenant_id.is.null,visibility.eq.shared,status.eq.approved)`;
     const pools = await Promise.all(
       levels.map((l) =>
-        admin.from("questions").select("id,marks").eq("tenant_id", tenantId).eq("difficulty", l.diff).limit(200)
+        admin.from("questions").select("id,marks").eq("difficulty", l.diff).or(sharedOr).limit(300)
       )
     );
     const picked: any[] = [];
@@ -177,15 +178,16 @@ async function generateCurriculum(admin: any, tenantId: string, examId: string, 
   const quotas = apportion(o.totalWant, (lessons as any[]).map((l) => Number(l.weight) || 1));
   const diffShare = new Map(o.levels.map((l) => [l.diff, l.want / o.totalWant]));
 
-  // أحواض الدروس بالتوازي
+  // أحواض الدروس بالتوازي: بنكي الخاص + المركزي المشترك
+  const sharedOr = `tenant_id.eq.${tenantId},and(tenant_id.is.null,visibility.eq.shared,status.eq.approved)`;
   const pools = await Promise.all(
     (lessons as any[]).map((l) => {
       let q = admin
         .from("questions")
         .select("id,difficulty,qtype,marks,lesson_code")
-        .eq("tenant_id", tenantId)
         .eq("lesson_code", l.code)
-        .limit(200);
+        .or(sharedOr)
+        .limit(300);
       if (o.bookIds?.length) q = q.in("book_id", o.bookIds);
       return q;
     })

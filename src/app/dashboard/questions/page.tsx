@@ -14,7 +14,7 @@ export default function QuestionsPage() {
   const [stats, setStats] = useState<{ total: number; byLevel: Record<number, number> } | null>(null);
   const [err, setErr] = useState("");
   const [okMsg, setOkMsg] = useState("");
-  const [form, setForm] = useState({ body: "", subject: "", lesson: "", difficulty: "2", qtype: "mcq", options: "", correct: "", marks: "1" });
+  const [form, setForm] = useState({ body: "", subject: "", lesson: "", difficulty: "2", qtype: "mcq", options: "", correct: "", marks: "1", sourceDetail: "", share: false });
   const [busy, setBusy] = useState(false);
   // ربط المنهج (اختياري)
   const [tracks, setTracks] = useState<{ code: string; system: string; grade_ar: string; stream_ar: string | null }[]>([]);
@@ -95,11 +95,14 @@ export default function QuestionsPage() {
           lesson_code: linkLesson || null,
           book_id: linkBook || null,
           source: linkBook ? "book" : "teacher",
+          source_detail: form.sourceDetail.trim() || null,
+          share: form.share,
         }),
       });
       const j = await r.json().catch(() => null);
       if (r.ok && j?.ok) {
-        setForm({ body: "", subject: "", lesson: "", difficulty: "2", qtype: "mcq", options: "", correct: "", marks: "1" });
+        setOkMsg(j.pending_review ? "تم الحفظ وإرساله لمراجعة المنصة للنشر العام. ✅" : "تم حفظ السؤال.");
+        setForm({ body: "", subject: "", lesson: "", difficulty: "2", qtype: "mcq", options: "", correct: "", marks: "1", sourceDetail: "", share: false });
         setLinkLesson(""); setLinkBook("");
         setShowAdd(false);
         setOkMsg("تم حفظ السؤال.");
@@ -147,6 +150,15 @@ export default function QuestionsPage() {
     a.download = "questions-template.csv";
     a.click();
     URL.revokeObjectURL(a.href);
+  }
+
+  async function onShare(id: string) {
+    if (!confirm("مشاركة هذا السؤال في البنك المركزي؟ سيراجعه فريق المنصة قبل النشر للجميع.")) return;
+    setErr(""); setOkMsg("");
+    const r = await fetch(`/api/questions/${id}/submit`, { method: "POST" });
+    const j = await r.json().catch(() => null);
+    if (r.ok && j?.ok) { setOkMsg("أُرسل للمراجعة — سيظهر في البنك العام بعد الاعتماد. ✅"); load(); }
+    else setErr(j?.message ?? "فشل الإرسال: " + (j?.error ?? "خطأ غير معروف"));
   }
 
   async function onDelete(id: string) {
@@ -224,6 +236,11 @@ export default function QuestionsPage() {
           </div>
           <textarea value={form.options} onChange={(e) => setForm({ ...form, options: e.target.value })} placeholder="الاختيارات — سطر لكل اختيار (لـ mcq)" rows={3} className="rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:border-primary sm:col-span-2" dir="ltr" style={{ textAlign: "right" }} />
           <input value={form.correct} onChange={(e) => setForm({ ...form, correct: e.target.value })} placeholder="الإجابة الصحيحة (نص مطابق لأحد الاختيارات)" className="rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:border-primary sm:col-span-2" />
+          <input value={form.sourceDetail} onChange={(e) => setForm({ ...form, sourceDetail: e.target.value })} placeholder="المرجع (اختياري): امتحان ثانوية 2023 دور أول — س 5" className="rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:border-primary sm:col-span-2" />
+          <label className="flex cursor-pointer items-center gap-2 text-small font-bold text-slate-600 sm:col-span-2">
+            <input type="checkbox" checked={form.share} onChange={(e) => setForm({ ...form, share: e.target.checked })} className="h-4 w-4 accent-success" />
+            مشاركة في البنك المركزي 🌍 (يراجعها فريق المنصة قبل النشر — شارك أسئلتك الأصلية فقط)
+          </label>
           {tracks.length > 0 && (
             <div className="grid gap-3 rounded-xl border border-primary/20 bg-primary-light/20 p-3 sm:col-span-2 sm:grid-cols-3">
               <div className="sm:col-span-3 text-xs font-bold text-primary">ربط بالمنهج والكتاب (اختياري — يدخل السؤال في التوليد المرجعي)</div>
@@ -271,11 +288,24 @@ export default function QuestionsPage() {
         {qs.map((q) => (
           <li key={q.id} className="card p-4">
             <div className="flex items-start justify-between gap-3">
-              <div className="text-small font-bold">{q.body}</div>
+              <div className="text-small font-bold">
+                {q.body}
+                <span className="mt-1 flex flex-wrap gap-1">
+                  {(q as any).shared && <span className="rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-bold text-success">🌍 بنك عام</span>}
+                  {(q as any).status === "pending" && <span className="rounded-full bg-warning/10 px-2 py-0.5 text-[10px] font-bold text-warning">⏳ بانتظار مراجعة المنصة</span>}
+                  {(q as any).status === "rejected" && <span className="rounded-full bg-danger/10 px-2 py-0.5 text-[10px] font-bold text-danger">مرفوض من المنصة</span>}
+                </span>
+              </div>
               <div className="flex shrink-0 items-center gap-2">
                 <span className="rounded-full bg-primary-light px-2.5 py-0.5 text-[11px] font-bold text-primary">صعوبة {q.difficulty} · {q.marks} درجات</span>
-                <button onClick={() => onDelete(q.id)} aria-label="حذف السؤال"
-                  className="rounded-lg px-2 py-0.5 text-xs font-bold text-danger transition hover:bg-danger/10">حذف</button>
+                {!(q as any).shared && (q as any).status !== "pending" && (
+                  <button onClick={() => onShare(q.id)} aria-label="مشاركة في البنك العام"
+                    className="rounded-lg px-2 py-0.5 text-xs font-bold text-success transition hover:bg-success/10">مشاركة 🌍</button>
+                )}
+                {!(q as any).shared && (
+                  <button onClick={() => onDelete(q.id)} aria-label="حذف السؤال"
+                    className="rounded-lg px-2 py-0.5 text-xs font-bold text-danger transition hover:bg-danger/10">حذف</button>
+                )}
               </div>
             </div>
             <div className="mt-2 flex gap-2 text-xs text-slate-500">

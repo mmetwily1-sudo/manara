@@ -36,6 +36,10 @@ export default async function AdminHome() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
+        <a href="/admin/bank" className="card p-6 transition hover:border-primary/40">
+          <div className="font-bold">البنك المركزي 🌍</div>
+          <div className="mt-1 text-small text-slate-500">مراجعة المساهمات · فجوات التغطية</div>
+        </a>
         <a href="/admin/tenants" className="card p-6 transition hover:border-primary/40">
           <div className="font-bold">إدارة السناتر</div>
           <div className="mt-1 text-small text-slate-500">بحث · تعليق · تغيير باقة</div>
