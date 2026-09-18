@@ -35,6 +35,33 @@ export async function getSessionUser() {
   return user;
 }
 
+/**
+ * بوابة إدارة المنصة: أي مستخدم دوره platform_admin (بلا شرط سنتر).
+ * تُستخدم لمسارات /api/admin — لأن مدير المنصة قد لا ينتمي لسنتر.
+ */
+export async function requirePlatformAdmin(): Promise<
+  | { ctx: { admin: any; user: NonNullable<Awaited<ReturnType<typeof getSessionUser>>>; adminId: string } }
+  | { error: ReturnType<typeof NextResponse.json> }
+> {
+  const user = await getSessionUser();
+  if (!user) return { error: NextResponse.json({ ok: false, error: "unauth" }, { status: 401 }) };
+  let admin;
+  try {
+    admin = adminClient();
+  } catch {
+    return { error: NextResponse.json({ ok: false, error: "not_configured" }, { status: 500 }) };
+  }
+  const { data: urow } = await admin
+    .from("users")
+    .select("id,role")
+    .eq("auth_user_id", user.id)
+    .single();
+  if (!urow || (urow as any).role !== "platform_admin") {
+    return { error: NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 }) };
+  }
+  return { ctx: { admin, user, adminId: (urow as any).id } };
+}
+
 /** هل الخطأ = جدول غير موجود (ترحيل لم يُنفذ بعد)؟ يغطي 42P01 وPGRST204 */
 export function isMissingTable(err: any): boolean {
   if (!err) return false;
