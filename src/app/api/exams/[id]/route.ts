@@ -71,6 +71,29 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   });
 }
 
+/** PATCH /api/exams/[id] — تعديل العنوان/المدة/النشر (معلم فقط، سنتره فقط) */
+export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+  const { requireTeacher } = await import("@/lib/server-auth");
+  const res = await requireTeacher(["teacher_admin"]);
+  if ("error" in res) return res.error;
+  const admin = res.ctx.admin;
+
+  const body = await req.json().catch(() => ({} as any));
+  const patch: Record<string, unknown> = {};
+  if (typeof body.is_published === "boolean") patch.is_published = body.is_published;
+  if (typeof body.title === "string" && body.title.trim().length >= 2) patch.title = body.title.trim().slice(0, 120);
+  if (typeof body.duration_minutes === "number" && body.duration_minutes >= 1 && body.duration_minutes <= 180) {
+    patch.duration_minutes = Math.floor(body.duration_minutes);
+  }
+  if (!Object.keys(patch).length) return NextResponse.json({ ok: false, error: "nothing_to_update" }, { status: 400 });
+
+  const { data: exam } = await admin.from("exams").select("id").eq("id", params.id).eq("tenant_id", res.ctx.tenantId).single();
+  if (!exam) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
+  const { error } = await admin.from("exams").update(patch).eq("id", params.id).eq("tenant_id", res.ctx.tenantId);
+  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true, updated: patch });
+}
+
 /** DELETE /api/exams/[id] — حذف الامتحان وروابطه ومحاولاته وشهاداتها (معلم فقط) */
 export async function DELETE(req: Request, { params }: { params: { id: string } }) {
   const { requireTeacher } = await import("@/lib/server-auth");

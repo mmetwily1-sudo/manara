@@ -16,6 +16,61 @@ export default function QuestionsPage() {
   const [okMsg, setOkMsg] = useState("");
   const [form, setForm] = useState({ body: "", subject: "", lesson: "", difficulty: "2", qtype: "mcq", options: "", correct: "", marks: "1", sourceDetail: "", share: false });
   const [busy, setBusy] = useState(false);
+  // مسح الصور
+  const [showScan, setShowScan] = useState(false);
+  const [scanFiles, setScanFiles] = useState<FileList | null>(null);
+  const [scanSubject, setScanSubject] = useState("");
+  const [scanTitle, setScanTitle] = useState("");
+  const [scanBusy, setScanBusy] = useState(false);
+  // مسوداتي
+  const [drafts, setDrafts] = useState<any[] | null>(null);
+
+  async function loadDrafts() {
+    try {
+      const r = await fetch("/api/questions/drafts");
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) setDrafts(j.drafts ?? []);
+    } catch {}
+  }
+  useEffect(() => { loadDrafts(); }, []);
+
+  async function onScan(e: React.FormEvent) {
+    e.preventDefault();
+    if (!scanFiles?.length) { setErr("اختر صورة واحدة على الأقل."); return; }
+    setScanBusy(true); setErr(""); setOkMsg("");
+    try {
+      const fd = new FormData();
+      Array.from(scanFiles).slice(0, 8).forEach((f) => fd.append("images", f));
+      if (scanSubject.trim()) fd.set("subject", scanSubject.trim());
+      if (scanTitle.trim()) fd.set("examTitle", scanTitle.trim());
+      const r = await fetch("/api/questions/scan", { method: "POST", body: fd });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) {
+        setOkMsg(`تم إنشاء ${j.drafts} مسودة من ${j.pages} صفحات${j.ocr ? " (بمساعدة OCR)" : " (انسخ من الصور)"}${j.examId ? " — مربوطة بامتحان جديد غير منشور" : ""}. راجعها بالأسفل.`);
+        setScanFiles(null); setScanTitle("");
+        setShowScan(false);
+        loadDrafts();
+      } else setErr(j?.message ?? "فشل المسح: " + (j?.error ?? "خطأ غير معروف"));
+    } catch { setErr("تعذر الاتصال بالخادم."); }
+    finally { setScanBusy(false); }
+  }
+
+  async function onDraftAct(id: string, action: "approve" | "delete", edits?: any) {
+    setErr(""); setOkMsg("");
+    try {
+      const r = await fetch("/api/questions/drafts", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, action, ...(edits ?? {}) }),
+      });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) {
+        setOkMsg(action === "approve" ? (j.linkedExam ? "تم الاعتماد والإرفاق بالامتحان ✅" : "تم الاعتماد ✅") : "تم حذف المسودة.");
+        loadDrafts(); load();
+      } else setErr(j?.message ?? "فشل: " + (j?.error ?? "خطأ غير معروف"));
+    } catch { setErr("تعذر الاتصال بالخادم."); }
+  }
+
+
   // ربط المنهج (اختياري)
   const [tracks, setTracks] = useState<{ code: string; system: string; grade_ar: string; stream_ar: string | null }[]>([]);
   const [linkTrack, setLinkTrack] = useState("");
@@ -39,9 +94,12 @@ export default function QuestionsPage() {
   }
   useEffect(() => { load(); }, [filter]);
   // رابط قادم من صفحة الامتحانات: ?subject= → تعبئة الفلتر + فتح نموذج الإضافة
+  // ?scan=1 → فتح نموذج المسح مباشرة
   useEffect(() => {
     try {
-      const s = new URLSearchParams(window.location.search).get("subject");
+      const q = new URLSearchParams(window.location.search);
+      if (q.get("scan") === "1") setShowScan(true);
+      const s = q.get("subject");
       if (s) {
         setFilter((f) => ({ ...f, subject: s }));
         setForm((f) => ({ ...f, subject: s }));
@@ -161,6 +219,54 @@ export default function QuestionsPage() {
     else setErr(j?.message ?? "فشل الإرسال: " + (j?.error ?? "خطأ غير معروف"));
   }
 
+  function TeacherDraftCard({ draft, onAct }: { draft: any; onAct: (id: string, action: "approve" | "delete", edits?: any) => void }) {
+    const [body, setBody] = useState(draft.body ?? "");
+    const [options, setOptions] = useState(((draft.options ?? []) as string[]).join("\n"));
+    const [correct, setCorrect] = useState(draft.correct_answer ?? "");
+    const [lesson, setLesson] = useState("");
+    const [busy, setBusy] = useState(false);
+    async function go(action: "approve" | "delete") {
+      if (action === "delete" && !confirm("حذف هذه المسودة؟")) return;
+      setBusy(true);
+      await onAct(draft.id, action, {
+        body, options: options.split("\n").map((s) => s.trim()).filter(Boolean),
+        correct_answer: correct, lesson_code: lesson || undefined,
+      });
+      setBusy(false);
+    }
+    return (
+      <li className="grid gap-3 rounded-xl border border-slate-200 p-4 md:grid-cols-2">
+        <div>
+          <div className="mb-1 text-xs font-bold text-slate-500">
+            الصورة الأصلية {draft.draft_page ? `(ص ${draft.draft_page})` : ""}{draft.exam_title ? ` · امتحان: ${draft.exam_title}` : ""}
+          </div>
+          {draft.page_url ? (
+            <a href={draft.page_url} target="_blank" rel="noreferrer">
+              <img src={draft.page_url} alt="صورة الورقة" className="max-h-80 w-full rounded-lg border object-contain" loading="lazy" />
+            </a>
+          ) : <p className="text-xs text-slate-400">لا توجد صورة.</p>}
+        </div>
+        <div className="space-y-2">
+          <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={3}
+            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-small outline-none focus:border-primary" />
+          <textarea value={options} onChange={(e) => setOptions(e.target.value)} rows={3} dir="ltr" style={{ textAlign: "right" }}
+            placeholder="الاختيارات — سطر لكل اختيار"
+            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-small outline-none focus:border-primary" />
+          <input value={correct} onChange={(e) => setCorrect(e.target.value)} placeholder="الإجابة الصحيحة"
+            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-small outline-none focus:border-primary" />
+          <input value={lesson} onChange={(e) => setLesson(e.target.value.trim())} placeholder="كود الدرس (اختياري: phys-u1-l1)" dir="ltr"
+            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-left text-small outline-none focus:border-primary" />
+          <div className="flex gap-2">
+            <button onClick={() => go("approve")} disabled={busy} className="rounded-lg bg-success px-4 py-1.5 text-xs font-bold text-white disabled:opacity-50">
+              {busy ? "جاري..." : "اعتماد ✅"}
+            </button>
+            <button onClick={() => go("delete")} disabled={busy} className="rounded-lg bg-danger/10 px-4 py-1.5 text-xs font-bold text-danger disabled:opacity-50">حذف</button>
+          </div>
+        </div>
+      </li>
+    );
+  }
+
   async function onDelete(id: string) {
     if (!confirm("حذف هذا السؤال من البنك؟")) return;
     setErr(""); setOkMsg("");
@@ -186,9 +292,43 @@ export default function QuestionsPage() {
           </label>
           <button onClick={() => setShowBulk((v) => !v)} className="btn-secondary text-small">لصق أسئلة نصية</button>
           <button onClick={downloadTemplate} className="btn-secondary text-small">تحميل القالب</button>
+          <button onClick={() => setShowScan((v) => !v)} className="btn-secondary text-small">مسح ورقة 📷</button>
           <button onClick={() => setShowAdd((v) => !v)} className="btn-primary text-small">سؤال جديد</button>
         </div>
       </header>
+
+      {showScan && (
+        <form onSubmit={onScan} className="card space-y-3 p-5">
+          <h3 className="font-bold">مسح ورقة امتحان/أسئلة 📷</h3>
+          <p className="text-xs leading-relaxed text-slate-500">
+            صوّر الورقة أو ارفع صورها (حتى 8 صور) — نستخرج مسودات تلقائياً (OCR عند توفره) وتراجعها أنت من الصور قبل الاعتماد. لا شيء يُنشر وحده.
+          </p>
+          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 px-4 py-4 text-small font-bold text-slate-600 transition hover:border-primary hover:text-primary">
+            {scanFiles?.length ? `📎 ${scanFiles.length} صور مختارة` : "اختر الصور (كاميرا أو ملفات)"}
+            <input type="file" accept="image/*" multiple className="hidden"
+              onChange={(e) => setScanFiles(e.target.files)} />
+          </label>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <input value={scanSubject} onChange={(e) => setScanSubject(e.target.value)} placeholder="المادة (مثال: فيزياء)"
+              className="rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:border-primary" />
+            <input value={scanTitle} onChange={(e) => setScanTitle(e.target.value)} placeholder="عنوان الامتحان (اختياري — ينشئ امتحاناً غير منشور ويُرفق به)"
+              className="rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:border-primary" />
+          </div>
+          <button className="btn-primary" disabled={scanBusy}>{scanBusy ? "جاري المسح والمعالجة..." : "بدء المسح"}</button>
+        </form>
+      )}
+
+      {drafts !== null && drafts.length > 0 && (
+        <section className="card space-y-3 p-5">
+          <h3 className="font-bold">مسوداتي للمراجعة ({drafts.length}) 📝</h3>
+          <p className="text-xs text-slate-500">اقرأ من الصورة وصحّح — الاعتماد يتطلب نصاً واختيارات وإجابة.</p>
+          <ul className="space-y-4">
+            {drafts.map((d) => (
+              <TeacherDraftCard key={d.id} draft={d} onAct={onDraftAct} />
+            ))}
+          </ul>
+        </section>
+      )}
 
       {stats && (
         <div className="card flex flex-wrap gap-x-6 gap-y-1 p-3 text-xs text-slate-600">

@@ -159,6 +159,21 @@ export default function ExamsListPage() {
     }
   }
 
+  async function onPublish(id: string, publish: boolean) {
+    try {
+      const { r, j } = await apiFetch(`/api/exams/${id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_published: publish }),
+      });
+      if (r.ok && j?.ok) {
+        setExams((prev) => (prev ?? []).map((e) => (e.id === id ? { ...e, is_published: publish } : e)));
+        setNotice({ kind: "ok", text: publish ? "تم نشر الامتحان — أصبح متاحاً للطلاب." : "تم إخفاء الامتحان عن الطلاب." });
+      } else setNotice({ kind: "err", text: "فشل التحديث." });
+    } catch {
+      setNotice({ kind: "err", text: "تعذر الاتصال بالخادم." });
+    }
+  }
+
   async function onDelete(id: string, title: string, attempts: number) {
     if (!confirm(`حذف "${title}" نهائياً؟${attempts ? `\nسيُحذف معه ${attempts} محاولة وشهاداتها.` : ""}`)) return;
     setDeletingId(id);
@@ -227,6 +242,10 @@ export default function ExamsListPage() {
             <span className="text-slate-400">(الإجمالي: {stats.total})</span>
           </>
         )}
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <a href="/dashboard/questions?scan=1" className="btn-secondary text-small">امتحان من صور ورقية 📷</a>
       </div>
 
       <div className="card space-y-4 p-6">
@@ -366,6 +385,11 @@ export default function ExamsListPage() {
                     {ex.questions_count === 0 && (
                       <span className="rounded-full bg-warning/10 px-2 py-0.5 text-[11px] font-bold text-warning">بدون أسئلة</span>
                     )}
+                    {!ex.is_published ? (
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500">مسودة</span>
+                    ) : (
+                      <span className="rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-bold text-success">منشور</span>
+                    )}
                   </div>
                   <div className="mt-1 text-xs text-slate-500">
                     {ex.questions_count} أسئلة · {ex.duration_minutes} دقيقة
@@ -377,6 +401,10 @@ export default function ExamsListPage() {
                   <a href={`/exam/${ex.id}`} className="btn-secondary !px-4 !py-1.5 text-xs">معاينة وحل</a>
                   <button onClick={() => copyLink(ex.id)} className="btn-secondary !px-4 !py-1.5 text-xs">
                     {copiedId === ex.id ? "✓ تم النسخ" : "نسخ رابط الطلاب"}
+                  </button>
+                  <button onClick={() => onPublish(ex.id, !ex.is_published)}
+                    className="rounded-lg bg-primary-light px-4 py-1.5 text-xs font-bold text-primary transition hover:bg-primary hover:text-white">
+                    {ex.is_published ? "إخفاء" : "نشر"}
                   </button>
                   <button onClick={() => onDelete(ex.id, ex.title, ex.attempts_count)}
                     disabled={deletingId === ex.id}
