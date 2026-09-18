@@ -38,6 +38,18 @@ export default function QuestionsPage() {
     } catch { setErr("تعذر الاتصال بالخادم."); }
   }
   useEffect(() => { load(); }, [filter]);
+  // رابط قادم من صفحة الامتحانات: ?subject= → تعبئة الفلتر + فتح نموذج الإضافة
+  useEffect(() => {
+    try {
+      const s = new URLSearchParams(window.location.search).get("subject");
+      if (s) {
+        setFilter((f) => ({ ...f, subject: s }));
+        setForm((f) => ({ ...f, subject: s }));
+        setShowAdd(true);
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     fetch("/api/questions/stats").then((r) => r.json()).then((j) => {
       if (j?.ok) setStats({ total: j.total, byLevel: j.byLevel });

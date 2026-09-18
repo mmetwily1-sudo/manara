@@ -94,12 +94,17 @@ export async function POST(req: Request) {
         totalMarks += m;
       }
     });
-    if (picked.length) {
-      const { error: linkErr } = await admin.from("exam_questions").insert(picked);
-      if (linkErr) throw new Error(linkErr.message);
-      await admin.from("exams").update({ total_marks: totalMarks }).eq("id", (exam as any).id);
-      await bumpUsage(admin, picked.map((p) => p.question_id));
+    if (!picked.length) {
+      await admin.from("exams").delete().eq("id", (exam as any).id);
+      const bankTotal = pools.reduce((s, p) => s + ((p.data ?? []).length as number), 0);
+      const err: any = new Error("empty_bank");
+      err.diagnostics = { bankTotal, lessonsWithBank: 0, lessonsTotal: 0, unlinkedInSubject: 0, subject: null };
+      throw err;
     }
+    const { error: linkErr } = await admin.from("exam_questions").insert(picked);
+    if (linkErr) throw new Error(linkErr.message);
+    await admin.from("exams").update({ total_marks: totalMarks }).eq("id", (exam as any).id);
+    await bumpUsage(admin, picked.map((p) => p.question_id));
     return NextResponse.json({
       ok: true, examId: (exam as any).id, mode: "legacy",
       picked: picked.length, totalMarks, pickedCount,
@@ -109,9 +114,12 @@ export async function POST(req: Request) {
     await admin.from("exams").delete().eq("id", (exam as any).id);
     const msg = e?.message ?? "generate_failed";
     const status =
-      msg === "track_not_found" || msg === "no_lessons" ? 400
+      msg === "track_not_found" || msg === "no_lessons" || msg === "empty_bank" ? 400
       : msg === "curriculum_not_ready" ? 500 : 500;
-    return NextResponse.json({ ok: false, error: msg }, { status });
+    return NextResponse.json(
+      { ok: false, error: msg, ...(e?.diagnostics ? { diagnostics: e.diagnostics } : {}) },
+      { status }
+    );
   }
 }
 
@@ -258,9 +266,26 @@ async function generateCurriculum(admin: any, tenantId: string, examId: string, 
   }
 
   const shortfall = Object.values(coverage).some((c) => c.picked < c.wanted);
+  const bankTotal = Object.values(coverage).reduce((s, c) => s + c.available, 0);
+  const lessonsWithBank = Object.values(coverage).filter((c) => c.available > 0).length;
+  // كم سؤالاً في نفس المادة بلا ربط بالدروس؟ (مرشح للربط السريع)
+  let unlinkedInSubject = 0;
+  try {
+    const { count } = await admin
+      .from("questions").select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenantId).eq("subject", o.subject).is("lesson_code", null);
+    unlinkedInSubject = count ?? 0;
+  } catch {}
+  if (!picked.length) {
+    // لا نترك امتحاناً فارغاً — نحذفه ونرجع تشخيصاً واضحاً
+    await admin.from("exams").delete().eq("id", examId);
+    const err: any = new Error("empty_bank");
+    err.diagnostics = { bankTotal, lessonsWithBank, lessonsTotal: Object.keys(coverage).length, unlinkedInSubject, subject: o.subject };
+    throw err;
+  }
   return {
     picked: picked.length, totalMarks, coverage,
-    shortfall,
+    shortfall, bankTotal, lessonsWithBank, unlinkedInSubject,
     track: { grade: (track as any).grade_ar, stream: (track as any).stream_ar },
   };
 }

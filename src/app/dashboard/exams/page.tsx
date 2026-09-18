@@ -27,7 +27,7 @@ const LEVEL_LABELS: Record<string, string> = { "1": "سهل", "2": "متوسط",
 export default function ExamsListPage() {
   const [exams, setExams] = useState<ExamRow[] | null>(null);
   const [stats, setStats] = useState<BankStats | null>(null);
-  const [notice, setNotice] = useState<{ kind: "ok" | "err" | "warn"; text: string } | null>(null);
+  const [notice, setNotice] = useState<{ kind: "ok" | "err" | "warn"; text: string; link?: { href: string; label: string } } | null>(null);
   const [generating, setGenerating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -131,6 +131,24 @@ export default function ExamsListPage() {
         });
         setForm((f) => ({ ...f, title: "" }));
         loadAll();
+      } else if (j?.error === "empty_bank") {
+        const d = j.diagnostics ?? {};
+        const bankLink = { href: `/dashboard/questions${d.subject ? `?subject=${encodeURIComponent(d.subject)}` : ""}`, label: "فتح بنك الأسئلة" };
+        if (d.subject && (d.unlinkedInSubject ?? 0) > 0) {
+          setNotice({
+            kind: "err",
+            text: `لا توجد أسئلة مربوطة بدروس ${d.subject} — لكن عندك ${d.unlinkedInSubject} سؤال في نفس المادة بلا ربط. اربطها بالدروس من بنك الأسئلة ثم ولّد مجدداً.`,
+            link: bankLink,
+          });
+        } else if (d.subject) {
+          setNotice({
+            kind: "err",
+            text: `لا توجد أسئلة لمادة ${d.subject} في بنكك (${d.lessonsWithBank ?? 0}/${d.lessonsTotal ?? 0} درس مغطى). أضف أسئلة مربوطة بالدروس أولاً.`,
+            link: bankLink,
+          });
+        } else {
+          setNotice({ kind: "err", text: "بنك الأسئلة فارغ — أضف أسئلة أولاً ثم ولّد الامتحان.", link: bankLink });
+        }
       } else {
         setNotice({ kind: "err", text: j?.error === "unauth" ? "انتهت جلستك — سجّل دخولك مجدداً." : `فشل التوليد: ${j?.error ?? "خطأ غير معروف"}` });
       }
@@ -184,6 +202,11 @@ export default function ExamsListPage() {
           : notice.kind === "warn" ? "border-warning/30 bg-warning/5 text-warning"
           : "border-danger/20 bg-danger/5 text-danger"}`}>
           {notice.text}
+          {notice.link && (
+            <a href={notice.link.href} className="mt-2 inline-block rounded-lg bg-white/70 px-4 py-1.5 underline">
+              {notice.link.label} ←
+            </a>
+          )}
         </div>
       )}
 
@@ -289,9 +312,28 @@ export default function ExamsListPage() {
               )}
             </div>
           )}
-          <button className="btn-primary w-full sm:w-auto sm:px-10" disabled={generating || bankEmpty}>
-            {generating ? "جاري التوليد... (قد يستغرق ثواني)" : "توليد الامتحان الآن"}
-          </button>
+          {(() => {
+            const useCurr = Boolean(trackCode && subject);
+            const selBank = useCurr
+              ? units.flatMap((u) => u.lessons).filter((l) => picked.has(l.code)).reduce((s, l) => s + (l.bank_count ?? 0), 0)
+              : -1;
+            return (
+              <>
+                {useCurr && selBank === 0 && (
+                  <div className="rounded-xl border border-warning/30 bg-warning/5 p-3 text-small font-bold text-warning">
+                    الدروس المحددة بلا أسئلة مربوطة في بنكك —{" "}
+                    <a href={`/dashboard/questions?subject=${encodeURIComponent(subject)}`} className="underline">أضف أسئلة لمادة {subject} أولاً</a>
+                  </div>
+                )}
+                <button
+                  className="btn-primary w-full sm:w-auto sm:px-10"
+                  disabled={generating || bankEmpty || (useCurr && selBank === 0)}
+                >
+                  {generating ? "جاري التوليد... (قد يستغرق ثواني)" : "توليد الامتحان الآن"}
+                </button>
+              </>
+            );
+          })()}
         </form>
       </div>
 
