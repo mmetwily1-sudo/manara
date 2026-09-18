@@ -112,7 +112,7 @@ export default function StudentsPage() {
         ) : (
           <table className="w-full text-right text-small">
             <thead className="bg-slate-50 text-xs text-slate-500">
-              <tr>{["الطالب", "المجموعات", "الهاتف"].map((h) => (
+              <tr>{["الطالب", "المجموعات", "الهاتف", "تقرير"].map((h) => (
                 <th key={h} className="px-4 py-3 font-semibold">{h}</th>
               ))}</tr>
             </thead>
@@ -124,6 +124,7 @@ export default function StudentsPage() {
                     {s.groups.length ? s.groups.map((g) => g.name).join("، ") : <span className="text-slate-300">—</span>}
                   </td>
                   <td className="px-4 py-3 font-mono text-xs text-slate-400" dir="ltr">{s.phone ?? "—"}</td>
+                  <td className="px-4 py-3"><a href={`/reports/parent/${s.id}`} className="text-xs font-bold text-primary hover:underline">تقرير 📄</a></td>
                 </tr>
               ))}
             </tbody>

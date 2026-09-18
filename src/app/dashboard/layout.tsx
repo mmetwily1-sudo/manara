@@ -1,5 +1,7 @@
 ﻿import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getTenantInfoDB } from "@/lib/data";
+import { getSessionUser, adminClient } from "@/lib/server-auth";
 import { AuthGate, SignOutButton } from "@/components/AuthGate";
 
 const nav = [
@@ -19,6 +21,19 @@ const navMore = [
 ];
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+  // الطالب لا يرى لوحة المعلم أبداً (بيانات الإيرادات والطلاب) — يُوجَّه لصفحة تقدمه
+  try {
+    const user = await getSessionUser();
+    if (user) {
+      const admin = adminClient();
+      const { data: urow } = await admin
+        .from("users")
+        .select("role")
+        .eq("auth_user_id", user.id)
+        .single();
+      if (urow && (urow as any).role === "student") redirect("/progress");
+    }
+  } catch {}
   const t = await getTenantInfoDB();
   return (
     <AuthGate>
