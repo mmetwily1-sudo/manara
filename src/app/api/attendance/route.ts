@@ -57,6 +57,10 @@ export async function POST(req: Request) {
   const { data: sess } = await admin.from("sessions").select("id,tenant_id,group_id").eq("id", sessionId).single();
   if (!sess || sess.tenant_id !== urow.tenant_id) return NextResponse.json({ ok: false, error: "bad_session" }, { status: 403 });
 
+  // الطالب يجب أن ينتمي لنفس السنتر (منع تلويث سجلات سناتر أخرى)
+  const { data: student } = await admin.from("users").select("id").eq("id", studentId).eq("tenant_id", urow.tenant_id).single();
+  if (!student) return NextResponse.json({ ok: false, error: "bad_student" }, { status: 403 });
+
   const { error } = await admin.from("attendance").upsert({
     tenant_id: urow.tenant_id,
     session_id: sessionId,

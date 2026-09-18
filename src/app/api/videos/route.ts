@@ -1,6 +1,8 @@
 ﻿import { NextResponse } from "next/server";
 import { createBunnyVideo, isBunnyLive } from "@/lib/bunny";
-import { decodeSource, encodeYoutube, parseYoutubeId } from "@/lib/video-source";
+import { decodeSource, encodeYoutube, parseYoutubeId, youtubeThumbnailUrl } from "@/lib/video-source";
+import { getBunnyThumbnailUrl } from "@/lib/bunny";
+import { THUMBNAIL_BUCKET, publicThumbnailUrl } from "@/lib/thumbnails";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";

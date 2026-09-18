@@ -45,6 +45,11 @@ export function getDemoHlsUrl() {
 
 export const TUS_ENDPOINT = "https://video.bunnycdn.com/tusupload";
 
+/** المصغّرة التلقائية التي يولّدها Bunny لأي فيديو */
+export function getBunnyThumbnailUrl(videoGuid: string): string {
+  return `https://${CDN}/${videoGuid}/thumbnail.jpg`;
+}
+
 /**
  * توقيع رفع tus المصرّح به — يُولّد على السيرفر فقط (لا يُكشف AccessKey أبداً للعميل).
  * الصيغة حسب توثيق Bunny: sha256(libraryId + apiKey + expiration + videoId) ثم base64.

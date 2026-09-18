@@ -46,3 +46,8 @@ export function parseYoutubeId(input: string): string | null {
 export function youtubeEmbedUrl(youtubeId: string): string {
   return `https://www.youtube-nocookie.com/embed/${youtubeId}?rel=0`;
 }
+
+/** المصغّرة التلقائية ليوتيوب (hqdefault متاحة دائماً) */
+export function youtubeThumbnailUrl(youtubeId: string): string {
+  return `https://i.ytimg.com/vi/${youtubeId}/hqdefault.jpg`;
+}

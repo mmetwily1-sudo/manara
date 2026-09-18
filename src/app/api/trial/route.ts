@@ -1,5 +1,6 @@
 ﻿import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { isRateLimited } from "@/lib/rate-limit";
 
 /**
  * POST /api/trial â€” ØªØ³Ø¬ÙŠÙ„ ØªØ¬Ø±Ø¨Ø© Ù…Ø¬Ø§Ù†ÙŠØ© Ø­Ù‚ÙŠÙ‚ÙŠØ©
@@ -87,6 +88,11 @@ function makeSlug(centerName: string): string {
 }
 
 export async function POST(req: Request) {
+  // حد: 5 محاولات/ساعة لكل IP ضد إغراق إنشاء السناتر
+  if (isRateLimited(req, "trial", 5)) {
+    return NextResponse.json({ ok: false, error: "too_many_attempts" }, { status: 429 });
+  }
+
   let body: { centerName?: string; phone?: string; email?: string; password?: string };
   try {
     body = await req.json();

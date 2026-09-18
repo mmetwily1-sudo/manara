@@ -36,13 +36,17 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   // 1) الامتحان أولاً — هو مصدر الحقيقة للسنتر
   const { data: exam } = await sb
     .from("exams")
-    .select("id,tenant_id,title")
+    .select("id,tenant_id,title,is_published")
     .eq("id", params.id)
     .single();
   if (!exam) return NextResponse.json({ ok: false, error: "exam_not_found" }, { status: 404 });
 
   // 2) صف المستخدم — وإن غاب يُنشأ تلقائياً كطالب في سنتر الامتحان
+  // (فقط للامتحانات المنشورة — وإلا فالتسجيل التلقائي ثغرة cross-tenant)
   let { data: urow } = await sb.from("users").select("id,tenant_id,role").eq("auth_user_id", user.id).single();
+  if (!urow && !(exam as any).is_published) {
+    return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  }
   if (!urow) {
     const meta = (user.user_metadata ?? {}) as any;
     const { data: created, error: cErr } = await sb.from("users").insert({

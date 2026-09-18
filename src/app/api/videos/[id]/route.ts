@@ -18,29 +18,51 @@ function supaUser() {
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   const admin = SUPA_URL ? createClient(SUPA_URL, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } }) : null;
+  if (!admin) return NextResponse.json({ ok: false, error: "not_configured" }, { status: 500 });
 
-  if (admin) {
-    const sbUser = supaUser();
-    const { data: { user } } = sbUser ? await sbUser.auth.getUser() : { data: { user: null } } as any;
-    if (user) {
-      const { data: vid } = await admin.from("videos").select("title,provider_video_id,visibility,group_ids,excluded_student_ids").eq("id", params.id).single();
-      if (vid?.provider_video_id) {
-        const sid = user.id;
-        const excluded = (vid.excluded_student_ids as string[] | null) ?? [];
-        if (excluded.includes(sid)) return NextResponse.json({ ok: false, error: "excluded" }, { status: 403 });
-        const src = decodeSource(vid.provider_video_id);
-        if (src.kind === "youtube") {
-          return NextResponse.json({ ok: true, source: "youtube", youtubeId: src.youtubeId, embedUrl: youtubeEmbedUrl(src.youtubeId), title: (vid as any).title });
-        }
-        if (src.kind === "bunny") {
-          const hls = isBunnyLive() ? signPlaybackUrl(src.guid, sid) : getDemoHlsUrl();
-          return NextResponse.json({ ok: true, source: "bunny", hls, live: isBunnyLive() });
-        }
-        return NextResponse.json({ ok: false, error: "bad_source" }, { status: 422 });
-      }
+  const sbUser = supaUser();
+  const { data: { user } } = sbUser ? await sbUser.auth.getUser() : { data: { user: null } } as any;
+  if (!user) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
+
+  const { data: urow } = await admin.from("users")
+    .select("id,tenant_id,role").eq("auth_user_id", user.id).single();
+  if (!urow?.tenant_id) return NextResponse.json({ ok: false, error: "no_tenant" }, { status: 403 });
+
+  const { data: vid } = await admin.from("videos")
+    .select("title,tenant_id,provider_video_id,visibility,group_ids,excluded_student_ids")
+    .eq("id", params.id).single();
+  // 404 موحد: لا نكشف عن وجود فيديو من سنتر آخر
+  if (!vid?.provider_video_id || vid.tenant_id !== urow.tenant_id) {
+    return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
+  }
+
+  const excluded = (vid.excluded_student_ids as string[] | null) ?? [];
+  if (excluded.includes(urow.id)) {
+    return NextResponse.json({ ok: false, error: "excluded" }, { status: 403 });
+  }
+
+  // فيديو مجموعة: الطالب يجب أن يكون مسجلاً في إحدى مجموعات الفيديو (المعلم يتجاوز)
+  if (vid.visibility === "group" && urow.role !== "teacher_admin") {
+    const allowedGroups = (vid.group_ids as string[] | null) ?? [];
+    if (!allowedGroups.length) {
+      return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+    }
+    const { data: enr } = await admin.from("enrollments")
+      .select("id").eq("student_id", urow.id).in("group_id", allowedGroups).limit(1);
+    if (!enr?.length) {
+      return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
     }
   }
-  return NextResponse.json({ ok: true, hls: getDemoHlsUrl(), live: false });
+
+  const src = decodeSource(vid.provider_video_id);
+  if (src.kind === "youtube") {
+    return NextResponse.json({ ok: true, source: "youtube", youtubeId: src.youtubeId, embedUrl: youtubeEmbedUrl(src.youtubeId), title: (vid as any).title });
+  }
+  if (src.kind === "bunny") {
+    const hls = isBunnyLive() ? signPlaybackUrl(src.guid, user.id) : getDemoHlsUrl();
+    return NextResponse.json({ ok: true, source: "bunny", hls, live: isBunnyLive() });
+  }
+  return NextResponse.json({ ok: false, error: "bad_source" }, { status: 422 });
 }
 
 /** PATCH /api/videos/[id] — تعديل بيانات الفيديو (العنوان، الظهور، المجموعات، رابط يوتيوب) */
