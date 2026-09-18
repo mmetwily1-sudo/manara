@@ -43,8 +43,12 @@ export type TeacherContext = {
   userRow: { id: string; tenant_id: string; role: string };
 };
 
-/** يتحقق من الجلسة + صف المستخدم، ويرجع سياق المعلم أو رد خطأ جاهز */
-export async function requireTeacher(): Promise<{ ctx: TeacherContext } | { error: ReturnType<typeof NextResponse.json> }> {
+/**
+ * يتحقق من الجلسة + صف المستخدم، ويرجع سياق المعلم أو رد خطأ جاهز.
+ * @param roles إن مُررت (مثل ["teacher_admin"]) يُرفض أي role خارجها بـ 403 —
+ * يمنع طالباً داخل السنتر من استدعاء APIs المعلم.
+ */
+export async function requireTeacher(roles?: string[]): Promise<{ ctx: TeacherContext } | { error: ReturnType<typeof NextResponse.json> }> {
   const user = await getSessionUser();
   if (!user) return { error: NextResponse.json({ ok: false, error: "unauth" }, { status: 401 }) };
   let admin;
@@ -60,6 +64,9 @@ export async function requireTeacher(): Promise<{ ctx: TeacherContext } | { erro
     .single();
   if (!urow?.tenant_id) {
     return { error: NextResponse.json({ ok: false, error: "no_tenant" }, { status: 403 }) };
+  }
+  if (roles?.length && !roles.includes(urow.role)) {
+    return { error: NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 }) };
   }
   return { ctx: { admin, user, tenantId: urow.tenant_id, userRow: urow } };
 }

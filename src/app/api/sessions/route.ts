@@ -3,7 +3,7 @@ import { requireTeacher } from "@/lib/server-auth";
 
 /** POST /api/sessions — إنشاء أو جلب جلسة اليوم لمجموعة */
 export async function POST(req: Request) {
-  const res = await requireTeacher();
+  const res = await requireTeacher(["teacher_admin"]);
   if ("error" in res) return res.error;
   const { ctx } = res;
 

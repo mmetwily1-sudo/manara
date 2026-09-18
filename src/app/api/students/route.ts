@@ -3,7 +3,7 @@ import { requireTeacher } from "@/lib/server-auth";
 
 /** GET /api/students?groupId= — طلاب السنتر مع مجموعاتهم */
 export async function GET(req: Request) {
-  const res = await requireTeacher();
+  const res = await requireTeacher(["teacher_admin"]);
   if ("error" in res) return res.error;
   const { ctx } = res;
 
@@ -41,7 +41,7 @@ export async function GET(req: Request) {
 
 /** POST /api/students — إضافة طالب (بدون حساب دخول؛ يُفعَّل عند تسجيله برقم الهاتف نفسه) */
 export async function POST(req: Request) {
-  const res = await requireTeacher();
+  const res = await requireTeacher(["teacher_admin"]);
   if ("error" in res) return res.error;
   const { ctx } = res;
 

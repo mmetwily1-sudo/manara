@@ -3,7 +3,7 @@ import { requireTeacher } from "@/lib/server-auth";
 
 /** GET /api/groups — مجموعات السنتر مع عدد الطلاب */
 export async function GET() {
-  const res = await requireTeacher();
+  const res = await requireTeacher(["teacher_admin"]);
   if ("error" in res) return res.error;
   const { ctx } = res;
 
@@ -30,7 +30,7 @@ export async function GET() {
 
 /** POST /api/groups — إنشاء مجموعة جديدة */
 export async function POST(req: Request) {
-  const res = await requireTeacher();
+  const res = await requireTeacher(["teacher_admin"]);
   if ("error" in res) return res.error;
   const { ctx } = res;
 
@@ -56,7 +56,7 @@ export async function POST(req: Request) {
 
 /** DELETE /api/groups?id= — حذف مجموعة (يحذف تسجيلاتها تبعياً) */
 export async function DELETE(req: Request) {
-  const res = await requireTeacher();
+  const res = await requireTeacher(["teacher_admin"]);
   if ("error" in res) return res.error;
   const { ctx } = res;
 

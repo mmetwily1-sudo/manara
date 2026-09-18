@@ -41,8 +41,9 @@ export async function POST(req: Request) {
   if (!user) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
 
   const admin = createClient(SUPA_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
-  const { data: urow } = await admin.from("users").select("tenant_id").eq("auth_user_id", user.id).single();
+  const { data: urow } = await admin.from("users").select("tenant_id,role").eq("auth_user_id", user.id).single();
   if (!urow) return NextResponse.json({ ok: false, error: "no_tenant" }, { status: 403 });
+  if ((urow as any).role !== "teacher_admin") return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
 
   let form: FormData;
   try {
@@ -92,8 +93,9 @@ export async function DELETE(req: Request) {
   if (!user) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
 
   const admin = createClient(SUPA_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
-  const { data: urow } = await admin.from("users").select("tenant_id").eq("auth_user_id", user.id).single();
+  const { data: urow } = await admin.from("users").select("tenant_id,role").eq("auth_user_id", user.id).single();
   if (!urow) return NextResponse.json({ ok: false, error: "no_tenant" }, { status: 403 });
+  if ((urow as any).role !== "teacher_admin") return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
 
   const videoId = new URL(req.url).searchParams.get("videoId") ?? "";
   if (!videoId) return NextResponse.json({ ok: false, error: "videoId" }, { status: 400 });

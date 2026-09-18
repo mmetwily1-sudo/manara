@@ -74,8 +74,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   const { data: { user } } = sbUser ? await sbUser.auth.getUser() : { data: { user: null } } as any;
   if (!user) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
 
-  const { data: urow } = await admin.from("users").select("tenant_id").eq("auth_user_id", user.id).single();
+  const { data: urow } = await admin.from("users").select("tenant_id,role").eq("auth_user_id", user.id).single();
   if (!urow) return NextResponse.json({ ok: false, error: "no_tenant" }, { status: 403 });
+  if ((urow as any).role !== "teacher_admin") return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
 
   const { data: vid } = await admin.from("videos")
     .select("id,tenant_id,provider_video_id")
@@ -141,8 +142,9 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
   const { data: { user } } = sbUser ? await sbUser.auth.getUser() : { data: { user: null } } as any;
   if (!user) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
 
-  const { data: urow } = await admin.from("users").select("tenant_id").eq("auth_user_id", user.id).single();
+  const { data: urow } = await admin.from("users").select("tenant_id,role").eq("auth_user_id", user.id).single();
   if (!urow) return NextResponse.json({ ok: false, error: "no_tenant" }, { status: 403 });
+  if ((urow as any).role !== "teacher_admin") return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
 
   const { data: vid } = await admin.from("videos")
     .select("id,provider_video_id")
