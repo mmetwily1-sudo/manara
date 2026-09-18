@@ -15,7 +15,7 @@ type Data = {
   gaps: { track: string; subject: string; lesson: string; code: string }[];
 };
 
-type Suggest = { id: string; body: string; suggestions: { code: string; lesson_title: string; unit_title: string; score: number; matched: string[] }[] };
+type Suggest = { id: string; body: string; suggestions: { code: string; lesson_title: string; unit_title: string; score: number; matched: string[]; other_track?: boolean; track_label?: string }[] };
 
 function DraftCard({ draft, busy, onDone, onBusy }: { draft: any; busy: boolean; onDone: () => void; onBusy: (b: boolean) => void }) {
   const [body, setBody] = useState(draft.body ?? "");
@@ -252,6 +252,7 @@ export default function AdminBankPage() {
                   <button key={s.code} onClick={() => setChosen((c) => ({ ...c, [q.id]: s.code }))}
                     className={`block w-full rounded-lg border px-3 py-2 text-right text-xs transition ${chosen[q.id] === s.code ? "border-success bg-success/5 font-bold" : "border-slate-200 hover:border-primary"}`}>
                     <span className="font-bold">[{i + 1}] {s.unit_title} — {s.lesson_title}</span>
+                    {s.other_track && <span className="mr-1 rounded bg-amber-100 px-1.5 text-[10px] text-amber-700">مسار آخر: {s.track_label}</span>}
                     <span className="block text-[11px] text-slate-500">الدليل: {s.matched.join("، ") || "—"}</span>
                   </button>
                 ))}

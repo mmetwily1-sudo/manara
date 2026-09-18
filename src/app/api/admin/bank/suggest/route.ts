@@ -23,6 +23,8 @@ export async function GET(req: Request) {
     .from("curriculum_tracks").select("id").eq("code", trackCode).single();
   if (!track) return NextResponse.json({ ok: false, error: "track_not_found" }, { status: 404 });
 
+  const limit = Math.min(Number(sp.get("limit") ?? 30) || 30, 200);
+  const offset = Math.max(Number(sp.get("offset") ?? 0) || 0, 0);
   const [{ data: lessons }, { data: questions }, { data: totalRow }] = await Promise.all([
     admin
       .from("curriculum_lessons")
@@ -40,7 +42,7 @@ export async function GET(req: Request) {
       .eq("subject", subject)
       .is("lesson_code", null)
       .order("created_at", { ascending: true })
-      .limit(30),
+      .range(offset, offset + limit - 1),
     admin
       .from("questions")
       .select("id", { count: "exact", head: true })
@@ -52,12 +54,28 @@ export async function GET(req: Request) {
   ]);
 
   const ls = (lessons ?? []) as any[];
-  const out = ((questions ?? []) as any[]).map((q) => ({
-    id: q.id,
-    body: q.body,
-    subject: q.subject,
-    suggestions: suggestLessons(`${q.body} ${(q.options ?? []).join(" ")}`, ls, 3),
-  }));
+  // احتياطي عبر المسارات: نفس المادة في مسارات أخرى (يُعلَّم باسم المسار)
+  let cross: any[] = [];
+  try {
+    const { data: cl } = await admin
+      .from("curriculum_lessons")
+      .select("code,lesson_title,unit_title,track_id")
+      .eq("subject", subject)
+      .neq("track_id", (track as any).id)
+      .limit(400);
+    const { data: ts } = await admin.from("curriculum_tracks").select("id,grade_ar,stream_ar,term");
+    const label: Record<string, string> = {};
+    for (const t of (ts ?? []) as any[]) label[t.id] = `${t.grade_ar}${t.stream_ar ? " " + t.stream_ar : ""} ت${t.term}`;
+    cross = ((cl ?? []) as any[]).map((l) => ({ ...l, track_label: label[l.track_id] ?? "" }));
+  } catch {}
+  const out = ((questions ?? []) as any[]).map((q) => {
+    const text = `${q.body} ${(q.options ?? []).join(" ")}`;
+    let sug: any[] = suggestLessons(text, ls, 3).map((s) => ({ ...s, other_track: false }));
+    if (!sug.length && cross.length) {
+      sug = suggestLessons(text, cross, 3).map((s) => ({ ...s, other_track: true }));
+    }
+    return { id: q.id, body: q.body, subject: q.subject, suggestions: sug };
+  });
 
   return NextResponse.json({
     ok: true,
