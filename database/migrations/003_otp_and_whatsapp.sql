@@ -17,8 +17,8 @@ create table if not exists otp_codes (
 create index if not exists idx_otp_lookup
   on otp_codes(tenant_id, phone, purpose, created_at desc);
 
--- تنظيف تلقائي للرموز المنتهية (اختياري — يعمل مع pg_cron إن كان مفعلاً)
--- select cron.schedule('otp-cleanup', '0 * * * *', $$delete from otp_codes where expires_at < now() - interval '1 day'$$);
+-- ملاحظة: نظّف الرموز المنتهية دورياً من لوحة التحكم عند الحاجة
+-- delete from otp_codes where expires_at < now() - interval '1 day';
 
 -- 2) السماح بقناة whatsapp في سجل الإشعارات (المرسلة عبر Cloud API)
 do $$
