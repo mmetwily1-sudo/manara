@@ -57,7 +57,16 @@ def main():
     for i, page in enumerate(doc):
         pix = page.get_pixmap(dpi=150)
         pix.save(os.path.join(pages_dir, "p%03d.png" % (i + 1)))
-        text = page.get_text("text") or ""
+        text = (page.get_text("text") or "").strip()
+        if len(text) < 40:
+            # صفحة ممسوحة/مرسومة بمنحنيات (مثل ملفات الوزارة): لا نص قابل للاستخراج.
+            # ننشئ مسودة على مستوى الصفحة — المراجع ينسخ بيده من الصورة (موثوق 100%).
+            manifest["segments"].append({
+                "page": i + 1,
+                "text": "[صفحة %d — تُنسخ يدوياً من الصورة]" % (i + 1),
+                "needs_transcription": True,
+            })
+            continue
         for seg in split_segments(text):
             manifest["segments"].append({"page": i + 1, "text": seg[:2000]})
     with open(os.path.join(outdir, "manifest.json"), "w", encoding="utf-8") as f:
