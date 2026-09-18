@@ -33,8 +33,15 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   if (!exam) return NextResponse.json({ ok: false, error: "exam_not_found" }, { status: 404 });
 
   // صلاحية: يجب أن ينتمي المستخدم لنفس السنتر (أو يُسجَّل تلقائياً عند التسليم)
-  const { data: urow } = await sb.from("users").select("tenant_id").eq("auth_user_id", user.id).single();
+  const { data: urow } = await sb.from("users").select("tenant_id,role").eq("auth_user_id", user.id).single();
   if (urow && urow.tenant_id !== exam.tenant_id) {
+    return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  }
+  // الطالب لا يرى أسئلة امتحان غير منشور (المعلم يستعرض بحرية)
+  if (!urow && !(exam as any).is_published) {
+    return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  }
+  if (urow && (urow as any).role !== "teacher_admin" && !(exam as any).is_published) {
     return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
   }
 
@@ -64,15 +71,13 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   });
 }
 
-/** DELETE /api/exams/[id] — حذف الامتحان وروابطه ومحاولاته وشهاداتها */
+/** DELETE /api/exams/[id] — حذف الامتحان وروابطه ومحاولاته وشهاداتها (معلم فقط) */
 export async function DELETE(req: Request, { params }: { params: { id: string } }) {
-  const sbUser = supaUser();
-  const { data: { user } } = sbUser ? await sbUser.auth.getUser() : { data: { user: null } } as any;
-  if (!user) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
-
-  const sb = admin();
-  const { data: urow } = await sb.from("users").select("tenant_id").eq("auth_user_id", user.id).single();
-  if (!urow) return NextResponse.json({ ok: false, error: "no_tenant" }, { status: 403 });
+  const { requireTeacher } = await import("@/lib/server-auth");
+  const res = await requireTeacher(["teacher_admin"]);
+  if ("error" in res) return res.error;
+  const sb = res.ctx.admin;
+  const urow = { tenant_id: res.ctx.tenantId };
 
   const { data: exam } = await sb.from("exams").select("id").eq("id", params.id).eq("tenant_id", urow.tenant_id).single();
   if (!exam) return NextResponse.json({ ok: false, error: "exam_not_found" }, { status: 404 });

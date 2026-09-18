@@ -23,13 +23,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "title+distribution required" }, { status: 400 });
   }
 
-  const sbUser = supaUser();
-  const { data: { user } } = sbUser ? await sbUser.auth.getUser() : { data: { user: null } } as any;
-  if (!user) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
-
-  const admin = createClient(SUPA_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
-  const { data: urow } = await admin.from("users").select("tenant_id").eq("auth_user_id", user.id).single();
-  if (!urow) return NextResponse.json({ ok: false, error: "no_tenant" }, { status: 403 });
+  const { requireTeacher } = await import("@/lib/server-auth");
+  const res = await requireTeacher(["teacher_admin"]);
+  if ("error" in res) return res.error;
+  const admin = res.ctx.admin;
+  const urow = { tenant_id: res.ctx.tenantId };
 
   // 1) إنشاء الامتحان أولاً
   const { data: exam, error: eErr } = await admin.from("exams").insert({

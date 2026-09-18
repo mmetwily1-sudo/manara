@@ -68,11 +68,12 @@ async function completeSetupForExistingAuth(
     user_metadata: { full_name: centerName, role: "teacher_admin", phone },
   });
 
+  // لا نرجع كلمة السر أبداً — العميل يملكها في ذاكرته للدخول التلقائي
   return NextResponse.json({
     ok: true,
     mode: "live",
     slug,
-    creds: { email, password },
+    email,
   });
 }
 
@@ -200,7 +201,7 @@ export async function POST(req: Request) {
           ok: true,
           mode: "live",
           slug: data.slug,
-          creds: { email: loginEmail, password },
+          email: loginEmail,
         });
       } catch (e: any) {
         console.error("trial failed:", e?.message);

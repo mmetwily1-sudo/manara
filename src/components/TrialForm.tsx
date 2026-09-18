@@ -63,7 +63,8 @@ export function TrialForm() {
       const data = await res.json().catch(() => null);
       if (res.ok && data?.ok && data.mode === "live" && data.slug) {
         setSlug(data.slug);
-        setCreds(data.creds ?? { email, password });
+        // الدخول التلقائي ببيانات الذاكرة المحلية فقط — السيرفر لا يرجع كلمة السر
+        setCreds({ email: data.email ?? email, password });
         setPhase("done-live");
         return;
       }
@@ -126,7 +127,7 @@ export function TrialForm() {
           <div className="mt-5 rounded-xl border border-slate-200 bg-white p-4 text-right">
             <div className="text-xs font-bold text-slate-500 mb-2">بيانات دخولك (احتفظ بيها):</div>
             <div className="text-small font-mono" dir="ltr">{creds.email}</div>
-            <div className="text-small font-mono" dir="ltr">{creds.password}</div>
+            <div className="text-xs text-slate-400">كلمة السر: التي أدخلتها في النموذج</div>
             {!signedIn && (
               <button onClick={enterDashboard} className="btn-primary w-full mt-3 !py-2.5 text-small">
                 ادخل لوحة التحكم الآن

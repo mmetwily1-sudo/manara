@@ -13,13 +13,11 @@ function supaUser() {
 
 /** GET /api/questions/stats — عدد أسئلة البنك لكل مستوى صعوبة */
 export async function GET() {
-  const sbUser = supaUser();
-  const { data: { user } } = sbUser ? await sbUser.auth.getUser() : { data: { user: null } } as any;
-  if (!user) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
-
-  const admin = createClient(SUPA_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
-  const { data: urow } = await admin.from("users").select("tenant_id").eq("auth_user_id", user.id).single();
-  if (!urow) return NextResponse.json({ ok: false, error: "no_tenant" }, { status: 403 });
+  const { requireTeacher } = await import("@/lib/server-auth");
+  const res = await requireTeacher(["teacher_admin"]);
+  if ("error" in res) return res.error;
+  const admin = res.ctx.admin;
+  const urow = { tenant_id: res.ctx.tenantId };
 
   const { data: rows } = await admin.from("questions").select("difficulty").eq("tenant_id", urow.tenant_id).limit(2000);
   const byLevel: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };

@@ -19,13 +19,11 @@ export async function GET(req: Request) {
   const difficulty = searchParams.get("difficulty");
   const qtype = searchParams.get("qtype");
 
-  const sbUser = supaUser();
-  const { data: { user } } = sbUser ? await sbUser.auth.getUser() : { data: { user: null } } as any;
-  if (!user) return NextResponse.json({ ok: true, questions: [], demo: true });
-
-  const admin = createClient(SUPA_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
-  const { data: urow } = await admin.from("users").select("tenant_id").eq("auth_user_id", user.id).single();
-  if (!urow) return NextResponse.json({ ok: true, questions: [], demo: true });
+  const { requireTeacher } = await import("@/lib/server-auth");
+  const res = await requireTeacher(["teacher_admin"]);
+  if ("error" in res) return res.error;
+  const admin = res.ctx.admin;
+  const urow = { tenant_id: res.ctx.tenantId };
 
   let q = admin.from("questions").select("id,subject,lesson,difficulty,qtype,body,options,marks,usage_count").eq("tenant_id", urow.tenant_id).order("created_at", { ascending: false }).limit(100);
   if (subject) q = q.eq("subject", subject);
@@ -38,13 +36,11 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null as any);
   if (!body?.body) return NextResponse.json({ ok: false, error: "body required" }, { status: 400 });
-  const sbUser = supaUser();
-  const { data: { user } } = sbUser ? await sbUser.auth.getUser() : { data: { user: null } } as any;
-  if (!user) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
-
-  const admin = createClient(SUPA_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
-  const { data: urow } = await admin.from("users").select("tenant_id").eq("auth_user_id", user.id).single();
-  if (!urow) return NextResponse.json({ ok: false, error: "no_tenant" }, { status: 403 });
+  const { requireTeacher: rt } = await import("@/lib/server-auth");
+  const res = await rt(["teacher_admin"]);
+  if ("error" in res) return res.error;
+  const admin = res.ctx.admin;
+  const urow = { tenant_id: res.ctx.tenantId };
 
   const { data, error } = await admin.from("questions").insert({
     tenant_id: urow.tenant_id, subject: body.subject ?? "عام", lesson: body.lesson ?? null,

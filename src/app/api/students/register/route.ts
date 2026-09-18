@@ -42,7 +42,8 @@ export async function POST(req: Request) {
   const cleanEmail = email.trim().toLowerCase();
   const cleanPhone = phone?.trim() || null;
 
-  // لو الطالب مسجل مسبقاً بنفس الرقم في نفس السنتر بدون حساب دخول → اربط الحساب الجديد بالصف الموجود
+  // لو الطالب مسجل مسبقاً بنفس الرقم في نفس السنتر بدون حساب دخول →
+  // لا نربط فوراً (أي شخص يعرف الرقم كان يستولي على الصف!) — نرسل رمز تحقق واتساب للرقم أولاً
   if (cleanPhone) {
     const { data: existing } = await admin
       .from("users")
@@ -53,24 +54,33 @@ export async function POST(req: Request) {
       .limit(1)
       .single();
     if (existing && !existing.auth_user_id) {
-      const { data: au2, error: aue2 } = await admin.auth.admin.createUser({
-        email: cleanEmail,
-        password,
-        email_confirm: true,
-        user_metadata: { full_name: name.trim(), role: "student", phone: cleanPhone },
-      });
-      if (aue2) {
-        const isDup = aue2.message?.includes("already registered") || aue2.message?.includes("already exists");
+      const { createOtp } = await import("@/lib/otp");
+      const { normalizePhone, sendOtpCode, otpPassthroughAllowed } = await import("@/lib/whatsapp");
+      const normalized = normalizePhone(cleanPhone);
+      if (!normalized) {
+        return NextResponse.json({ ok: false, error: "bad_phone" }, { status: 400 });
+      }
+      const created = await createOtp(admin, tenant.id, normalized, "link_student");
+      if ("error" in created) {
+        const msg =
+          created.error === "cooldown"
+            ? "أُرسل رمز منذ لحظات — انتظر دقيقة وحاول مجدداً"
+            : created.error === "db_not_ready"
+              ? "نظام التحقق غير مكتمل — تواصل مع إدارة السنتر"
+              : "تعذر إرسال رمز التحقق — حاول مجدداً";
         return NextResponse.json(
-          { ok: false, error: isDup ? "email_exists" : "auth_failed", details: aue2.message },
-          { status: 400 }
+          { ok: false, error: created.error, message: msg },
+          { status: created.error === "cooldown" ? 429 : 500 }
         );
       }
-      await admin.from("users").update({ auth_user_id: au2.user.id, full_name: name.trim() }).eq("id", existing.id);
+      const sent = await sendOtpCode(normalized, created.code, tenant.name);
       return NextResponse.json({
         ok: true,
-        linked: true,
-        student: { email: cleanEmail, tenant: tenant.name, slug: tenant.slug },
+        otp_required: true,
+        masked_phone: `${normalized.slice(0, 5)}***${normalized.slice(-2)}`,
+        whatsapp_sent: sent.ok,
+        // يُرجع الرمز الصريح في بيئة التطوير/الاختبار فقط (OTP_DEV_PASSTHROUGH)
+        ...(otpPassthroughAllowed() ? { dev_code: created.code } : {}),
       });
     }
   }

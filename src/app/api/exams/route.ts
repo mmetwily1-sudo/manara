@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
+import { requireTeacher } from "@/lib/server-auth";
 
 const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -18,13 +19,10 @@ function admin() {
 
 /** GET /api/exams — قائمة امتحانات سنتر المستخدم الحالي */
 export async function GET() {
-  const sbUser = supaUser();
-  const { data: { user } } = sbUser ? await sbUser.auth.getUser() : { data: { user: null } } as any;
-  if (!user) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
-
-  const sb = admin();
-  const { data: urow } = await sb.from("users").select("tenant_id").eq("auth_user_id", user.id).single();
-  if (!urow) return NextResponse.json({ ok: false, error: "no_tenant" }, { status: 403 });
+  const res = await requireTeacher(["teacher_admin"]);
+  if ("error" in res) return res.error;
+  const sb = res.ctx.admin;
+  const urow = { tenant_id: res.ctx.tenantId };
 
   const { data: exams } = await sb
     .from("exams")

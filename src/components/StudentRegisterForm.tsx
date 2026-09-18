@@ -7,8 +7,11 @@ export function StudentRegisterForm({ slug, teacherPhone }: { slug: string; teac
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [phase, setPhase] = useState<"idle" | "sending" | "done" | "error">("idle");
+  const [phase, setPhase] = useState<"idle" | "sending" | "otp" | "verifying" | "done" | "error">("idle");
   const [msg, setMsg] = useState("");
+  const [maskedPhone, setMaskedPhone] = useState("");
+  const [waSent, setWaSent] = useState(true);
+  const [otp, setOtp] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -24,14 +27,44 @@ export function StudentRegisterForm({ slug, teacherPhone }: { slug: string; teac
       if (!res.ok || !data.ok) {
         if (data.error === "email_exists") setMsg("البريد مسجل مسبقاً — جرّب بريداً آخر");
         else if (data.error === "weak_password") setMsg("كلمة السر ضعيفة — 6 أحرف على الأقل");
-        else setMsg(data.details ?? data.error ?? "حدث خطأ");
+        else setMsg(data.message ?? data.details ?? data.error ?? "حدث خطأ");
         setPhase("error");
+        return;
+      }
+      // الرقم مربوط بصف موجود → تحقق واتساب قبل الربط
+      if (data.otp_required) {
+        setMaskedPhone(data.masked_phone ?? "");
+        setWaSent(data.whatsapp_sent !== false);
+        setPhase("otp");
         return;
       }
       setPhase("done");
     } catch {
       setMsg("خطأ في الاتصال");
       setPhase("error");
+    }
+  }
+
+  async function handleVerify(e: React.FormEvent) {
+    e.preventDefault();
+    setPhase("verifying");
+    setMsg("");
+    try {
+      const res = await fetch("/api/students/verify-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug, phone, code: otp, name, email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setMsg(data.message ?? "فشل التحقق — حاول مجدداً");
+        setPhase("otp");
+        return;
+      }
+      setPhase("done");
+    } catch {
+      setMsg("خطأ في الاتصال");
+      setPhase("otp");
     }
   }
 
@@ -49,8 +82,31 @@ export function StudentRegisterForm({ slug, teacherPhone }: { slug: string; teac
 
   function sendViaWhatsapp() {
     setSentVia("whatsapp");
-    const text = `مرحباً ${name}، بيانات دخولك لمنصة ${slug}:\nالبريد: ${email}\nكلمة السر: ${password}\nرابط الدخول: ${window.location.origin}/login`;
+    // لا نضع كلمة السر في الرابط أبداً (تظهر في سجل المتصفح) — رابط الدخول فقط
+    const text = `مرحباً ${name}، تم تسجيلك في منصة ${slug} ✅\nسجّل دخولك بالبريد ${email} من هنا: ${window.location.origin}/login`;
     window.open(`https://wa.me/${phone.replace(/\D/g, "") || "201025183569"}?text=${encodeURIComponent(text)}`, "_blank");
+  }
+
+  if (phase === "otp" || phase === "verifying") {
+    return (
+      <form onSubmit={handleVerify} className="mx-auto mt-8 max-w-md space-y-3 rounded-xl border bg-white p-6 text-right">
+        <h3 className="text-center font-bold">تحقق من رقمك 📲</h3>
+        <p className="text-center text-small text-slate-600">
+          رقمك مسجل لدينا ({maskedPhone || phone}) — أرسلنا رمز تحقق من 6 أرقام على واتساب.
+          {!waSent && " (تعذّر الإرسال التلقائي — اطلب الرمز من إدارة السنتر.)"}
+        </p>
+        {phase === "otp" && msg && <div className="rounded-lg bg-danger/10 px-3 py-2 text-sm font-semibold text-danger">{msg}</div>}
+        <input required value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+          placeholder="─ ─ ─ ─ ─ ─" dir="ltr" inputMode="numeric" maxLength={6}
+          className="w-full rounded-xl border-2 border-slate-200 px-4 py-3 text-center text-2xl font-bold tracking-[0.5em] outline-none focus:border-primary" />
+        <button disabled={phase === "verifying" || otp.length !== 6} className="btn-primary w-full">
+          {phase === "verifying" ? "جاري التحقق..." : "تأكيد وربط حسابي"}
+        </button>
+        <button type="button" onClick={handleSubmit} className="w-full text-center text-xs font-bold text-primary">
+          إعادة إرسال الرمز
+        </button>
+      </form>
+    );
   }
 
   if (phase === "done") {

@@ -21,9 +21,10 @@ function supaUser() {
  * Ø«Ø§Ù„ options: ["Ø£","Ø¨","Ø¬","Ø¯"]  Ø£Ùˆ  "Ø£|Ø¨|Ø¬|Ø¯"
  */
 export async function POST(req: Request) {
-  const sbUser = supaUser();
-  const { data: { user } } = sbUser ? await sbUser.auth.getUser() : { data: { user: null } } as any;
-  if (!user) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
+  const { requireTeacher } = await import("@/lib/server-auth");
+  const tres = await requireTeacher(["teacher_admin"]);
+  if ("error" in tres) return tres.error;
+  const tctx = tres.ctx;
 
   const form = await req.formData().catch(() => null);
   const file = form?.get("file") as File | null;
@@ -53,9 +54,8 @@ export async function POST(req: Request) {
     });
   }
 
-  const admin = createClient(SUPA_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
-  const { data: urow } = await admin.from("users").select("tenant_id").eq("auth_user_id", user.id).single();
-  if (!urow) return NextResponse.json({ ok: false, error: "no_tenant" }, { status: 403 });
+  const admin = tctx.admin;
+  const urow = { tenant_id: tctx.tenantId };
 
   let ok = 0, bad = 0;
   for (const r of rows) {
