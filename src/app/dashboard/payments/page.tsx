@@ -30,6 +30,23 @@ export default function PaymentsPage() {
   }
   useEffect(() => { load(); }, []);
 
+  async function onReview(id: string, action: "confirm" | "reject") {
+    if (!confirm(action === "confirm" ? "تأكيد استلام هذه الدفعة؟" : "رفض هذه المطالبة؟")) return;
+    setErr("");
+    try {
+      const r = await fetch(`/api/payments/${id}/review`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) load();
+      else setErr("فشل المراجعة: " + (j?.error ?? "خطأ غير معروف"));
+    } catch { setErr("تعذر الاتصال بالخادم."); }
+  }
+
+  const pending = (payments ?? []).filter((p) => p.status === "pending");
+  const history = (payments ?? []).filter((p) => p.status !== "pending");
+
   async function onCollect(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true); setErr("");
@@ -91,10 +108,32 @@ export default function PaymentsPage() {
         ))}
       </section>
 
+      {pending.length > 0 && (
+        <section className="card space-y-3 border-warning/30 p-5">
+          <h2 className="font-bold">مطالبات بانتظار المراجعة ({pending.length}) ⏳</h2>
+          <ul className="space-y-2">
+            {pending.map((p) => (
+              <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-amber-50 px-4 py-3 text-small">
+                <div>
+                  <span className="font-bold">{p.student}</span>
+                  <span className="mx-2 text-success font-bold">{fmt(p.amount)}</span>
+                  <span className="text-slate-500">{METHODS[p.method] ?? p.method}</span>
+                  {p.note && <span className="block text-xs text-slate-400">{p.note}</span>}
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => onReview(p.id, "confirm")} className="rounded-lg bg-success px-4 py-1.5 text-xs font-bold text-white">تأكيد الاستلام</button>
+                  <button onClick={() => onReview(p.id, "reject")} className="rounded-lg bg-danger/10 px-4 py-1.5 text-xs font-bold text-danger">رفض</button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <section className="card overflow-hidden">
         {payments === null ? (
           <div className="p-8 text-center text-slate-400">جاري تحميل الدفعات...</div>
-        ) : payments.length === 0 ? (
+        ) : history.length === 0 ? (
           <div className="p-8 text-center text-small text-slate-500">لا توجد دفعات مسجلة بعد — سجّل أول دفعة بالزر بالأعلى.</div>
         ) : (
           <table className="w-full text-right text-small">
@@ -102,7 +141,7 @@ export default function PaymentsPage() {
               <tr>{["الطالب", "المبلغ", "الطريقة", "ملاحظة", "الوقت"].map((h) => <th key={h} className="px-4 py-3 font-semibold">{h}</th>)}</tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {payments.map((p) => (
+              {history.map((p) => (
                 <tr key={p.id}>
                   <td className="px-4 py-3 font-bold">{p.student}</td>
                   <td className="px-4 py-3 font-bold text-success">{fmt(p.amount)}</td>

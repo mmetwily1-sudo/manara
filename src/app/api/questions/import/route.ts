@@ -20,6 +20,40 @@ function supaUser() {
  * subject | lesson | difficulty(1-5) | qtype(mcq/true_false/short_answer) | body | options(JSON Ø£Ùˆ ÙØµÙˆÙ„Ø© Ø¨Ù€|) | correct_answer | marks
  * Ø«Ø§Ù„ options: ["Ø£","Ø¨","Ø¬","Ø¯"]  Ø£Ùˆ  "Ø£|Ø¨|Ø¬|Ø¯"
  */
+/**
+ * محلل النص المجمع: كتل مفصولة بسطر فارغ.
+ * مثال الكتلة:
+ *   ما ناتج 2+2؟
+ *   أ) 3
+ *   ب) 4
+ *   ج) 5
+ *   =: 4
+ */
+function parseBulkText(text: string): any[] {
+  const rows: any[] = [];
+  const blocks = text.replace(/\r/g, "").split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean);
+  for (const b of blocks) {
+    const lines = b.split("\n").map((l) => l.trim()).filter(Boolean);
+    if (!lines.length) continue;
+    const body = lines[0].replace(/^س:\s*/, "");
+    const options: string[] = [];
+    let correct: string | null = null;
+    let tf: string | null = null;
+    for (const l of lines.slice(1)) {
+      const ans = l.match(/^=:\s*(.+)$/);
+      if (ans) { correct = ans[1].trim(); continue; }
+      const opt = l.match(/^[أ-يa-dA-D][).\-:]\s*(.+)$/);
+      if (opt) { options.push(opt[1].trim()); continue; }
+      if (/^(صح|خطأ|true|false)$/i.test(l)) { tf = /^(صح|true)$/i.test(l) ? "صح" : "خطأ"; continue; }
+    }
+    if (!body) continue;
+    if (tf) rows.push({ body, qtype: "true_false", correct_answer: tf });
+    else if (options.length >= 2) rows.push({ body, qtype: "mcq", options, correct_answer: correct });
+    else rows.push({ body, qtype: "short_answer", correct_answer: correct });
+  }
+  return rows;
+}
+
 export async function POST(req: Request) {
   const { requireTeacher } = await import("@/lib/server-auth");
   const tres = await requireTeacher(["teacher_admin"]);
@@ -31,27 +65,35 @@ export async function POST(req: Request) {
   if (!file) return NextResponse.json({ ok: false, error: "file required" }, { status: 400 });
 
   const buf = Buffer.from(await file.arrayBuffer());
+  const mode = (form?.get("mode") as string) || "auto";
   let rows: any[] = [];
 
-  // Ø¬Ø±Ù‘Ø¨ xlsx Ø£ÙˆÙ„Ø§Ù‹ (Ø¥Ù† ØªÙˆÙØ±)ØŒ Ø« CSV ÙƒØ¨Ø¯ÙŠÙ„
-  try {
-    const XLSX: any = await import("xlsx").catch(() => null);
-    if (XLSX) {
-      const wb = XLSX.read(buf, { type: "buffer" });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+  if (mode === "text") {
+    // استيراد نصي: سؤال لكل كتلة مفصولة بسطر فارغ
+    // الصيغة: السطر الأول نص السؤال، ثم سطور "أ) ..." للاختيارات، وسطر "=: ..." للإجابة
+    rows = parseBulkText(buf.toString("utf8"));
+    if (!rows.length) return NextResponse.json({ ok: false, error: "empty" }, { status: 400 });
+  } else {
+    // Ø¬Ø±Ù‘Ø¨ xlsx Ø£ÙˆÙ„Ø§Ù‹ (Ø¥Ù† ØªÙˆÙØ±)ØŒ Ø« CSV ÙƒØ¨Ø¯ÙŠÙ„
+    try {
+      const XLSX: any = await import("xlsx").catch(() => null);
+      if (XLSX) {
+        const wb = XLSX.read(buf, { type: "buffer" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+      }
+    } catch {}
+    if (rows.length === 0) {
+      const text = buf.toString("utf8");
+      const lines = text.split(/\r?\n/).filter(Boolean);
+      if (lines.length < 2) return NextResponse.json({ ok: false, error: "empty" }, { status: 400 });
+      const headers = lines[0].split(",").map((h) => h.trim());
+      rows = lines.slice(1).map((l) => {
+        const vals = l.split(","); const r: any = {};
+        headers.forEach((h, i) => (r[h] = vals[i]?.trim() ?? ""));
+        return r;
+      });
     }
-  } catch {}
-  if (rows.length === 0) {
-    const text = buf.toString("utf8");
-    const lines = text.split(/\r?\n/).filter(Boolean);
-    if (lines.length < 2) return NextResponse.json({ ok: false, error: "empty" }, { status: 400 });
-    const headers = lines[0].split(",").map((h) => h.trim());
-    rows = lines.slice(1).map((l) => {
-      const vals = l.split(","); const r: any = {};
-      headers.forEach((h, i) => (r[h] = vals[i]?.trim() ?? ""));
-      return r;
-    });
   }
 
   const admin = tctx.admin;

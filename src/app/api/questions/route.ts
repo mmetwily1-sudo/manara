@@ -52,4 +52,23 @@ export async function POST(req: Request) {
   return NextResponse.json({ ok: true, id: data.id });
 }
 
+/** DELETE /api/questions?id= — حذف سؤال من البنك (معلم فقط) */
+export async function DELETE(req: Request) {
+  const { requireTeacher: rt } = await import("@/lib/server-auth");
+  const res = await rt(["teacher_admin"]);
+  if ("error" in res) return res.error;
+  const id = new URL(req.url).searchParams.get("id");
+  if (!id) return NextResponse.json({ ok: false, error: "missing_id" }, { status: 400 });
+  // لا تحذف سؤالاً مستخدماً في امتحان
+  const { data: used } = await res.ctx.admin
+    .from("exam_questions").select("exam_id").eq("question_id", id).limit(1);
+  if (used?.length) {
+    return NextResponse.json({ ok: false, error: "in_use", message: "السؤال مستخدم في امتحان — احذفه من الامتحان أولاً" }, { status: 400 });
+  }
+  const { error } = await res.ctx.admin
+    .from("questions").delete().eq("id", id).eq("tenant_id", res.ctx.tenantId);
+  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}
+
 

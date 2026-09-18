@@ -66,3 +66,53 @@ export function NotifyToggle() {
     </div>
   );
 }
+
+/** أرقام استقبال الدفع (تظهر للطالب في صفحة الدفع) */
+export function PayNumbersForm() {
+  const [nums, setNums] = useState({ instapay: "", wallet: "", fawry: "" });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/tenant/settings")
+      .then((r) => r.json())
+      .then((j) => {
+        if (j?.ok && j.pay_numbers) setNums({ instapay: j.pay_numbers.instapay ?? "", wallet: j.pay_numbers.wallet ?? "", fawry: j.pay_numbers.fawry ?? "" });
+      })
+      .catch(() => {});
+  }, []);
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true); setSaved(false);
+    try {
+      const r = await fetch("/api/tenant/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pay_numbers: nums }),
+      });
+      if (r.ok) setSaved(true);
+    } catch {}
+    setSaving(false);
+  }
+
+  return (
+    <form onSubmit={save} className="space-y-3">
+      <div>
+        <div className="text-small font-bold">أرقام استقبال الدفع 💳</div>
+        <p className="mt-0.5 text-xs text-slate-500">تظهر للطالب في صفحة الدفع — اترك الفارغ فارغاً.</p>
+      </div>
+      {([["instapay", "انستاباي (عنوان الدفع)"], ["wallet", "محفظة (رقم الموبايل)"], ["fawry", "فوري (رقم التاجر)"]] as const).map(([k, label]) => (
+        <div key={k}>
+          <label className="mb-1 block text-xs font-bold text-slate-600">{label}</label>
+          <input value={nums[k]} onChange={(e) => setNums({ ...nums, [k]: e.target.value })} dir="ltr"
+            placeholder="—" className="w-full rounded-xl border border-slate-200 px-4 py-2 text-left outline-none focus:border-primary" />
+        </div>
+      ))}
+      <div className="flex items-center gap-2">
+        <button className="btn-primary !py-2 text-small" disabled={saving}>{saving ? "جاري الحفظ..." : "حفظ الأرقام"}</button>
+        {saved && <span className="text-xs font-bold text-success">✓ تم الحفظ</span>}
+      </div>
+    </form>
+  );
+}

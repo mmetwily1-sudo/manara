@@ -9,7 +9,11 @@ export default function QuestionsPage() {
   const [filter, setFilter] = useState({ subject: "", difficulty: "" });
   const [importing, setImporting] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
+  const [showBulk, setShowBulk] = useState(false);
+  const [bulkText, setBulkText] = useState("");
+  const [stats, setStats] = useState<{ total: number; byLevel: Record<number, number> } | null>(null);
   const [err, setErr] = useState("");
+  const [okMsg, setOkMsg] = useState("");
   const [form, setForm] = useState({ body: "", subject: "", lesson: "", difficulty: "2", qtype: "mcq", options: "", correct: "", marks: "1" });
   const [busy, setBusy] = useState(false);
 
@@ -25,6 +29,11 @@ export default function QuestionsPage() {
     } catch { setErr("تعذر الاتصال بالخادم."); }
   }
   useEffect(() => { load(); }, [filter]);
+  useEffect(() => {
+    fetch("/api/questions/stats").then((r) => r.json()).then((j) => {
+      if (j?.ok) setStats({ total: j.total, byLevel: j.byLevel });
+    }).catch(() => {});
+  }, []);
 
   async function onAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -53,12 +62,50 @@ export default function QuestionsPage() {
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
-    setImporting(true);
+    setImporting(true); setErr(""); setOkMsg("");
     const fd = new FormData(); fd.set("file", f);
     const r = await fetch("/api/questions/import", { method: "POST", body: fd });
     const j = await r.json();
-    alert(j.ok ? `تم استيراد ${j.imported} سؤال (تخطي ${j.skipped})` : j.error);
+    if (j.ok) setOkMsg(`تم استيراد ${j.imported} سؤال (تخطي ${j.skipped})`);
+    else setErr("فشل الاستيراد: " + (j?.error ?? "خطأ غير معروف"));
     setImporting(false); load();
+  }
+
+  async function onBulk(e: React.FormEvent) {
+    e.preventDefault();
+    if (!bulkText.trim()) return;
+    setImporting(true); setErr(""); setOkMsg("");
+    const fd = new FormData();
+    fd.set("file", new Blob([bulkText], { type: "text/plain" }), "bulk.txt");
+    fd.set("mode", "text");
+    try {
+      const r = await fetch("/api/questions/import", { method: "POST", body: fd });
+      const j = await r.json();
+      if (j.ok) { setOkMsg(`تم استيراد ${j.imported} سؤال (تخطي ${j.skipped})`); setBulkText(""); setShowBulk(false); }
+      else setErr("فشل الاستيراد: " + (j?.error ?? "خطأ غير معروف"));
+    } catch { setErr("تعذر الاتصال بالخادم."); }
+    setImporting(false); load();
+  }
+
+  function downloadTemplate() {
+    const csv = "subject,lesson,difficulty,qtype,body,options,correct_answer,marks\n" +
+      "رياضيات,الكسور,2,mcq,ما ناتج 1/2 + 1/4؟,1/2|3/4|1|2/3,3/4,2\n" +
+      "علوم,,1,true_false,الماء يغلي عند 100 درجة مئوية,,صح,1\n";
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "questions-template.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  async function onDelete(id: string) {
+    if (!confirm("حذف هذا السؤال من البنك؟")) return;
+    setErr(""); setOkMsg("");
+    const r = await fetch(`/api/questions?id=${id}`, { method: "DELETE" });
+    const j = await r.json().catch(() => null);
+    if (r.ok && j?.ok) { setOkMsg("تم حذف السؤال."); load(); }
+    else setErr(j?.message ?? "فشل الحذف: " + (j?.error ?? "خطأ غير معروف"));
   }
 
 
@@ -70,16 +117,42 @@ export default function QuestionsPage() {
           <h1 className="text-h1">بنك الأسئلة</h1>
           <p className="mt-1 text-small text-slate-500">أسئلتك بمعادلات KaTeX وإستيراد Excel/CSV</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <label className="btn-secondary cursor-pointer text-small">
             {importing ? "جاري..." : "استيراد Excel/CSV"}
             <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={onFile} disabled={importing} />
           </label>
+          <button onClick={() => setShowBulk((v) => !v)} className="btn-secondary text-small">لصق أسئلة نصية</button>
+          <button onClick={downloadTemplate} className="btn-secondary text-small">تحميل القالب</button>
           <button onClick={() => setShowAdd((v) => !v)} className="btn-primary text-small">سؤال جديد</button>
         </div>
       </header>
 
+      {stats && (
+        <div className="card flex flex-wrap gap-x-6 gap-y-1 p-3 text-xs text-slate-600">
+          <span>الإجمالي: <b>{stats.total}</b></span>
+          {[1, 2, 3, 4, 5].map((d) => (
+            <span key={d}>مستوى {d}: <b>{stats.byLevel?.[d] ?? 0}</b></span>
+          ))}
+        </div>
+      )}
+
       {err && <div className="card border-danger/20 bg-danger/5 p-4 text-small font-bold text-danger">{err}</div>}
+      {okMsg && <div className="card border-success/30 bg-success/5 p-4 text-small font-bold text-success">{okMsg}</div>}
+
+      {showBulk && (
+        <form onSubmit={onBulk} className="card space-y-3 p-5">
+          <h3 className="font-bold">لصق أسئلة مجمعة</h3>
+          <p className="text-xs leading-relaxed text-slate-500">
+            سؤال لكل كتلة يفصلها سطر فارغ — السطر الأول نص السؤال، ثم الاختيارات (أ، ب، ج...)، وسطر <code dir="ltr">=: الإجابة</code> للصحيحة.
+            مثال:
+          </p>
+          <pre dir="rtl" className="overflow-x-auto rounded-lg bg-slate-50 p-3 text-xs text-slate-600">ما ناتج 2+2؟{"\n"}أ) 3{"\n"}ب) 4{"\n"}ج) 5{"\n"}=: 4</pre>
+          <textarea value={bulkText} onChange={(e) => setBulkText(e.target.value)} rows={8}
+            placeholder="الصق أسئلتك هنا..." className="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:border-primary" />
+          <button className="btn-primary" disabled={importing || !bulkText.trim()}>{importing ? "جاري الاستيراد..." : "استيراد النص"}</button>
+        </form>
+      )}
 
       {showAdd && (
         <form onSubmit={onAdd} className="card grid gap-3 p-5 sm:grid-cols-2">
@@ -126,7 +199,11 @@ export default function QuestionsPage() {
           <li key={q.id} className="card p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="text-small font-bold">{q.body}</div>
-              <span className="shrink-0 rounded-full bg-primary-light px-2.5 py-0.5 text-[11px] font-bold text-primary">صعوبة {q.difficulty} · {q.marks} درجات</span>
+              <div className="flex shrink-0 items-center gap-2">
+                <span className="rounded-full bg-primary-light px-2.5 py-0.5 text-[11px] font-bold text-primary">صعوبة {q.difficulty} · {q.marks} درجات</span>
+                <button onClick={() => onDelete(q.id)} aria-label="حذف السؤال"
+                  className="rounded-lg px-2 py-0.5 text-xs font-bold text-danger transition hover:bg-danger/10">حذف</button>
+              </div>
             </div>
             <div className="mt-2 flex gap-2 text-xs text-slate-500">
               <span>{q.subject}</span>
