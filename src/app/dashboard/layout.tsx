@@ -22,6 +22,8 @@ const navMore = [
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   // الطالب لا يرى لوحة المعلم أبداً (بيانات الإيرادات والطلاب) — يُوجَّه لصفحة تقدمه
+  // ملاحظة: redirect() يعمل برمي استثناء خاص — يجب أن يبقى خارج try/catch
+  let viewerRole: string | null = null;
   try {
     const user = await getSessionUser();
     if (user) {
@@ -31,9 +33,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
         .select("role")
         .eq("auth_user_id", user.id)
         .single();
-      if (urow && (urow as any).role === "student") redirect("/progress");
+      viewerRole = (urow as any)?.role ?? null;
     }
   } catch {}
+  if (viewerRole === "student") redirect("/progress");
   const t = await getTenantInfoDB();
   return (
     <AuthGate>
