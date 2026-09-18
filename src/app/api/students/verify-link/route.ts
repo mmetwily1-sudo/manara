@@ -98,7 +98,11 @@ export async function POST(req: Request) {
   }
   await admin
     .from("users")
-    .update({ auth_user_id: au.user.id, full_name: String(name).trim() })
+    .update({
+      auth_user_id: au.user.id,
+      full_name: String(name).trim(),
+      phone_verified_at: new Date().toISOString(),
+    })
     .eq("id", existing.id);
 
   return NextResponse.json({

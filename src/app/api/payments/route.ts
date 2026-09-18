@@ -112,5 +112,18 @@ export async function POST(req: Request) {
   if (error || !data) {
     return NextResponse.json({ ok: false, error: error?.message ?? "insert_failed" }, { status: 500 });
   }
+
+  // إيصال واتساب فوري (best-effort)
+  try {
+    const { notifyStudent } = await import("@/lib/notify");
+    const { data: trow } = await ctx.admin.from("tenants").select("name").eq("id", ctx.tenantId).single();
+    await notifyStudent(ctx.admin, {
+      tenantId: ctx.tenantId,
+      studentId,
+      event: { kind: "payment_received", studentName: "", amount, centerName: (trow as any)?.name ?? "" },
+      dedupeKey: `payment:${(data as any).id}`,
+    });
+  } catch {}
+
   return NextResponse.json({ ok: true, id: data.id });
 }

@@ -1,4 +1,5 @@
 import { PasskeyManager } from "@/components/PasskeyManager";
+import { NotifyToggle } from "@/components/NotifyToggle";
 import { getTenantInfoDB } from "@/lib/data";
 
 export default async function SettingsPage() {
@@ -27,6 +28,10 @@ export default async function SettingsPage() {
             <dd className="font-bold">{t.plan}</dd>
           </div>
         </dl>
+      </section>
+
+      <section className="card space-y-4 p-6">
+        <NotifyToggle />
       </section>
 
       <section className="card space-y-4 p-6">

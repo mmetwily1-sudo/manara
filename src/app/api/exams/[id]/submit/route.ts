@@ -109,5 +109,16 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     }
   }
 
+  // إشعار واتساب بالنتيجة (best-effort)
+  try {
+    const { notifyStudent } = await import("@/lib/notify");
+    await notifyStudent(sb, {
+      tenantId: exam.tenant_id,
+      studentId: urow.id,
+      event: { kind: "exam_graded", studentName: "", examTitle: exam.title, score, total, certSerial },
+      dedupeKey: `exam:${att.id}`,
+    });
+  } catch {}
+
   return NextResponse.json({ ok: true, score, total, certSerial });
 }

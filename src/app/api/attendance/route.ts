@@ -78,5 +78,26 @@ export async function POST(req: Request) {
     details: { studentId, status },
   });
 
+  // إشعار واتساب فوري عند الغياب (best-effort — لا يؤثر على الرد)
+  if (status === "absent") {
+    try {
+      const { notifyStudent } = await import("@/lib/notify");
+      const { data: sessFull } = await admin
+        .from("sessions")
+        .select("session_date,groups(name)")
+        .eq("id", sessionId)
+        .single();
+      const gname = (sessFull as any)?.groups?.name ?? "";
+      const label = `${gname ? gname + " — " : ""}${(sessFull as any)?.session_date ?? ""}`.trim() || "حصة اليوم";
+      const { data: trow } = await admin.from("tenants").select("name").eq("id", urow.tenant_id).single();
+      await notifyStudent(admin, {
+        tenantId: urow.tenant_id,
+        studentId,
+        event: { kind: "attendance_absent", studentName: "", centerName: (trow as any)?.name ?? "", sessionLabel: label },
+        dedupeKey: `attendance:${sessionId}:${studentId}`,
+      });
+    } catch {}
+  }
+
   return NextResponse.json({ ok: true });
 }
