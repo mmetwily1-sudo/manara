@@ -115,12 +115,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, action });
   }
   if (action === "approve_draft") {
+    const { parseOptions } = await import("@/lib/parse-options");
     const patch: Record<string, unknown> = { status: "approved", reviewed_by: g.ctx!.adminId, reviewed_at: new Date().toISOString() };
     if (typeof body.body === "string" && body.body.trim().length >= 2) patch.body = body.body.trim();
-    if (Array.isArray(body.options)) {
-      const opts = body.options.map((o: unknown) => String(o ?? "").trim()).filter(Boolean);
-      if (opts.length >= 2) patch.options = opts;
-    }
+    const opts = parseOptions(body.options);
+    if (opts.length >= 2) patch.options = opts;
     if (typeof body.correct_answer === "string" && body.correct_answer.trim()) patch.correct_answer = body.correct_answer.trim();
     if (typeof body.lesson_code === "string" && body.lesson_code) patch.lesson_code = body.lesson_code;
     if (typeof body.difficulty === "number" && body.difficulty >= 1 && body.difficulty <= 5) patch.difficulty = body.difficulty;

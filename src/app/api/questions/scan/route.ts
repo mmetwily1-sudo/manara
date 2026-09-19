@@ -3,24 +3,83 @@ import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFile } from "node:child_process";
+import { isVisionLive, transcribeImage } from "@/lib/vision";
 
 /**
- * POST /api/questions/scan — المعلم يصور ورقة/يرفع صوراً.
- * multipart: images[] (حتى 8 صور، 8MB) + subject? + examTitle?
- * يحاول OCR محلياً؛ عند غيابه يحفظ الصور وينشئ مسودات نسخ يدوي.
- * المخرج دائماً مسودات خاصة (status=draft) — لا شيء يُنشر تلقائياً.
- * مع examTitle: يُنشأ امتحان غير منشور وتُوسم مسوداته به.
+ * POST /api/questions/scan — مسح ورقة بالكاميرا/رفع صور.
+ * multipart: images[] (حتى 8، 8MB) + subject? + examTitle?
+ * الترتيب: رؤية Gemini (إن وُجد المفتاح) → Tesseract محلي → نسخ يدوي.
+ * يعمل على Vercel بدون بايثون (رؤية أو يدوي) — البايثون تحسين محلي فقط.
+ * المخرج دائماً مسودات خاصة — لا شيء يُنشر تلقائياً.
  */
 const MAX_FILES = 8;
 const MAX_BYTES = 8 * 1024 * 1024;
 
-function run(cmd: string, args: string[], timeoutMs = 120000): Promise<{ ok: boolean; out: string }> {
+function runPy(args: string[], timeoutMs = 120000): Promise<boolean> {
   return new Promise((resolve) => {
-    execFile(cmd, args, { timeout: timeoutMs, maxBuffer: 8 * 1024 * 1024 }, (err, stdout, stderr) => {
-      if (err) resolve({ ok: false, out: String(stderr ?? err.message).slice(0, 300) });
-      else resolve({ ok: true, out: String(stdout).slice(0, 500) });
+    const go = (cmd: string) => {
+      execFile(cmd, args, { timeout: timeoutMs, maxBuffer: 8 * 1024 * 1024 }, (err) => {
+        if (err) resolve(false);
+        else resolve(true);
+      });
+    };
+    // جرّب python3 ثم python
+    execFile("python3", ["--version"], (e3) => {
+      if (!e3) go("python3");
+      else go("python");
     });
   });
+}
+
+type Seg = { page: number; text: string; needs_transcription?: boolean; via: string };
+
+async function extractPath(
+  files: { buf: Buffer; mime: string }[],
+  work: string,
+  ref: string,
+  subject: string
+): Promise<{ segments: Seg[]; via: string } | null> {
+  // 1) رؤية أولاً (HTTPS خالص — تعمل على أي استضافة)
+  if (isVisionLive()) {
+    const settled = await Promise.allSettled(
+      files.map((f) => transcribeImage(f.buf, f.mime))
+    );
+    const segments: Seg[] = [];
+    let n = 0;
+    let anyOk = false;
+    for (const s of settled) {
+      n++;
+      if (s.status === "fulfilled" && s.value.ok) {
+        anyOk = true;
+        for (const seg of s.value.segments) segments.push({ page: n, text: seg.text, via: "vision" });
+      }
+    }
+    if (anyOk) return { segments, via: "vision" };
+    // كلها فشلت → أكمل للمسارات التالية (صفحات يدوية)
+  }
+  // 2) بايثون/Tesseract محلياً
+  try {
+    const script = join(process.cwd(), "scripts", "image_ingest.py");
+    const outdir = join(work, "out");
+    const paths: string[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const p = join(work, `img${i}.bin`);
+      await writeFile(p, files[i].buf);
+      paths.push(p);
+    }
+    const ok = await runPy([script, outdir, "--ref", ref, "--subject", subject, ...paths]);
+    if (ok) {
+      const { readFile } = await import("node:fs/promises");
+      const manifest = JSON.parse(await readFile(join(outdir, "manifest.json"), "utf8"));
+      return {
+        segments: (manifest.segments ?? []).map((s: any) => ({
+          page: s.page, text: s.text, needs_transcription: s.needs_transcription, via: "ocr",
+        })),
+        via: "ocr",
+      };
+    }
+  } catch {}
+  return null;
 }
 
 export async function POST(req: Request) {
@@ -43,13 +102,15 @@ export async function POST(req: Request) {
   if (files.length > MAX_FILES) {
     return NextResponse.json({ ok: false, error: "too_many", message: `حتى ${MAX_FILES} صور في المرة` }, { status: 400 });
   }
-  for (const f of files) {
-    if (!(f as File).type.startsWith("image/")) {
+  const bufs: { buf: Buffer; mime: string }[] = [];
+  for (const f of files as File[]) {
+    if (!f.type.startsWith("image/")) {
       return NextResponse.json({ ok: false, error: "bad_type", message: "الملفات المقبولة صور فقط" }, { status: 400 });
     }
-    if ((f as File).size > MAX_BYTES) {
+    if (f.size > MAX_BYTES) {
       return NextResponse.json({ ok: false, error: "too_large", message: "حجم الصورة يتجاوز 8MB" }, { status: 400 });
     }
+    bufs.push({ buf: Buffer.from(await f.arrayBuffer()), mime: f.type });
   }
   const subject = String(form.get("subject") ?? "").trim().slice(0, 60) || "عام";
   const examTitle = String(form.get("examTitle") ?? "").trim().slice(0, 120);
@@ -57,39 +118,10 @@ export async function POST(req: Request) {
   const ref = `scan-${Date.now().toString(36)}`;
   const work = await mkdtemp(join(tmpdir(), "scan-"));
   try {
-    // 1) حفظ الصور مؤقتاً
-    const paths: string[] = [];
-    let i = 0;
-    for (const f of files as File[]) {
-      const ext = (f.type.split("/")[1] || "jpg").split("+")[0].replace(/[^a-z]/g, "") || "jpg";
-      const p = join(work, `img${++i}.${ext}`);
-      await writeFile(p, Buffer.from(await f.arrayBuffer()));
-      paths.push(p);
-    }
-
-    // 2) معالجة + OCR (أو سقوط آمن)
-    const outdir = join(work, "out");
-    let manifest: any = null;
-    let ocr = false;
-    const script = join(process.cwd(), "scripts", "image_ingest.py");
-    for (const py of ["python3", "python"]) {
-      const r = await run(py, [script, outdir, "--ref", ref, "--subject", subject, ...paths]);
-      if (r.ok) {
-        try {
-          const { readFile } = await import("node:fs/promises");
-          manifest = JSON.parse(await readFile(join(outdir, "manifest.json"), "utf8"));
-          ocr = !!manifest.ocr;
-          break;
-        } catch {}
-      }
-    }
-
-    // 3) bucket
     try {
       await admin.storage.createBucket("exam-pages", { public: true });
     } catch {}
 
-    // 4) امتحان؟ (غير منشور)
     let examId: string | null = null;
     if (examTitle) {
       const { data: ex } = await admin
@@ -100,33 +132,22 @@ export async function POST(req: Request) {
       examId = (ex as any)?.id ?? null;
     }
 
-    const pageFiles: { page: number; buf: Buffer }[] = [];
-    const segments: { page: number; text: string; needs_transcription?: boolean }[] = [];
-    if (manifest) {
-      const { readFile, readdir } = await import("node:fs/promises");
-      const pngs = (await readdir(join(outdir, "pages"))).filter((x) => x.endsWith(".png")).sort();
-      let n = 0;
-      for (const f of pngs) {
-        pageFiles.push({ page: ++n, buf: await readFile(join(outdir, "pages", f)) });
-      }
-      for (const s of manifest.segments ?? []) segments.push(s);
-    } else {
-      // سقوط آمن: الصور الأصلية + مسودات نسخ يدوي
-      let n = 0;
-      for (const p of paths) {
-        const { readFile } = await import("node:fs/promises");
-        pageFiles.push({ page: ++n, buf: await readFile(p) });
-        segments.push({ page: n, text: `[صفحة ${n} — تُنسخ يدوياً من الصورة]`, needs_transcription: true });
-      }
-    }
+    const parsed = await extractPath(bufs, work, ref, subject);
+    const via = parsed?.via ?? "manual";
 
-    for (const pf of pageFiles) {
-      const dst = `scans/${tenantId}/${ref}/p${String(pf.page).padStart(3, "0")}.png`;
-      const { error } = await admin.storage.from("exam-pages").upload(dst, pf.buf, { contentType: "image/png", upsert: true });
+    // خزّن الأصلية دائماً (مرجع المراجعة) — المعالجة للـ OCR فقط
+    let n = 0;
+    for (const f of bufs) {
+      const dst = `scans/${tenantId}/${ref}/p${String(++n).padStart(3, "0")}.png`;
+      const { error } = await admin.storage.from("exam-pages").upload(dst, f.buf, { contentType: "image/png", upsert: true });
       if (error) {
         return NextResponse.json({ ok: false, error: "upload_failed" }, { status: 500 });
       }
     }
+
+    const segments: Seg[] = parsed?.segments ?? bufs.map((_, i) => ({
+      page: i + 1, text: `[صفحة ${i + 1} — تُنسخ يدوياً من الصورة]`, needs_transcription: true, via: "manual" as const,
+    }));
 
     const rows = segments.map((s) => ({
       tenant_id: tenantId,
@@ -140,7 +161,7 @@ export async function POST(req: Request) {
       correct_answer: null,
       marks: 1,
       source: "teacher",
-      source_detail: JSON.stringify({ ref, page: s.page, kind: "scan", exam_id: examId, ocr }),
+      source_detail: JSON.stringify({ ref, page: s.page, kind: "scan", exam_id: examId, ocr: via !== "manual", via }),
       visibility: "private",
       status: "draft",
     }));
@@ -148,7 +169,7 @@ export async function POST(req: Request) {
       const { error } = await admin.from("questions").insert(rows);
       if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     }
-    return NextResponse.json({ ok: true, drafts: rows.length, pages: pageFiles.length, examId, ocr });
+    return NextResponse.json({ ok: true, drafts: rows.length, pages: bufs.length, examId, ocr: via !== "manual", via });
   } finally {
     await rm(work, { recursive: true, force: true }).catch(() => {});
   }

@@ -174,6 +174,17 @@ export default function ExamsListPage() {
     }
   }
 
+  async function onPurgeImages(id: string) {
+    if (!confirm("حذف صور المسح الأصلية؟ (الأسئلة النصية المعتمدة تبقى كما هي)")) return;
+    try {
+      const { r, j } = await apiFetch(`/api/exams/${id}/source-images`, { method: "DELETE" });
+      if (r.ok && j?.ok) setNotice({ kind: "ok", text: `تم حذف ${j.removed} صور مصدر.` });
+      else setNotice({ kind: "err", text: "فشل الحذف." });
+    } catch {
+      setNotice({ kind: "err", text: "تعذر الاتصال بالخادم." });
+    }
+  }
+
   async function onDelete(id: string, title: string, attempts: number) {
     if (!confirm(`حذف "${title}" نهائياً؟${attempts ? `\nسيُحذف معه ${attempts} محاولة وشهاداتها.` : ""}`)) return;
     setDeletingId(id);
@@ -405,6 +416,10 @@ export default function ExamsListPage() {
                   <button onClick={() => onPublish(ex.id, !ex.is_published)}
                     className="rounded-lg bg-primary-light px-4 py-1.5 text-xs font-bold text-primary transition hover:bg-primary hover:text-white">
                     {ex.is_published ? "إخفاء" : "نشر"}
+                  </button>
+                  <button onClick={() => onPurgeImages(ex.id)}
+                    className="rounded-lg px-4 py-1.5 text-xs font-bold text-slate-500 transition hover:bg-slate-100">
+                    حذف صور المسح
                   </button>
                   <button onClick={() => onDelete(ex.id, ex.title, ex.attempts_count)}
                     disabled={deletingId === ex.id}
