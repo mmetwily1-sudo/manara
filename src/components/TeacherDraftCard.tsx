@@ -49,20 +49,33 @@ export function TeacherDraftCard({
           <p className="text-xs text-slate-400">لا توجد صورة.</p>
         )}
       </div>
-      <div className="space-y-2">
-        <textarea
-          value={body} onChange={(e) => setBody(e.target.value)} rows={3}
-          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-small outline-none focus:border-primary"
-        />
-        <textarea
-          value={options} onChange={(e) => setOptions(e.target.value)} rows={3} dir="ltr" style={{ textAlign: "right" }}
-          placeholder={"الاختيارات — سطر لكل اختيار، أو: أ) نص ب) نص ج) نص"}
-          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-small outline-none focus:border-primary"
-        />
-        <input
-          value={correct} onChange={(e) => setCorrect(e.target.value)} placeholder="الإجابة الصحيحة (انسخ نص أحد الاختيارات)"
-          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-small outline-none focus:border-primary"
-        />
+        <div className="space-y-2">
+          <textarea
+            value={body} onChange={(e) => setBody(e.target.value)} rows={3}
+            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-small outline-none focus:border-primary"
+          />
+          <textarea
+            value={options} onChange={(e) => setOptions(e.target.value)} rows={3} dir="ltr" style={{ textAlign: "right" }}
+            placeholder={"الاختيارات — سطر لكل اختيار، أو: أ) نص ب) نص ج) نص"}
+            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-small outline-none focus:border-primary"
+          />
+          {options.split("\n").map((s) => s.trim()).filter(Boolean).length >= 2 && (
+            <div className="flex flex-wrap gap-1.5">
+              <span className="w-full text-[11px] font-bold text-slate-500">اضغط الاختيار الصحيح:</span>
+              {options.split("\n").map((s) => s.trim()).filter(Boolean).map((o) => (
+                <button
+                  key={o} type="button" onClick={() => setCorrect(o)}
+                  className={`rounded-full px-3 py-1 text-xs font-bold transition ${correct === o ? "bg-success text-white" : "bg-slate-100 text-slate-600 hover:bg-success/20"}`}
+                >
+                  {o.length > 40 ? o.slice(0, 40) + "…" : o}
+                </button>
+              ))}
+            </div>
+          )}
+          <input
+            value={correct} onChange={(e) => setCorrect(e.target.value)} placeholder="الإجابة الصحيحة (أو اضغط أحد الاختيارات)"
+            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-small outline-none focus:border-primary"
+          />
         <input
           value={lesson} onChange={(e) => setLesson(e.target.value.trim())} placeholder="كود الدرس (اختياري: phys-u1-l1)" dir="ltr"
           className="w-full rounded-xl border border-slate-200 px-3 py-2 text-left text-small outline-none focus:border-primary"

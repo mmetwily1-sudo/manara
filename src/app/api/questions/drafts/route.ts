@@ -124,7 +124,13 @@ export async function POST(req: Request) {
       const { error: linkErr } = await admin.from("exam_questions").insert({
         tenant_id: tid, exam_id: examId, question_id: id, position: pos, marks: 1,
       });
-      if (!linkErr) linkedExam = examId;
+      if (!linkErr) {
+        linkedExam = examId;
+        // حدّث مجموع درجات الامتحان
+        const { data: all } = await admin.from("exam_questions").select("marks").eq("exam_id", examId);
+        const total = ((all ?? []) as any[]).reduce((s, r) => s + Number(r.marks ?? 1), 0);
+        await admin.from("exams").update({ total_marks: total }).eq("id", examId);
+      }
     }
   }
   return NextResponse.json({ ok: true, action, linkedExam });

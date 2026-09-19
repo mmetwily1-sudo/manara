@@ -67,22 +67,54 @@ if (prior?.length) {
   process.exit(0);
 }
 
-const rows = manifest.segments.map((s) => ({
-  tenant_id: null,
-  subject: manifest.subject || "عام",
-  lesson: null,
-  lesson_code: null,
-  difficulty: 3,
-  qtype: "mcq",
-  body: s.text,
-  options: null,
-  correct_answer: null,
-  marks: 1,
-  source: "teacher",
-  source_detail: JSON.stringify({ ref: manifest.ref, page: s.page, kind: "pdf-draft" }),
-  visibility: "shared",
-  status: "draft",
-}));
+const OPT_LINE = /^\s*(?:\(?[أ-ي]\)|\(?[a-dA-D]\)|\(?\d+\)|[أ-ي]\.|[a-dA-D]\.|\d+\.)\s*\S/;
+function stripMarker(s) {
+  return s
+    .replace(/^\s*\(?[أ-ي]\)\s*/, "")
+    .replace(/^\s*\(?[a-dA-D]\)\s*/, "")
+    .replace(/^\s*\(?\d+\)\s*/, "")
+    .replace(/^\s*[أ-ي]\.\s*/, "")
+    .replace(/^\s*\d+\.\s*/, "")
+    .trim();
+}
+function splitQA(text) {
+  const lines = String(text ?? "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  let cut = -1;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (OPT_LINE.test(lines[i])) cut = i;
+    else if (cut >= 0) break;
+  }
+  if (cut <= 0) return { stem: String(text ?? "").trim(), options: [] };
+  const options = [...new Set(lines.slice(cut).map(stripMarker).filter(Boolean))];
+  const stem = lines.slice(0, cut).join("\n").trim();
+  if (stem && options.length >= 2) return { stem, options };
+  if (lines.length >= 2) {
+    const dashed = lines[lines.length - 1].split(/\s+[-–—]\s+/).map((s) => s.trim()).filter(Boolean);
+    if (dashed.length >= 2) {
+      return { stem: lines.slice(0, -1).join("\n").trim(), options: [...new Set(dashed)] };
+    }
+  }
+  return { stem: String(text ?? "").trim(), options: [] };
+}
+const rows = manifest.segments.map((s) => {
+  const qa = splitQA(s.text);
+  return {
+    tenant_id: null,
+    subject: manifest.subject || "عام",
+    lesson: null,
+    lesson_code: null,
+    difficulty: 3,
+    qtype: "mcq",
+    body: qa.stem.slice(0, 2000) || s.text.slice(0, 2000),
+    options: qa.options.length >= 2 ? qa.options : null,
+    correct_answer: null,
+    marks: 1,
+    source: "teacher",
+    source_detail: JSON.stringify({ ref: manifest.ref, page: s.page, kind: "pdf-draft" }),
+    visibility: "shared",
+    status: "draft",
+  };
+});
 let n = 0;
 for (let i = 0; i < rows.length; i += 50) {
   const { error } = await sb.from("questions").insert(rows.slice(i, i + 50));

@@ -149,22 +149,26 @@ export async function POST(req: Request) {
       page: i + 1, text: `[صفحة ${i + 1} — تُنسخ يدوياً من الصورة]`, needs_transcription: true, via: "manual" as const,
     }));
 
-    const rows = segments.map((s) => ({
-      tenant_id: tenantId,
-      subject,
-      lesson: null,
-      lesson_code: null,
-      difficulty: 3,
-      qtype: "mcq",
-      body: s.text.slice(0, 2000),
-      options: null,
-      correct_answer: null,
-      marks: 1,
-      source: "teacher",
-      source_detail: JSON.stringify({ ref, page: s.page, kind: "scan", exam_id: examId, ocr: via !== "manual", via }),
-      visibility: "private",
-      status: "draft",
-    }));
+    const { splitQuestion } = await import("@/lib/parse-options");
+    const rows = segments.map((s) => {
+      const qa = splitQuestion(s.text);
+      return {
+        tenant_id: tenantId,
+        subject,
+        lesson: null,
+        lesson_code: null,
+        difficulty: 3,
+        qtype: "mcq",
+        body: qa.stem.slice(0, 2000) || s.text.slice(0, 2000),
+        options: qa.options.length >= 2 ? qa.options : null,
+        correct_answer: null,
+        marks: 1,
+        source: "teacher",
+        source_detail: JSON.stringify({ ref, page: s.page, kind: "scan", exam_id: examId, ocr: via !== "manual", via }),
+        visibility: "private",
+        status: "draft",
+      };
+    });
     if (rows.length) {
       const { error } = await admin.from("questions").insert(rows);
       if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
