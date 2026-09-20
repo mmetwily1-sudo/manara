@@ -39,11 +39,13 @@ async function extractPath(
   ref: string,
   subject: string,
   tenantVisionKey: string | null
-): Promise<{ segments: Seg[]; via: string } | null> {
+): Promise<{ segments: Seg[]; via: string; note?: string | null } | null> {
   // 1) رؤية أولاً (HTTPS خالص — تعمل على أي استضافة)
+  let visionNote: string | null = isVisionLive(tenantVisionKey) ? null : "no_key";
   if (isVisionLive(tenantVisionKey)) {
     const settled = await Promise.allSettled(
-      files.map((f) => transcribeImage(f.buf, f.mime, 60000, tenantVisionKey))
+      // مهلة 90ث لكل محاولة؛ transcribeImage يعيد المحاولة تلقائياً عند 503/429
+      files.map((f) => transcribeImage(f.buf, f.mime, 90000, tenantVisionKey))
     );
     const segments: Seg[] = [];
     let n = 0;
@@ -53,10 +55,15 @@ async function extractPath(
       if (s.status === "fulfilled" && s.value.ok) {
         anyOk = true;
         for (const seg of s.value.segments) segments.push({ page: n, text: seg.text, via: "vision" });
+      } else if (s.status === "fulfilled") {
+        const v = s.value as { ok: boolean; reason?: string };
+        visionNote = v.ok ? null : (v.reason ?? "unknown");
+      } else {
+        visionNote = "crashed";
       }
     }
-    if (anyOk) return { segments, via: "vision" };
-    // كلها فشلت → أكمل للمسارات التالية (صفحات يدوية)
+    if (anyOk) return { segments, via: "vision", note: visionNote };
+    // كلها فشلت → أكمل للمسارات التالية مع تمرير السبب
   }
   // 2) بايثون/Tesseract محلياً
   try {
@@ -77,6 +84,7 @@ async function extractPath(
           page: s.page, text: s.text, needs_transcription: s.needs_transcription, via: "ocr",
         })),
         via: "ocr",
+        note: visionNote,
       };
     }
   } catch {}
@@ -141,6 +149,7 @@ export async function POST(req: Request) {
     } catch {}
     const parsed = await extractPath(bufs, work, ref, subject, tenantVisionKey);
     const via = parsed?.via ?? "manual";
+    const visionNote = (parsed as any)?.note ?? (via === "manual" && !isVisionLive(tenantVisionKey) ? "no_key" : null);
 
     // خزّن الأصلية دائماً (مرجع المراجعة) — المعالجة للـ OCR فقط
     let n = 0;
@@ -180,7 +189,7 @@ export async function POST(req: Request) {
       const { error } = await admin.from("questions").insert(rows);
       if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     }
-    return NextResponse.json({ ok: true, drafts: rows.length, pages: bufs.length, examId, ocr: via !== "manual", via });
+    return NextResponse.json({ ok: true, drafts: rows.length, pages: bufs.length, examId, ocr: via !== "manual", via, visionNote });
   } finally {
     await rm(work, { recursive: true, force: true }).catch(() => {});
   }

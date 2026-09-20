@@ -18,6 +18,9 @@ export function TeacherDraftCard({
   const [correct, setCorrect] = useState(draft.correct_answer ?? "");
   const [lesson, setLesson] = useState("");
   const [busy, setBusy] = useState(false);
+  const [visionBusy, setVisionBusy] = useState(false);
+  const [visionMsg, setVisionMsg] = useState("");
+  const isManual = String(draft.body ?? "").startsWith("[صفحة");
 
   async function go(action: "approve" | "delete") {
     if (action === "delete" && !confirm("حذف هذه المسودة؟")) return;
@@ -31,6 +34,26 @@ export function TeacherDraftCard({
       });
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function retranscribe() {
+    setVisionBusy(true); setVisionMsg("");
+    try {
+      const r = await fetch("/api/questions/drafts", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: draft.id, action: "retranscribe" }),
+      });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) {
+        setBody(j.body ?? "");
+        setOptions(((j.options ?? []) as string[]).join("\n"));
+        setVisionMsg((j.options ?? []).length >= 2 ? "تم التفريغ التلقائي ✅ — راجع واعتمد." : "تم التفريغ — أكمل الاختيارات والإجابة ثم اعتمد.");
+      } else setVisionMsg(j?.message ?? "فشل التفريغ: " + (j?.error ?? "خطأ غير معروف"));
+    } catch {
+      setVisionMsg("تعذر الاتصال بالخادم.");
+    } finally {
+      setVisionBusy(false);
     }
   }
 
@@ -80,6 +103,16 @@ export function TeacherDraftCard({
           value={lesson} onChange={(e) => setLesson(e.target.value.trim())} placeholder="كود الدرس (اختياري: phys-u1-l1)" dir="ltr"
           className="w-full rounded-xl border border-slate-200 px-3 py-2 text-left text-small outline-none focus:border-primary"
         />
+        {isManual && (
+          <div className="rounded-lg bg-primary-light/30 p-2 text-[11px] leading-relaxed text-slate-600">
+            لم تُفرّغ هذه الصفحة آلياً بعد.
+            <button onClick={retranscribe} disabled={visionBusy || busy}
+              className="mr-1 rounded-lg bg-primary px-3 py-1 text-[11px] font-bold text-white disabled:opacity-50">
+              {visionBusy ? "جاري التفريغ..." : "تفريغ تلقائي 👁️"}
+            </button>
+            {visionMsg && <div className="mt-1 font-bold">{visionMsg}</div>}
+          </div>
+        )}
         <div className="flex gap-2">
           <button onClick={() => go("approve")} disabled={busy} className="rounded-lg bg-success px-4 py-1.5 text-xs font-bold text-white disabled:opacity-50">
             {busy ? "جاري..." : "اعتماد ✅"}

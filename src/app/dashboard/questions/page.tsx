@@ -47,7 +47,11 @@ export default function QuestionsPage() {
       const r = await fetch("/api/questions/scan", { method: "POST", body: fd });
       const j = await r.json().catch(() => null);
       if (r.ok && j?.ok) {
-        const how = j.via === "vision" ? " (تفريغ مرئي دقيق 👁️ — راجع بسرعة واعتمد)" : j.ocr ? " (بمساعدة OCR — صحّح من الصور)" : " (انسخ من الصور)";
+        const how = j.via === "vision"
+          ? " (تفريغ مرئي دقيق 👁️ — راجع بسرعة واعتمد)"
+          : j.via === "ocr"
+            ? " (بمساعدة OCR — صحّح من الصور، أو اضغط «تفريغ تلقائي 👁️» داخل المسودة لإعادة المحاولة المرئية)"
+            : " (انسخ من الصور، أو اضغط «تفريغ تلقائي 👁️» داخل المسودة)";
         setOkMsg(`تم إنشاء ${j.drafts} مسودة من ${j.pages} صفحات${how}${j.examId ? " — مربوطة بامتحان جديد غير منشور" : ""}.`);
         setScanFiles(null); setScanTitle("");
         setShowScan(false);
@@ -255,7 +259,7 @@ export default function QuestionsPage() {
         <form onSubmit={onScan} className="card space-y-3 p-5">
           <h3 className="font-bold">مسح ورقة امتحان/أسئلة 📷</h3>
           <p className="text-xs leading-relaxed text-slate-500">
-            صوّر الورقة أو ارفع صورها (حتى 8 صور) — نستخرج مسودات تلقائياً (OCR عند توفره) وتراجعها أنت من الصور قبل الاعتماد. لا شيء يُنشر وحده.
+            صوّر الورقة أو ارفع صورها (حتى 8 صور) — نحاول التفريغ المرئي تلقائياً (مع إعادة المحاولة عند الازدحام) ثم OCR، وتراجع أنت من الصور قبل الاعتماد. لا شيء يُنشر وحده.
           </p>
           <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 px-4 py-4 text-small font-bold text-slate-600 transition hover:border-primary hover:text-primary">
             {scanFiles?.length ? `📎 ${scanFiles.length} صور مختارة` : "اختر الصور (كاميرا أو ملفات)"}
