@@ -94,14 +94,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, action });
   }
 
-  // مفتاح الرؤية للسنتر (يُستخدم في الاعتماد والرسائل وإعادة التفريغ)
+  // مفتاحا الرؤية للسنتر (يُستخدمان في الاعتماد والرسائل وإعادة التفريغ)
   let tenantVisionKey: string | null = null;
+  let tenantVisionKey2: string | null = null;
   try {
     const { data: trow } = await admin.from("tenants").select("settings").eq("id", tid).single();
     tenantVisionKey = (trow as any)?.settings?.vision_key ?? null;
+    tenantVisionKey2 = (trow as any)?.settings?.vision_key_2 ?? null;
   } catch {}
   const { isVisionLive, transcribeImage } = await import("@/lib/vision");
-  const vLive = isVisionLive(tenantVisionKey);
+  const vLive = isVisionLive(tenantVisionKey, tenantVisionKey2);
 
   if (action === "retranscribe") {
     const m = metaOf(d);
@@ -119,7 +121,7 @@ export async function POST(req: Request) {
     if (dlErr || !blob) {
       return NextResponse.json({ ok: false, error: "image_missing", message: "تعذر تحميل الصورة المخزنة." }, { status: 400 });
     }
-    const tr = await transcribeImage(Buffer.from(await (blob as Blob).arrayBuffer()), "image/png", 90000, tenantVisionKey);
+    const tr = await transcribeImage(Buffer.from(await (blob as Blob).arrayBuffer()), "image/png", 90000, tenantVisionKey, tenantVisionKey2);
     if (!tr.ok) {
       return NextResponse.json({ ok: false, error: "vision_failed", reason: tr.reason, message: visionFailAr(tr.reason) }, { status: 502 });
     }

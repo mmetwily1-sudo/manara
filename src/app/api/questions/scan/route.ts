@@ -38,14 +38,15 @@ async function extractPath(
   work: string,
   ref: string,
   subject: string,
-  tenantVisionKey: string | null
+  tenantVisionKey: string | null,
+  tenantVisionKey2?: string | null
 ): Promise<{ segments: Seg[]; via: string; note?: string | null } | null> {
   // 1) رؤية أولاً (HTTPS خالص — تعمل على أي استضافة)
-  let visionNote: string | null = isVisionLive(tenantVisionKey) ? null : "no_key";
-  if (isVisionLive(tenantVisionKey)) {
+  let visionNote: string | null = isVisionLive(tenantVisionKey, tenantVisionKey2) ? null : "no_key";
+  if (isVisionLive(tenantVisionKey, tenantVisionKey2)) {
     const settled = await Promise.allSettled(
-      // مهلة 90ث لكل محاولة؛ transcribeImage يعيد المحاولة تلقائياً عند 503/429
-      files.map((f) => transcribeImage(f.buf, f.mime, 90000, tenantVisionKey))
+      // مهلة 90ث لكل محاولة؛ transcribeImage يناوب المفاتيح/الموديلات تلقائياً
+      files.map((f) => transcribeImage(f.buf, f.mime, 90000, tenantVisionKey, tenantVisionKey2))
     );
     const segments: Seg[] = [];
     let n = 0;
@@ -143,15 +144,17 @@ export async function POST(req: Request) {
       examId = (ex as any)?.id ?? null;
     }
 
-    // مفتاح الرؤية: السنتر أولاً ثم المنصة
+    // مفتاحا الرؤية: السنتر أولاً ثم المنصة (تناوب تلقائي عند نفاد الحصة)
     let tenantVisionKey: string | null = null;
+    let tenantVisionKey2: string | null = null;
     try {
       const { data: trow } = await admin.from("tenants").select("settings").eq("id", tenantId).single();
       tenantVisionKey = (trow as any)?.settings?.vision_key ?? null;
+      tenantVisionKey2 = (trow as any)?.settings?.vision_key_2 ?? null;
     } catch {}
-    const parsed = await extractPath(bufs, work, ref, subject, tenantVisionKey);
+    const parsed = await extractPath(bufs, work, ref, subject, tenantVisionKey, tenantVisionKey2);
     const via = parsed?.via ?? "manual";
-    const visionNote = (parsed as any)?.note ?? (via === "manual" && !isVisionLive(tenantVisionKey) ? "no_key" : null);
+    const visionNote = (parsed as any)?.note ?? (via === "manual" && !isVisionLive(tenantVisionKey, tenantVisionKey2) ? "no_key" : null);
 
     // خزّن الأصلية دائماً (مرجع المراجعة) — المعالجة للـ OCR فقط
     let n = 0;

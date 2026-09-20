@@ -16,8 +16,22 @@ export function visionKey(tenantKey?: string | null): string | null {
   return envVisionKey();
 }
 
-export function isVisionLive(tenantKey?: string | null): boolean {
-  return !!visionKey(tenantKey);
+/** سلسلة المفاتيح بالترتيب: سنتر1، سنتر2، منصة1، منصة2 — تُجرَّب عند نفاد الحصة */
+export function visionChain(tenantKey?: string | null, tenantKey2?: string | null): string[] {
+  const list = [
+    tenantKey,
+    tenantKey2,
+    process.env.GEMINI_API_KEY,
+    process.env.GOOGLE_AI_KEY,
+    process.env.GEMINI_API_KEY_2,
+  ]
+    .map((k) => String(k ?? "").trim())
+    .filter((k) => k.length >= 10);
+  return Array.from(new Set(list));
+}
+
+export function isVisionLive(tenantKey?: string | null, tenantKey2?: string | null): boolean {
+  return visionChain(tenantKey, tenantKey2).length > 0;
 }
 
 export type VisionSegment = { text: string; answer?: string | null };
@@ -35,9 +49,14 @@ const PROMPT =
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** سلسلة الموديلات: المُعدّ في البيئة أولاً ثم البدائل المعروفة بتاريخ 2026-09 */
+/** سلسلة الموديلات: المُعدّ في البيئة أولاً ثم البدائل — الحصص تختلف بين الموديلات */
 function modelChain(): string[] {
-  const list = [process.env.GEMINI_MODEL, "gemini-3-flash-preview", "gemini-3.6-flash"].filter(Boolean) as string[];
+  const list = [
+    process.env.GEMINI_MODEL,
+    "gemini-3-flash-preview",
+    "gemini-3.6-flash",
+    "gemini-flash-latest",
+  ].filter(Boolean) as string[];
   return Array.from(new Set(list));
 }
 
@@ -107,40 +126,51 @@ async function once(
 }
 
 /**
- * تفريغ صورة بالرؤية مع إعادة محاولة تلقائية:
- * كل موديل محاولتان بفاصل متزايد (2ث ثم 6ث) — يعالج 503/429 الموقتة دون تدخل المعلم.
+ * تفريغ صورة بالرؤية مع تناوب المفاتيح والموديلات:
+ * لكل مفتاح → كل موديل (محاولتان بفاصل 4ث لـ 503)؛
+ * 429 حصة تعني: تخطَّ الموديل فوراً (الحصص تختلف بين الموديلات)،
+ * وبعد نفاد موديلات المفتاح انتقل للمفتاح التالي؛
+ * انتظار 15ث مرة واحدة فقط عند نفاد كل المفاتيح.
  */
+const QUOTA_RE = /429|quota|exceed/i;
 export async function transcribeImage(
   buf: Buffer,
   mime: string,
   timeoutMs = 75000,
-  tenantKey?: string | null
+  tenantKey?: string | null,
+  tenantKey2?: string | null
 ): Promise<{ ok: true; segments: VisionSegment[] } | { ok: false; reason: string }> {
-  const key = visionKey(tenantKey);
-  if (!key) return { ok: false, reason: "not_configured" };
+  const keys = visionChain(tenantKey, tenantKey2);
+  if (!keys.length) return { ok: false, reason: "not_configured" };
   let last = "unknown";
   let quotaWaited = false;
-  for (const model of modelChain()) {
-    let attempts = 0;
-    while (attempts < 2) {
-      if (attempts > 0) await sleep(4000); // فاصل قبل إعادة المحاولة (يمتص 503 الموقتة)
-      attempts++;
-      const r = await once(model, key, buf, mime, timeoutMs);
-      if (r.ok) return r;
-      last = r.reason;
-      // 429 حصة مستنفدة: نفس المفتاح لكل الموديلات — انتظار واحد طويل ثم استسلام صريح
-      if (/429|quota|exceed/i.test(r.reason)) {
-        if (!quotaWaited) {
-          quotaWaited = true;
-          await sleep(15000);
-          attempts--; // أعد نفس المحاولة مرة أخيرة
-          continue;
-        }
-        return { ok: false, reason: last };
+  for (let ki = 0; ki < keys.length; ki++) {
+    const key = keys[ki];
+    const lastKey = ki === keys.length - 1;
+    for (const model of modelChain()) {
+      let attempts = 0;
+      while (attempts < 2) {
+        if (attempts > 0) await sleep(4000); // يمتص 503 الموقتة
+        attempts++;
+        const r = await once(model, key, buf, mime, timeoutMs);
+        if (r.ok) return r;
+        last = r.reason;
+        if (QUOTA_RE.test(r.reason)) break; // حصة هذا الموديل — جرّب الموديل التالي فوراً
+        if (!r.retryable) break; // خطأ بنيوي — الموديل التالي مباشرة
       }
-      if (!r.retryable) break; // خطأ بنيوي — جرّب الموديل البديل مباشرة
+      await sleep(500);
     }
-    await sleep(1000);
+    if (lastKey) {
+      if (QUOTA_RE.test(last) && !quotaWaited) {
+        quotaWaited = true;
+        await sleep(15000); // فرصة أخيرة واحدة بعد مهلة
+        const r = await once(modelChain()[0], key, buf, mime, timeoutMs);
+        if (r.ok) return r;
+        last = r.reason;
+      }
+      return { ok: false, reason: last };
+    }
+    // مفاتيح أخرى متاحة — تابع الحلقة الخارجية
   }
   return { ok: false, reason: last };
 }

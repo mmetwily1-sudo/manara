@@ -20,7 +20,8 @@ export async function GET() {
     notify_whatsapp: settings.notify_whatsapp !== false,
     pay_numbers: settings.pay_numbers ?? {},
     has_vision_key: !!(settings.vision_key as string),
-    vision_live: isVisionLive((settings.vision_key as string) ?? null),
+    has_vision_key_2: !!(settings.vision_key_2 as string),
+    vision_live: isVisionLive((settings.vision_key as string) ?? null, (settings.vision_key_2 as string) ?? null),
   });
 }
 
@@ -39,13 +40,16 @@ export async function PATCH(req: Request) {
     }
     patch.pay_numbers = pn;
   }
-  // مفتاح Gemini الشخصي للسنتر (تفريغ مرئي دقيق) — فارغ = مسح
-  if (typeof body.vision_key !== "undefined") {
-    const vk = String(body.vision_key ?? "").trim();
-    if (vk && !/^[A-Za-z0-9_-]{10,200}$/.test(vk)) {
-      return NextResponse.json({ ok: false, error: "bad_key" }, { status: 400 });
+  // مفتاحا Gemini للسنتر (تفريغ مرئي دقيق + تناوب عند نفاد الحصة) — فارغ = مسح
+  // ملاحظة: مفاتيح AI Studio تحتوي نقاطاً (AQ.xxx) لذا تُقبل [A-Za-z0-9_.~-]
+  for (const f of ["vision_key", "vision_key_2"]) {
+    if (typeof (body as any)[f] !== "undefined") {
+      const vk = String((body as any)[f] ?? "").trim();
+      if (vk && !/^[A-Za-z0-9_.~-]{10,200}$/.test(vk)) {
+        return NextResponse.json({ ok: false, error: "bad_key" }, { status: 400 });
+      }
+      patch[f] = vk || null;
     }
-    patch.vision_key = vk || null;
   }
   if (!Object.keys(patch).length) {
     return NextResponse.json({ ok: false, error: "invalid_value" }, { status: 400 });
