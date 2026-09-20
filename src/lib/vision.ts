@@ -49,6 +49,53 @@ const PROMPT =
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** توحيد نص الخيار للمقارنة (تجريد علامات أ) 1) - ... البادئة) */
+export function normOption(t: string): string {
+  return String(t ?? "")
+    .replace(/^[\sأبجدهـو\d]+[).:\-]/, "")
+    .replace(/^[\(\[]\s*[أبجدهـوa-dA-D\d]\s*[\)\]]\s*/, "")
+    .trim();
+}
+
+/**
+ * حل سؤال من خياراته (مكالمة نصية واحدة رخيصة).
+ * يعيد الخيار المطابق حرفياً أو null — لا تخمين أبداً.
+ */
+export async function solveAnswer(
+  stem: string, options: string[], keys: string[]
+): Promise<string | null> {
+  if (!keys.length || options.length < 2) return null;
+  const prompt =
+    "You are an expert Egyptian curriculum teacher. Answer this multiple-choice question. "
+    + "Return ONLY the exact text of the correct option, copied word-for-word, nothing else. "
+    + "Question: " + String(stem).slice(0, 500) + "\nOptions:\n"
+    + options.slice(0, 6).map((o, i) => `${i + 1}) ${o}`).join("\n");
+  for (const key of keys) {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 45000);
+      const r = await fetch(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=" + key,
+        {
+          method: "POST", headers: { "Content-Type": "application/json" }, signal: ctrl.signal,
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0, maxOutputTokens: 200 },
+          }),
+        }
+      ).finally(() => clearTimeout(timer));
+      const j = await r.json().catch(() => null);
+      const t: string = j?.candidates?.[0]?.content?.parts?.map((p: any) => p.text ?? "").join("").trim() ?? "";
+      if (r.ok && t) {
+        const m = options.find((o) => o === t || normOption(o) === normOption(t));
+        if (m) return m;
+      }
+      if (r.status !== 429) break;
+    } catch { break; }
+  }
+  return null;
+}
+
 /** سلسلة الموديلات: المُعدّ في البيئة أولاً ثم البدائل — الحصص تختلف بين الموديلات */
 function modelChain(): string[] {
   const list = [

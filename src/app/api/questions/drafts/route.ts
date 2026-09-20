@@ -102,7 +102,7 @@ export async function POST(req: Request) {
     tenantVisionKey = (trow as any)?.settings?.vision_key ?? null;
     tenantVisionKey2 = (trow as any)?.settings?.vision_key_2 ?? null;
   } catch {}
-  const { isVisionLive, transcribeImage } = await import("@/lib/vision");
+  const { isVisionLive, transcribeImage, visionChain, solveAnswer, normOption } = await import("@/lib/vision");
   const vLive = isVisionLive(tenantVisionKey, tenantVisionKey2);
 
   if (action === "retranscribe") {
@@ -130,8 +130,9 @@ export async function POST(req: Request) {
     const { splitQuestion } = await import("@/lib/parse-options");
     const qa = splitQuestion(text);
     const opts = qa.options.length >= 2 ? qa.options : null;
-    const norm = (t: string) => t.replace(/^[\sأبجدهـو\d]+[).:\-]/, "").trim();
-    const safeAns = aiAnswer && opts && opts.some((o) => o === aiAnswer || norm(o) === norm(aiAnswer)) ? aiAnswer : null;
+    const safeAns = aiAnswer && opts
+      ? (opts.find((o) => o === aiAnswer || normOption(o) === normOption(aiAnswer)) ?? null)
+      : null;
     const patch: Record<string, unknown> = {
       body: (qa.stem || text).slice(0, 2000),
       options: opts,
@@ -152,7 +153,7 @@ export async function POST(req: Request) {
   if (typeof body.difficulty === "number" && body.difficulty >= 1 && body.difficulty <= 5) patch.difficulty = body.difficulty;
 
   const finalOpts = (patch.options ?? (d as any).options) as string[] | null;
-  const finalAns = (patch.correct_answer ?? (d as any).correct_answer) as string | null;
+  let finalAns = (patch.correct_answer ?? (d as any).correct_answer) as string | null;
   const finalBody = (patch.body ?? (d as any).body) as string;
   if (!finalBody || finalBody.startsWith("[صفحة")) {
     return NextResponse.json(
@@ -160,14 +161,25 @@ export async function POST(req: Request) {
         ok: false,
         error: "incomplete",
         message: vLive
-          ? "هذه الصفحة لم تُفرّغ آلياً بعد — اضغط «تفريغ تلقائي 👁️» في البطاقة أولاً، أو انسخ نص السؤال من الصورة المجاورة هنا (دقيقة واحدة) ثم اعتمد."
+          ? "هذه الصفحة لم تُفرّغ آلياً بعد — انتظر اكتمال التفريغ التلقائي ثم أعد المحاولة."
           : "تعذّرت القراءة الآلية لهذه الصفحة — انسخ نص السؤال من الصورة المجاورة هنا (دقيقة واحدة) ثم اعتمد. للتفريغ التلقائي الكامل: اربط مفتاح Gemini مجاني من الإعدادات.",
       },
       { status: 400 }
     );
   }
-  if (!finalOpts?.length || !finalAns) {
-    return NextResponse.json({ ok: false, error: "incomplete", message: "المسودة تحتاج اختيارات وإجابة صحيحة" }, { status: 400 });
+  // حل تلقائي أخير: اختيارات موجودة بلا إجابة → نحلها بدل مطالبتك بالاختيار
+  if (finalOpts && finalOpts.length >= 2 && !String(finalAns ?? "").trim()) {
+    const solved = await solveAnswer(finalBody, finalOpts, visionChain(tenantVisionKey, tenantVisionKey2));
+    if (solved) {
+      patch.correct_answer = solved;
+      finalAns = solved;
+    }
+  }
+  if (!finalOpts?.length) {
+    return NextResponse.json({ ok: false, error: "incomplete", message: "تعذر استخراج الاختيارات من هذه الصفحة — أضفها سطراً لكل اختيار ثم اعتمد." }, { status: 400 });
+  }
+  if (!String(finalAns ?? "").trim()) {
+    return NextResponse.json({ ok: false, error: "incomplete", message: "تعذر الحل التلقائي (الخدمة مشغولة) — اضغط أحد الاختيارات الصحيح ثم اعتمد." }, { status: 400 });
   }
 
   const { error } = await admin

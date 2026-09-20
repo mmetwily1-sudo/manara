@@ -3,7 +3,7 @@ import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFile } from "node:child_process";
-import { isVisionLive, transcribeImage } from "@/lib/vision";
+import { isVisionLive, transcribeImage, normOption } from "@/lib/vision";
 
 /**
  * POST /api/questions/scan — مسح ورقة بالكاميرا/رفع صور.
@@ -174,10 +174,9 @@ export async function POST(req: Request) {
     const rows = segments.map((s) => {
       const qa = splitQuestion(s.text);
       const opts = qa.options.length >= 2 ? qa.options : null;
-      // ثبّت إجابة الرؤية فقط إن طابقت أحد الاختيارات المستخرجة (حماية من هلوسة)
-      const norm = (t: string) => t.replace(/^[\sأبجدهـو\d]+[).:\-]/, "").trim();
+      // ثبّت إجابة الرؤية فقط إن طابقت أحد الاختيارات — وخزّن نص الخيار نفسه (لا نص النموذج)
       const ans = (s.answer ?? "").trim();
-      const safeAns = ans && opts && opts.some((o) => o === ans || norm(o) === norm(ans)) ? ans : null;
+      const safeAns = ans && opts ? (opts.find((o) => o === ans || normOption(o) === normOption(ans)) ?? null) : null;
       return {
         tenant_id: tenantId,
         subject,
