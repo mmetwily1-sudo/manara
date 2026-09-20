@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
  * بطاقة مراجعة مسودة ممسوحة (مستوى الوحدة — هوية ثابتة لا تُعاد إنشاؤها
@@ -20,7 +20,23 @@ export function TeacherDraftCard({
   const [busy, setBusy] = useState(false);
   const [visionBusy, setVisionBusy] = useState(false);
   const [visionMsg, setVisionMsg] = useState("");
-  const isManual = String(draft.body ?? "").startsWith("[صفحة");
+  const isManual = String(body ?? "").startsWith("[صفحة");
+  // مزامنة لمرة واحدة: إذا مُلئت المسودة من الخادم (تفريغ تلقائي) بينما
+  // الحقول المحلية ما زالت العنصر اليدوي الأصلي — اعرض النص الجديد.
+  // لا تمس مدخلات كتبها المراجع بيده أبداً.
+  const wasManual = useRef(String(draft.body ?? "").startsWith("[صفحة"));
+  const synced = useRef(false);
+  useEffect(() => {
+    const serverBody = String(draft.body ?? "");
+    if (!synced.current && wasManual.current && String(body).startsWith("[صفحة") && !serverBody.startsWith("[صفحة")) {
+      synced.current = true;
+      setBody(draft.body ?? "");
+      setOptions(((draft.options ?? []) as string[]).join("\n"));
+      if (draft.correct_answer) setCorrect(draft.correct_answer);
+      setVisionMsg("تم التفريغ التلقائي ✅ — راجع واعتمد.");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft.body]);
 
   async function go(action: "approve" | "delete") {
     if (action === "delete" && !confirm("حذف هذه المسودة؟")) return;
@@ -110,9 +126,9 @@ export function TeacherDraftCard({
               className="mr-1 rounded-lg bg-primary px-3 py-1 text-[11px] font-bold text-white disabled:opacity-50">
               {visionBusy ? "جاري التفريغ..." : "تفريغ تلقائي 👁️"}
             </button>
-            {visionMsg && <div className="mt-1 font-bold">{visionMsg}</div>}
           </div>
         )}
+        {visionMsg && <div className="text-[11px] font-bold text-success">{visionMsg}</div>}
         <div className="flex gap-2">
           <button onClick={() => go("approve")} disabled={busy} className="rounded-lg bg-success px-4 py-1.5 text-xs font-bold text-white disabled:opacity-50">
             {busy ? "جاري..." : "اعتماد ✅"}

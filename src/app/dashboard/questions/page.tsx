@@ -28,9 +28,11 @@ export default function QuestionsPage() {
 
   const [autoBusy, setAutoBusy] = useState(false);
 
+  const [examLink, setExamLink] = useState<string | null>(null);
+
   async function fetchDrafts(): Promise<any[]> {
     try {
-      const r = await fetch("/api/questions/drafts");
+      const r = await fetch("/api/questions/drafts", { cache: "no-store" });
       const j = await r.json().catch(() => null);
       const list = (r.ok && j?.ok) ? (j.drafts ?? []) : [];
       setDrafts(list);
@@ -48,21 +50,22 @@ export default function QuestionsPage() {
       return;
     }
     setAutoBusy(true);
-    let done = 0;
     for (let i = 0; i < manual.length; i++) {
       setOkMsg(`تم إنشاء ${pages} صفحات — جاري التفريغ التلقائي (${i + 1}/${manual.length})... لا تغلق الصفحة.`);
       try {
-        const rr = await fetch("/api/questions/drafts", {
+        await fetch("/api/questions/drafts", {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: manual[i].id, action: "retranscribe" }),
         });
-        const jj = await rr.json().catch(() => null);
-        if (rr.ok && jj?.ok) done++;
       } catch {}
       await fetchDrafts(); // حدّث البطاقات تدريجياً
     }
     setAutoBusy(false);
-    const left = manual.length - done;
+    // عدّاد صادق من البيانات الطازجة (لا من استجابات وسيطة)
+    const fresh = await fetchDrafts();
+    const still = fresh.filter((d) => String(d.body ?? "").startsWith("[صفحة")).length;
+    const done = manual.length - still;
+    const left = still;
     setOkMsg(
       left === 0
         ? `اكتمل التفريغ التلقائي ✅ (${done}/${manual.length}) — راجع واعتمد.${examNote}`
@@ -73,7 +76,7 @@ export default function QuestionsPage() {
   async function onScan(e: React.FormEvent) {
     e.preventDefault();
     if (!scanFiles?.length) { setErr("اختر صورة واحدة على الأقل."); return; }
-    setScanBusy(true); setErr(""); setOkMsg("");
+    setScanBusy(true); setErr(""); setOkMsg(""); setExamLink(null);
     try {
       const fd = new FormData();
       Array.from(scanFiles).slice(0, 8).forEach((f) => fd.append("images", f));
@@ -83,6 +86,7 @@ export default function QuestionsPage() {
       const j = await r.json().catch(() => null);
       if (r.ok && j?.ok) {
         const examNote = j.examId ? " — مربوطة بامتحان جديد غير منشور" : "";
+        setExamLink(j.examId ? `/dashboard/exams` : null);
         setScanFiles(null); setScanTitle("");
         setShowScan(false);
         const list = await fetchDrafts();
@@ -330,7 +334,14 @@ export default function QuestionsPage() {
       )}
 
       {err && <div className="card border-danger/20 bg-danger/5 p-4 text-small font-bold text-danger">{err}</div>}
-      {okMsg && <div className="card border-success/30 bg-success/5 p-4 text-small font-bold text-success">{okMsg}</div>}
+      {okMsg && (
+        <div className="card border-success/30 bg-success/5 p-4 text-small font-bold text-success">
+          {okMsg}
+          {examLink && (
+            <a href={examLink} className="mr-2 underline underline-offset-2">عرض الامتحان في صفحة الامتحانات ←</a>
+          )}
+        </div>
+      )}
 
       {showBulk && (
         <form onSubmit={onBulk} className="card space-y-3 p-5">
