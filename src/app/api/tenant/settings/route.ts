@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireTeacher, adminClient } from "@/lib/server-auth";
 import { isWhatsAppLive } from "@/lib/whatsapp";
+import { isVisionLive } from "@/lib/vision";
 
 /** GET — حالة الإشعارات وإعداد الواتساب */
 export async function GET() {
@@ -18,6 +19,8 @@ export async function GET() {
     whatsapp_configured: isWhatsAppLive(),
     notify_whatsapp: settings.notify_whatsapp !== false,
     pay_numbers: settings.pay_numbers ?? {},
+    has_vision_key: !!(settings.vision_key as string),
+    vision_live: isVisionLive((settings.vision_key as string) ?? null),
   });
 }
 
@@ -35,6 +38,14 @@ export async function PATCH(req: Request) {
       if (v) pn[k] = v;
     }
     patch.pay_numbers = pn;
+  }
+  // مفتاح Gemini الشخصي للسنتر (تفريغ مرئي دقيق) — فارغ = مسح
+  if (typeof body.vision_key !== "undefined") {
+    const vk = String(body.vision_key ?? "").trim();
+    if (vk && !/^[A-Za-z0-9_-]{10,200}$/.test(vk)) {
+      return NextResponse.json({ ok: false, error: "bad_key" }, { status: 400 });
+    }
+    patch.vision_key = vk || null;
   }
   if (!Object.keys(patch).length) {
     return NextResponse.json({ ok: false, error: "invalid_value" }, { status: 400 });

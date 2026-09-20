@@ -5,12 +5,19 @@
  * المراجعة البشرية تبقى إلزامية دائماً — الرؤية مساعد لا حَكَم.
  */
 
-export function visionKey(): string | null {
+export function envVisionKey(): string | null {
   return process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY || null;
 }
 
-export function isVisionLive(): boolean {
-  return !!visionKey();
+/** مفتاح السنتر أولاً (من إعداداته)، ثم مفتاح المنصة */
+export function visionKey(tenantKey?: string | null): string | null {
+  const t = String(tenantKey ?? "").trim();
+  if (t.length >= 10) return t;
+  return envVisionKey();
+}
+
+export function isVisionLive(tenantKey?: string | null): boolean {
+  return !!visionKey(tenantKey);
 }
 
 export type VisionSegment = { text: string };
@@ -27,9 +34,10 @@ const PROMPT =
 export async function transcribeImage(
   buf: Buffer,
   mime: string,
-  timeoutMs = 60000
+  timeoutMs = 60000,
+  tenantKey?: string | null
 ): Promise<{ ok: true; segments: VisionSegment[] } | { ok: false; reason: string }> {
-  const key = visionKey();
+  const key = visionKey(tenantKey);
   if (!key) return { ok: false, reason: "not_configured" };
   const model = process.env.GEMINI_MODEL ?? "gemini-2.0-flash";
   const ctrl = new AbortController();

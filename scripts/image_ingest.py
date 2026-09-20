@@ -46,11 +46,34 @@ def ocr_available():
         return False
 
 
-def ocr_image(path):
+def ocr_text(img):
     import pytesseract
 
+    try:
+        return pytesseract.image_to_string(img, lang="ara", config="--psm 6") or ""
+    except Exception as e:
+        print("tesseract failed: %s" % e)
+        return ""
+
+
+def ocr_image(path):
+    """OCR مزدوج: طبيعي + عتبة مزيلة للعلامات المائية — يُؤخذ الأطول."""
+    from PIL import ImageOps
+
     img = Image.open(path)
-    return pytesseract.image_to_string(img, lang="ara", config="--psm 6") or ""
+    a = ocr_text(img)
+    try:
+        g = img.convert("L")
+        g = ImageOps.autocontrast(g, cutoff=1)
+        w, h = g.size
+        px = g.load()
+        data = list(g.getdata())
+        g2 = Image.new("L", (w, h))
+        g2.putdata([0 if p < 170 else 255 for p in data])
+        b = ocr_text(g2)
+        return b if len(b) > len(a) else a
+    except Exception:
+        return a
 
 
 def preprocess(src, dst):

@@ -47,7 +47,8 @@ export default function QuestionsPage() {
       const r = await fetch("/api/questions/scan", { method: "POST", body: fd });
       const j = await r.json().catch(() => null);
       if (r.ok && j?.ok) {
-        setOkMsg(`تم إنشاء ${j.drafts} مسودة من ${j.pages} صفحات${j.ocr ? " (بمساعدة OCR)" : " (انسخ من الصور)"}${j.examId ? " — مربوطة بامتحان جديد غير منشور" : ""}. راجعها بالأسفل.`);
+        const how = j.via === "vision" ? " (تفريغ مرئي دقيق 👁️ — راجع بسرعة واعتمد)" : j.ocr ? " (بمساعدة OCR — صحّح من الصور)" : " (انسخ من الصور)";
+        setOkMsg(`تم إنشاء ${j.drafts} مسودة من ${j.pages} صفحات${how}${j.examId ? " — مربوطة بامتحان جديد غير منشور" : ""}.`);
         setScanFiles(null); setScanTitle("");
         setShowScan(false);
         loadDrafts();

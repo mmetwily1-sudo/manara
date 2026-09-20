@@ -1,5 +1,5 @@
 import { PasskeyManager } from "@/components/PasskeyManager";
-import { NotifyToggle, PayNumbersForm } from "@/components/NotifyToggle";
+import { NotifyToggle, PayNumbersForm, VisionKeyForm } from "@/components/NotifyToggle";
 import { getTenantInfoDB } from "@/lib/data";
 
 export default async function SettingsPage() {
@@ -36,6 +36,10 @@ export default async function SettingsPage() {
 
       <section className="card space-y-4 p-6">
         <PayNumbersForm />
+      </section>
+
+      <section className="card space-y-4 p-6">
+        <VisionKeyForm />
       </section>
 
       <section className="card space-y-4 p-6">

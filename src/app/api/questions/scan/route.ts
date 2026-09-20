@@ -37,12 +37,13 @@ async function extractPath(
   files: { buf: Buffer; mime: string }[],
   work: string,
   ref: string,
-  subject: string
+  subject: string,
+  tenantVisionKey: string | null
 ): Promise<{ segments: Seg[]; via: string } | null> {
   // 1) رؤية أولاً (HTTPS خالص — تعمل على أي استضافة)
-  if (isVisionLive()) {
+  if (isVisionLive(tenantVisionKey)) {
     const settled = await Promise.allSettled(
-      files.map((f) => transcribeImage(f.buf, f.mime))
+      files.map((f) => transcribeImage(f.buf, f.mime, 60000, tenantVisionKey))
     );
     const segments: Seg[] = [];
     let n = 0;
@@ -132,7 +133,13 @@ export async function POST(req: Request) {
       examId = (ex as any)?.id ?? null;
     }
 
-    const parsed = await extractPath(bufs, work, ref, subject);
+    // مفتاح الرؤية: السنتر أولاً ثم المنصة
+    let tenantVisionKey: string | null = null;
+    try {
+      const { data: trow } = await admin.from("tenants").select("settings").eq("id", tenantId).single();
+      tenantVisionKey = (trow as any)?.settings?.vision_key ?? null;
+    } catch {}
+    const parsed = await extractPath(bufs, work, ref, subject, tenantVisionKey);
     const via = parsed?.via ?? "manual";
 
     // خزّن الأصلية دائماً (مرجع المراجعة) — المعالجة للـ OCR فقط

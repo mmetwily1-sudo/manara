@@ -98,7 +98,14 @@ export async function POST(req: Request) {
   const finalAns = (patch.correct_answer ?? (d as any).correct_answer) as string | null;
   const finalBody = (patch.body ?? (d as any).body) as string;
   if (!finalBody || finalBody.startsWith("[صفحة")) {
-    return NextResponse.json({ ok: false, error: "incomplete", message: "انسخ نص السؤال من الصورة أولاً" }, { status: 400 });
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "incomplete",
+        message: "تعذّرت القراءة الآلية لهذه الصفحة (زخارف/علامة مائية) — انسخ نص السؤال من الصورة المجاورة هنا (دقيقة واحدة) ثم اعتمد. للتفريغ التلقائي الكامل: اربط مفتاح Gemini مجاني من الإعدادات.",
+      },
+      { status: 400 }
+    );
   }
   if (!finalOpts?.length || !finalAns) {
     return NextResponse.json({ ok: false, error: "incomplete", message: "المسودة تحتاج اختيارات وإجابة صحيحة" }, { status: 400 });
