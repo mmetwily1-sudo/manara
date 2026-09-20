@@ -32,15 +32,25 @@ export async function GET() {
     .limit(50);
 
   const ids = (exams ?? []).map((e: any) => e.id);
+  const idSet = new Set(ids);
   let qCounts: Record<string, number> = {};
   let aCounts: Record<string, number> = {};
+  let draftCounts: Record<string, number> = {};
   if (ids.length) {
-    const [{ data: links }, { data: attempts }] = await Promise.all([
+    const [{ data: links }, { data: attempts }, { data: drafts }] = await Promise.all([
       sb.from("exam_questions").select("exam_id").in("exam_id", ids),
       sb.from("exam_attempts").select("exam_id").in("exam_id", ids),
+      sb.from("questions").select("source_detail").eq("tenant_id", urow.tenant_id).eq("status", "draft"),
     ]);
     for (const l of (links ?? []) as any[]) qCounts[l.exam_id] = (qCounts[l.exam_id] ?? 0) + 1;
     for (const a of (attempts ?? []) as any[]) aCounts[a.exam_id] = (aCounts[a.exam_id] ?? 0) + 1;
+    // مسودات كل امتحان (مخزنة في source_detail JSON)
+    for (const d of (drafts ?? []) as any[]) {
+      try {
+        const eid = JSON.parse(d.source_detail ?? "{}")?.exam_id;
+        if (eid && idSet.has(eid)) draftCounts[eid] = (draftCounts[eid] ?? 0) + 1;
+      } catch {}
+    }
   }
 
   return NextResponse.json({
@@ -49,6 +59,7 @@ export async function GET() {
       ...e,
       questions_count: qCounts[e.id] ?? 0,
       attempts_count: aCounts[e.id] ?? 0,
+      pending_drafts: draftCounts[e.id] ?? 0,
     })),
   });
 }

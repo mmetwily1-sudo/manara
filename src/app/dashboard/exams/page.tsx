@@ -4,7 +4,12 @@ import { useEffect, useState } from "react";
 
 type ExamRow = {
   id: string; title: string; duration_minutes: number; total_marks: number;
-  is_published: boolean; questions_count: number; attempts_count: number;
+  is_published: boolean; questions_count: number; attempts_count: number; pending_drafts?: number;
+};
+type AuditReport = {
+  total: number; fixed: string[];
+  warnings: { n: number; question_id: string; body: string; issues: string[]; suggested?: string | null }[];
+  llm: { checked: number; skipped: string | null };
 };
 type BankStats = { total: number; byLevel: Record<string, number> };
 
@@ -32,6 +37,23 @@ export default function ExamsListPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [form, setForm] = useState({ title: "", easy: 2, mid: 2, hard: 1, duration: 30 });
+  const [auditingId, setAuditingId] = useState<string | null>(null);
+  const [audits, setAudits] = useState<Record<string, AuditReport>>({});
+
+  async function onAudit(id: string) {
+    setAuditingId(id);
+    try {
+      const { r, j } = await apiFetch(`/api/exams/${id}/audit`, { method: "POST" });
+      if (r.ok && j?.ok) {
+        setAudits((p) => ({ ...p, [id]: j as AuditReport }));
+        loadAll();
+      } else setNotice({ kind: "err", text: "فشل التدقيق: " + (j?.error ?? "خطأ غير معروف") });
+    } catch {
+      setNotice({ kind: "err", text: "تعذر الاتصال بالخادم." });
+    } finally {
+      setAuditingId(null);
+    }
+  }
   // المنهج المرجعي (وضع curriculum) — اختياري: بدونه يعمل التوليد القديم
   const [tracks, setTracks] = useState<{ code: string; system: string; grade_ar: string; stream_ar: string | null }[]>([]);
   const [currReady, setCurrReady] = useState<boolean | null>(null);
@@ -407,8 +429,20 @@ export default function ExamsListPage() {
                     {ex.total_marks ? ` · ${ex.total_marks} درجات` : ""}
                     {ex.attempts_count > 0 && ` · ${ex.attempts_count} محاولة محلولة`}
                   </div>
+                  {(ex.pending_drafts ?? 0) > 0 && (
+                    <div className="mt-1 text-xs font-bold text-warning">
+                      ⏳ {ex.pending_drafts} مسودات لهذا الامتحان بانتظار مراجعتك —{" "}
+                      <a href="/dashboard/questions" className="underline underline-offset-2">راجعها من بنك الأسئلة</a>
+                    </div>
+                  )}
                 </div>
                 <div className="flex flex-wrap gap-2">
+                  {ex.questions_count > 0 && (
+                    <button onClick={() => onAudit(ex.id)} disabled={auditingId === ex.id}
+                      className="rounded-lg bg-primary-light px-4 py-1.5 text-xs font-bold text-primary transition hover:bg-primary hover:text-white disabled:opacity-50">
+                      {auditingId === ex.id ? "جاري التدقيق..." : "تدقيق تلقائي 🔍"}
+                    </button>
+                  )}
                   <a href={`/exam/${ex.id}`} className="btn-secondary !px-4 !py-1.5 text-xs">معاينة وحل</a>
                   <button onClick={() => copyLink(ex.id)} className="btn-secondary !px-4 !py-1.5 text-xs">
                     {copiedId === ex.id ? "✓ تم النسخ" : "نسخ رابط الطلاب"}
@@ -428,6 +462,27 @@ export default function ExamsListPage() {
                   </button>
                 </div>
               </div>
+              {audits[ex.id] && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed">
+                  <div className="font-bold">نتيجة التدقيق ({audits[ex.id].total} أسئلة، تحقق لغوي: {audits[ex.id].llm.checked}
+                    {audits[ex.id].llm.skipped ? ` — تُخطي: ${audits[ex.id].llm.skipped === "no_key" ? "لا مفتاح رؤية" : "الخدمة مشغولة"}` : " ✅"})
+                  </div>
+                  {audits[ex.id].fixed.length > 0 && (
+                    <ul className="mt-1 space-y-0.5 text-success">
+                      {audits[ex.id].fixed.map((f, i) => <li key={i}>🔧 {f}</li>)}
+                    </ul>
+                  )}
+                  {audits[ex.id].warnings.length === 0 ? (
+                    <div className="mt-1 font-bold text-success">كل الأسئلة سليمة ✅ — جاهز للنشر.</div>
+                  ) : (
+                    <ul className="mt-1 space-y-1 text-warning">
+                      {audits[ex.id].warnings.map((w) => (
+                        <li key={w.question_id}>⚠️ س{w.n} «{w.body}…»: {w.issues.join("؛ ")}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
             </li>
           ))}
         </ul>
