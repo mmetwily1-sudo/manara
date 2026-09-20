@@ -7,13 +7,18 @@
  */
 
 const MARKER =
-  /(?:^|\s)(?:\(?[أ-ي]\)|\(?[a-dA-D]\)|\(?\d+\)|[أ-ي]\.|[a-dA-D]\.|[أ-ي]-|\d+-)\s*/;
+  /(?:^|\s)(?:\(?[أ-ي©®]\)|\(?[a-dA-D]\)|\(?\d+\)|[أ-ي©®]\s*[:.．]|[a-dA-D]\s*[:.]|\d+\s*[:.\-]|[أ-ي]-|\d+-|\(\s*\))\s*/;
 
 function stripMarker(s: string): string {
   return s
-    .replace(/^\s*\(?[أ-ي]\)\s*/, "")
+    .replace(/^\s*\(?[أ-ي©®]\)\s*/, "")
+    .replace(/^\s*[أ-ي©®]\s*[:.．]\s*/, "")
+    .replace(/^\s*\(\s*\)\s*/, "")
     .replace(/^\s*\(?[a-dA-D]\)\s*/, "")
     .replace(/^\s*\(?\d+\)\s*/, "")
+    .replace(/^\s*\d+\s*[:.\-]\s*/, "")
+    .replace(/^\s*[©®]\s*/, "")
+    .replace(/^\s*[1-9]\s+/, "")
     .replace(/^\s*[أ-ي]\.\s*/, "")
     .replace(/^\s*[a-dA-D]\.\s*/, "")
     .replace(/^\s*[أ-ي]-\s*/, "")
@@ -56,7 +61,7 @@ function dedupe(arr: string[]): string[] {
 }
 
 const OPT_LINE =
-  /^\s*(?:\(?[أ-ي]\)|\(?[a-dA-D]\)|\(?\d+\)|[أ-ي]\.|[a-dA-D]\.|\d+\.)\s*\S/;
+  /^\s*(?:\(?[أ-ي©®]\)|\(?[a-dA-D]\)|\(?\d+\)|[أ-ي©®]\s*[:.．]|[a-dA-D]\s*[:.]|\d+\s*[:.\-]|\(\s*\))\s*\S/;
 
 /**
  * فصل سؤال عن اختياراته: آخر كتلة متصلة من سطور تبدأ بعلامات
@@ -64,17 +69,48 @@ const OPT_LINE =
  * يُستخدم عند إنشاء المسودات لتصل المراجع باختيارات جاهزة.
  */
 export function splitQuestion(text: string): { stem: string; options: string[] } {
-  const lines = String(text ?? "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  if (lines.length < 2) return { stem: String(text ?? "").trim(), options: [] };
-  let cut = -1;
-  for (let i = lines.length - 1; i >= 0; i--) {
-    if (OPT_LINE.test(lines[i])) cut = i;
-    else if (cut >= 0) break;
+  const full0 = String(text ?? "").trim();
+  const lines = full0.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (lines.length >= 2) {
+    let cut = -1;
+    for (let i = lines.length - 1; i >= 0; i--) {
+      if (OPT_LINE.test(lines[i])) cut = i;
+      else if (cut >= 0) break;
+    }
+    if (cut > 0) {
+      const options = dedupe(lines.slice(cut).map(stripMarker).filter((s) => s.length > 0));
+      const stem = lines.slice(0, cut).join("\n").trim();
+      if (stem && options.length >= 2) return { stem, options };
+    }
   }
-  if (cut <= 0) return { stem: String(text ?? "").trim(), options: [] };
-  const options = dedupe(lines.slice(cut).map(stripMarker).filter((s) => s.length > 0));
-  const stem = lines.slice(0, cut).join("\n").trim();
-  if (stem && options.length >= 2) return { stem, options };
+  // علامات داخل السطور (ناتج OCR مدمج): أول علامة بعد أول 25 حرفاً تبدأ الاختيارات.
+  // تشمل علامات OCR المشوهة: © منفردة، وأرقام مفردة (2 عمر)، و() الفارغة.
+  const LOOSE =
+    /(?:^|\s)(?:\(?[أ-ي©®]\)|\(?[a-dA-D]\)|\(?\d+\)|[أ-ي©®]\s*[:.．]|[a-dA-D]\s*[:.]|\d+\s*[:.\-]|\(\s*\)|[أ-ي]-|\d+-|[©®](?=\s|$)|[1-9](?=\s))/g;
+  const full = String(text ?? "");
+  let cutPos = -1;
+  let m: RegExpExecArray | null;
+  LOOSE.lastIndex = 0;
+  while ((m = LOOSE.exec(full)) !== null) {
+    if (m.index > 25) {
+      cutPos = m.index;
+      break;
+    }
+    if (m.index === 0) continue;
+    // علامة مبكرة جداً (رقم السؤال غالباً) — تجاهل وواصل
+  }
+  if (cutPos > 25) {
+    const stem = full.slice(0, cutPos).trim();
+    const rest = full.slice(cutPos);
+    const LOOSE2 =
+      /(?:^|\s)(?:\(?[أ-ي©®]\)|\(?[a-dA-D]\)|\(?\d+\)|[أ-ي©®]\s*[:.．]|[a-dA-D]\s*[:.]|\d+\s*[:.\-]|\(\s*\)|[أ-ي]-|\d+-|[©®](?=\s|$)|[1-9](?=\s))/g;
+    const options = dedupe(
+      rest.split(LOOSE2).map((s) => stripMarker(s)).filter((s) => s.length > 5)
+    );
+    if (stem.length >= 10 && options.length >= 2) {
+      return { stem: stem.slice(0, 2000), options };
+    }
+  }
   // بديل الشرطات في سطر واحد: "س؟\nأ - ب - ج"
   if (lines.length >= 2) {
     const last = lines[lines.length - 1];
