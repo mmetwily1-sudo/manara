@@ -26,14 +26,49 @@ export default function QuestionsPage() {
   // مسوداتي
   const [drafts, setDrafts] = useState<any[] | null>(null);
 
-  async function loadDrafts() {
+  const [autoBusy, setAutoBusy] = useState(false);
+
+  async function fetchDrafts(): Promise<any[]> {
     try {
       const r = await fetch("/api/questions/drafts");
       const j = await r.json().catch(() => null);
-      if (r.ok && j?.ok) setDrafts(j.drafts ?? []);
-    } catch {}
+      const list = (r.ok && j?.ok) ? (j.drafts ?? []) : [];
+      setDrafts(list);
+      return list;
+    } catch { return []; }
   }
+  async function loadDrafts() { await fetchDrafts(); }
   useEffect(() => { loadDrafts(); }, []);
+
+  /** بعد المسح: فرّغ أي مسودات يدوية متبقية تلقائياً (خطوة واحدة للمعلم) */
+  async function autoTranscribe(list: any[], pages: number, examNote: string) {
+    const manual = list.filter((d) => String(d.body ?? "").startsWith("[صفحة"));
+    if (!manual.length) {
+      setOkMsg(`تم إنشاء ${list.length} مسودة مفرّغة ✅ — راجع واعتمد.${examNote}`);
+      return;
+    }
+    setAutoBusy(true);
+    let done = 0;
+    for (let i = 0; i < manual.length; i++) {
+      setOkMsg(`تم إنشاء ${pages} صفحات — جاري التفريغ التلقائي (${i + 1}/${manual.length})... لا تغلق الصفحة.`);
+      try {
+        const rr = await fetch("/api/questions/drafts", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: manual[i].id, action: "retranscribe" }),
+        });
+        const jj = await rr.json().catch(() => null);
+        if (rr.ok && jj?.ok) done++;
+      } catch {}
+      await fetchDrafts(); // حدّث البطاقات تدريجياً
+    }
+    setAutoBusy(false);
+    const left = manual.length - done;
+    setOkMsg(
+      left === 0
+        ? `اكتمل التفريغ التلقائي ✅ (${done}/${manual.length}) — راجع واعتمد.${examNote}`
+        : `فُرّغ ${done}/${manual.length} تلقائياً — المتبقي (${left}) اضغط فيه «تفريغ تلقائي 👁️» لاحقاً أو انسخ يدوياً.${examNote}`
+    );
+  }
 
   async function onScan(e: React.FormEvent) {
     e.preventDefault();
@@ -47,15 +82,12 @@ export default function QuestionsPage() {
       const r = await fetch("/api/questions/scan", { method: "POST", body: fd });
       const j = await r.json().catch(() => null);
       if (r.ok && j?.ok) {
-        const how = j.via === "vision"
-          ? " (تفريغ مرئي دقيق 👁️ — راجع بسرعة واعتمد)"
-          : j.via === "ocr"
-            ? " (بمساعدة OCR — صحّح من الصور، أو اضغط «تفريغ تلقائي 👁️» داخل المسودة لإعادة المحاولة المرئية)"
-            : " (انسخ من الصور، أو اضغط «تفريغ تلقائي 👁️» داخل المسودة)";
-        setOkMsg(`تم إنشاء ${j.drafts} مسودة من ${j.pages} صفحات${how}${j.examId ? " — مربوطة بامتحان جديد غير منشور" : ""}.`);
+        const examNote = j.examId ? " — مربوطة بامتحان جديد غير منشور" : "";
         setScanFiles(null); setScanTitle("");
         setShowScan(false);
-        loadDrafts();
+        const list = await fetchDrafts();
+        // خطوة واحدة: المسح + التفريغ التلقائي معاً
+        await autoTranscribe(list, j.pages, examNote);
       } else setErr(j?.message ?? "فشل المسح: " + (j?.error ?? "خطأ غير معروف"));
     } catch { setErr("تعذر الاتصال بالخادم."); }
     finally { setScanBusy(false); }
@@ -259,7 +291,7 @@ export default function QuestionsPage() {
         <form onSubmit={onScan} className="card space-y-3 p-5">
           <h3 className="font-bold">مسح ورقة امتحان/أسئلة 📷</h3>
           <p className="text-xs leading-relaxed text-slate-500">
-            صوّر الورقة أو ارفع صورها (حتى 8 صور) — نحاول التفريغ المرئي تلقائياً (مع إعادة المحاولة عند الازدحام) ثم OCR، وتراجع أنت من الصور قبل الاعتماد. لا شيء يُنشر وحده.
+            صوّر الورقة أو ارفع صورها (حتى 8 صور) — خطوة واحدة: مسح + تفريغ تلقائي لكل الصفحات (مع إعادة المحاولة عند الازدحام)، ثم تراجع أنت قبل الاعتماد. لا شيء يُنشر وحده.
           </p>
           <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 px-4 py-4 text-small font-bold text-slate-600 transition hover:border-primary hover:text-primary">
             {scanFiles?.length ? `📎 ${scanFiles.length} صور مختارة` : "اختر الصور (كاميرا أو ملفات)"}
