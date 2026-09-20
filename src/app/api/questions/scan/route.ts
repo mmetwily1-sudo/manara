@@ -31,7 +31,7 @@ function runPy(args: string[], timeoutMs = 120000): Promise<boolean> {
   });
 }
 
-type Seg = { page: number; text: string; needs_transcription?: boolean; via: string };
+type Seg = { page: number; text: string; needs_transcription?: boolean; via: string; answer?: string | null };
 
 async function extractPath(
   files: { buf: Buffer; mime: string }[],
@@ -54,7 +54,7 @@ async function extractPath(
       n++;
       if (s.status === "fulfilled" && s.value.ok) {
         anyOk = true;
-        for (const seg of s.value.segments) segments.push({ page: n, text: seg.text, via: "vision" });
+        for (const seg of s.value.segments) segments.push({ page: n, text: seg.text, via: "vision", answer: seg.answer ?? null });
       } else if (s.status === "fulfilled") {
         const v = s.value as { ok: boolean; reason?: string };
         visionNote = v.ok ? null : (v.reason ?? "unknown");
@@ -131,11 +131,13 @@ export async function POST(req: Request) {
       await admin.storage.createBucket("exam-pages", { public: true });
     } catch {}
 
+    // كل مسح = امتحان واحد مجمّع (غير منشور): تُرفق به كل مسوداته عند الاعتماد
+    const autoTitle = examTitle || `مسح ${subject} — ${new Date().toLocaleDateString("ar-EG")}`;
     let examId: string | null = null;
-    if (examTitle) {
+    {
       const { data: ex } = await admin
         .from("exams")
-        .insert({ tenant_id: tenantId, title: examTitle, duration_minutes: 30, total_marks: 0, is_published: false })
+        .insert({ tenant_id: tenantId, title: autoTitle, duration_minutes: 30, total_marks: 0, is_published: false })
         .select("id")
         .single();
       examId = (ex as any)?.id ?? null;
@@ -168,6 +170,11 @@ export async function POST(req: Request) {
     const { splitQuestion } = await import("@/lib/parse-options");
     const rows = segments.map((s) => {
       const qa = splitQuestion(s.text);
+      const opts = qa.options.length >= 2 ? qa.options : null;
+      // ثبّت إجابة الرؤية فقط إن طابقت أحد الاختيارات المستخرجة (حماية من هلوسة)
+      const norm = (t: string) => t.replace(/^[\sأبجدهـو\d]+[).:\-]/, "").trim();
+      const ans = (s.answer ?? "").trim();
+      const safeAns = ans && opts && opts.some((o) => o === ans || norm(o) === norm(ans)) ? ans : null;
       return {
         tenant_id: tenantId,
         subject,
@@ -176,8 +183,8 @@ export async function POST(req: Request) {
         difficulty: 3,
         qtype: "mcq",
         body: qa.stem.slice(0, 2000) || s.text.slice(0, 2000),
-        options: qa.options.length >= 2 ? qa.options : null,
-        correct_answer: null,
+        options: opts,
+        correct_answer: safeAns,
         marks: 1,
         source: "teacher",
         source_detail: JSON.stringify({ ref, page: s.page, kind: "scan", exam_id: examId, ocr: via !== "manual", via }),

@@ -33,7 +33,11 @@ export function TeacherDraftCard({
       setBody(draft.body ?? "");
       setOptions(((draft.options ?? []) as string[]).join("\n"));
       if (draft.correct_answer) setCorrect(draft.correct_answer);
-      setVisionMsg("تم التفريغ التلقائي ✅ — راجع واعتمد.");
+      setVisionMsg(
+        draft.correct_answer
+          ? "تم التفريغ والحل التلقائي ✅ — راجع الإجابة واعتمد."
+          : "تم التفريغ التلقائي ✅ — اختر الإجابة الصحيحة واعتمد."
+      );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft.body]);

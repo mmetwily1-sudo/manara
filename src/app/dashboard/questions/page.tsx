@@ -305,7 +305,7 @@ export default function QuestionsPage() {
           <div className="grid gap-3 sm:grid-cols-2">
             <input value={scanSubject} onChange={(e) => setScanSubject(e.target.value)} placeholder="المادة (مثال: فيزياء)"
               className="rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:border-primary" />
-            <input value={scanTitle} onChange={(e) => setScanTitle(e.target.value)} placeholder="عنوان الامتحان (اختياري — ينشئ امتحاناً غير منشور ويُرفق به)"
+            <input value={scanTitle} onChange={(e) => setScanTitle(e.target.value)} placeholder="عنوان الامتحان (اختياري — بدونه نسميه تلقائياً بتاريخ اليوم)"
               className="rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:border-primary" />
           </div>
           <button className="btn-primary" disabled={scanBusy}>{scanBusy ? "جاري المسح والمعالجة..." : "بدء المسح"}</button>

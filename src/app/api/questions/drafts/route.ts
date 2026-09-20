@@ -124,15 +124,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "vision_failed", reason: tr.reason, message: visionFailAr(tr.reason) }, { status: 502 });
     }
     const text = tr.segments.map((s) => s.text).join("\n\n").slice(0, 2000);
+    const aiAnswer = tr.segments.map((s) => s.answer ?? "").find((a) => a.trim())?.trim() ?? "";
     const { splitQuestion } = await import("@/lib/parse-options");
     const qa = splitQuestion(text);
+    const opts = qa.options.length >= 2 ? qa.options : null;
+    const norm = (t: string) => t.replace(/^[\sأبجدهـو\d]+[).:\-]/, "").trim();
+    const safeAns = aiAnswer && opts && opts.some((o) => o === aiAnswer || norm(o) === norm(aiAnswer)) ? aiAnswer : null;
     const patch: Record<string, unknown> = {
       body: (qa.stem || text).slice(0, 2000),
-      options: qa.options.length >= 2 ? qa.options : null,
+      options: opts,
+      correct_answer: safeAns,
     };
     const { error } = await admin.from("questions").update(patch).eq("id", id).eq("tenant_id", tid).eq("status", "draft");
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-    return NextResponse.json({ ok: true, action, body: patch.body, options: (patch.options as string[]) ?? [] });
+    return NextResponse.json({ ok: true, action, body: patch.body, options: opts ?? [], correct_answer: safeAns });
   }
 
   const { parseOptions } = await import("@/lib/parse-options");

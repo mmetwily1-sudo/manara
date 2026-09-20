@@ -20,15 +20,17 @@ export function isVisionLive(tenantKey?: string | null): boolean {
   return !!visionKey(tenantKey);
 }
 
-export type VisionSegment = { text: string };
+export type VisionSegment = { text: string; answer?: string | null };
 
 const PROMPT =
   "You transcribe Arabic exam paper photos into structured drafts. " +
   "Read the image carefully (Arabic RTL, ignore decorative watermarks/headers/footers). " +
   "Split into individual questions. For each: full question text, then options each on its own line " +
   "starting with the original marker like أ) or 1). " +
+  "Then SOLVE each question yourself (you are an expert Egyptian curriculum teacher) and add the " +
+  "correct option as exact text copied from the options. " +
   "Return ONLY a JSON array, no markdown, no explanation: " +
-  '[{"text": "question line\\nأ) opt1\\nb) opt2"}]. ' +
+  '[{"text": "question line\\nأ) opt1\\nb) opt2", "answer": "opt2 exact text"}]. ' +
   "If a page has no questions, return []. Keep Quranic verses and formulas as-is.";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -86,10 +88,13 @@ async function once(
       return { ok: false, reason: "bad_shape", retryable: true };
     }
     if (!Array.isArray(arr)) return { ok: false, reason: "bad_shape", retryable: false };
-    const segments = arr
-      .map((x: any) => String(x?.text ?? "").trim())
-      .filter((s: string) => s.length >= 10)
-      .map((s: string) => ({ text: s.slice(0, 2000) }));
+    const segments: VisionSegment[] = arr
+      .map((x: any) => ({
+        text: String(x?.text ?? "").trim(),
+        answer: String(x?.answer ?? "").trim().slice(0, 500) || null,
+      }))
+      .filter((s: VisionSegment) => s.text.length >= 10)
+      .map((s: VisionSegment) => ({ text: s.text.slice(0, 2000), answer: s.answer }));
     if (!segments.length) return { ok: false, reason: "empty_result", retryable: true };
     return { ok: true, segments };
   } catch (e: any) {
@@ -114,12 +119,25 @@ export async function transcribeImage(
   const key = visionKey(tenantKey);
   if (!key) return { ok: false, reason: "not_configured" };
   let last = "unknown";
+  let quotaWaited = false;
   for (const model of modelChain()) {
-    for (let a = 0; a < 2; a++) {
-      if (a > 0) await sleep(4000); // فاصل قبل إعادة المحاولة (يمتص 503/429 الموقتة)
+    let attempts = 0;
+    while (attempts < 2) {
+      if (attempts > 0) await sleep(4000); // فاصل قبل إعادة المحاولة (يمتص 503 الموقتة)
+      attempts++;
       const r = await once(model, key, buf, mime, timeoutMs);
       if (r.ok) return r;
       last = r.reason;
+      // 429 حصة مستنفدة: نفس المفتاح لكل الموديلات — انتظار واحد طويل ثم استسلام صريح
+      if (/429|quota|exceed/i.test(r.reason)) {
+        if (!quotaWaited) {
+          quotaWaited = true;
+          await sleep(15000);
+          attempts--; // أعد نفس المحاولة مرة أخيرة
+          continue;
+        }
+        return { ok: false, reason: last };
+      }
       if (!r.retryable) break; // خطأ بنيوي — جرّب الموديل البديل مباشرة
     }
     await sleep(1000);
