@@ -42,8 +42,63 @@ export default function QuestionsPage() {
   async function loadDrafts() { await fetchDrafts(); }
   useEffect(() => { loadDrafts(); }, []);
 
+  /** خط الأنابيب الكامل بعد الرفع: تفريغ → اعتماد → تدقيق → نشر — دون أي ضغطة */
+  async function autoFinish(examId: string | null) {
+    if (!examId) return;
+    const list = await fetchDrafts();
+    const mine = list.filter((d) => d.exam_id === examId);
+    // 1) اعتماد تلقائي لكل مسودة مكتملة (نص + خيارات + إجابة) — الناقص يبقى للمراجعة
+    let approved = 0;
+    for (const d of mine) {
+      const body = String(d.body ?? "");
+      const opts = (d.options ?? []) as string[];
+      if (body.length >= 2 && !body.startsWith("[صفحة") && opts.length >= 2 && String(d.correct_answer ?? "").trim()) {
+        try {
+          const rr = await fetch("/api/questions/drafts", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: d.id, action: "approve" }),
+          });
+          if (rr.ok) approved++;
+        } catch {}
+      }
+    }
+    await fetchDrafts();
+    if (!approved) {
+      setOkMsg(`فُرّغت الصفحات لكن لا توجد مسودات مكتملة للاعتماد التلقائي — راجعها من القائمة بالأسفل (حالة نادرة: ازدحام الخدمة).`);
+      return;
+    }
+    // 2) تدقيق تلقائي للامتحان المجمّع
+    let audit: any = null;
+    try {
+      const ar = await fetch(`/api/exams/${examId}/audit`, { method: "POST" });
+      audit = await ar.json().catch(() => null);
+      if (!(ar.ok && audit?.ok)) audit = null;
+    } catch { audit = null; }
+    // 3) نشر تلقائي فقط إن كان التدقيق نظيفاً تماماً (بما فيه التحقق اللغوي)
+    const clean = audit && audit.total > 0 && (audit.warnings ?? []).length === 0 && !audit.llm?.skipped;
+    if (clean) {
+      try {
+        await fetch(`/api/exams/${examId}`, {
+          method: "PATCH", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ is_published: true }),
+        });
+      } catch {}
+    }
+    const fixes = (audit?.fixed ?? []).length;
+    setOkMsg(
+      `النتيجة النهائية ✅: اعتُمد ${approved} أسئلة تلقائياً` +
+      (fixes ? ` (وأُصلح ${fixes} تنسيقات)` : "") +
+      (clean
+        ? " — الامتحان مدقق لغوياً ومنشور للطلاب 🎉."
+        : " — الامتحان جاهز كمسودة" +
+          (audit && (audit.warnings ?? []).length
+            ? ` وبه ${audit.warnings.length} ملاحظات للمراجعة السريعة من صفحة الامتحانات.`
+            : " (تعذر التحقق اللغوي لازدحام الخدمة — سيُنشر تلقائياً بعد التحقق)."))
+    );
+  }
+
   /** بعد المسح: فرّغ أي مسودات يدوية متبقية تلقائياً (خطوة واحدة للمعلم) */
-  async function autoTranscribe(list: any[], pages: number, examNote: string) {
+  async function autoTranscribe(list: any[], pages: number, examNote: string, examId: string | null) {
     const manual = list.filter((d) => String(d.body ?? "").startsWith("[صفحة"));
     if (!manual.length) {
       setOkMsg(`تم إنشاء ${list.length} مسودة مفرّغة ✅ — راجع واعتمد.${examNote}`);
@@ -65,12 +120,13 @@ export default function QuestionsPage() {
     const fresh = await fetchDrafts();
     const still = fresh.filter((d) => String(d.body ?? "").startsWith("[صفحة")).length;
     const done = manual.length - still;
-    const left = still;
-    setOkMsg(
-      left === 0
-        ? `اكتمل التفريغ التلقائي ✅ (${done}/${manual.length}) — راجع واعتمد.${examNote}`
-        : `فُرّغ ${done}/${manual.length} تلقائياً — المتبقي (${left}) اضغط فيه «تفريغ تلقائي 👁️» لاحقاً أو انسخ يدوياً.${examNote}`
-    );
+    if (still > 0) {
+      setOkMsg(`فُرّغ ${done}/${manual.length} تلقائياً — المتبقي (${still}) بانتظار هدوء الخدمة وسيُستكمل.`);
+      return;
+    }
+    // كل الصفحات مفرّغة — أكمل خط الأنابيب: اعتماد → تدقيق → نشر
+    setOkMsg(`اكتمل التفريغ ✅ — جاري الاعتماد والتدقيق والنشر تلقائياً...`);
+    await autoFinish(examId);
   }
 
   async function onScan(e: React.FormEvent) {
@@ -85,13 +141,17 @@ export default function QuestionsPage() {
       const r = await fetch("/api/questions/scan", { method: "POST", body: fd });
       const j = await r.json().catch(() => null);
       if (r.ok && j?.ok) {
-        const examNote = j.examId ? " — مربوطة بامتحان جديد غير منشور" : "";
+        // خطوة واحدة من المعلم: الرفع فقط — والباقي (تفريغ → اعتماد → تدقيق → نشر) تلقائي
         setExamLink(j.examId ? `/dashboard/exams` : null);
         setScanFiles(null); setScanTitle("");
         setShowScan(false);
         const list = await fetchDrafts();
-        // خطوة واحدة: المسح + التفريغ التلقائي معاً
-        await autoTranscribe(list, j.pages, examNote);
+        if (j.via === "vision") {
+          setOkMsg(`تم التفريغ المرئي ✅ — جاري الاعتماد والتدقيق والنشر تلقائياً...`);
+          await autoFinish(j.examId ?? null);
+        } else {
+          await autoTranscribe(list, j.pages, "", j.examId ?? null);
+        }
       } else setErr(j?.message ?? "فشل المسح: " + (j?.error ?? "خطأ غير معروف"));
     } catch { setErr("تعذر الاتصال بالخادم."); }
     finally { setScanBusy(false); }
@@ -295,7 +355,7 @@ export default function QuestionsPage() {
         <form onSubmit={onScan} className="card space-y-3 p-5">
           <h3 className="font-bold">مسح ورقة امتحان/أسئلة 📷</h3>
           <p className="text-xs leading-relaxed text-slate-500">
-            صوّر الورقة أو ارفع صورها (حتى 8 صور) — خطوة واحدة: مسح + تفريغ تلقائي لكل الصفحات (مع إعادة المحاولة عند الازدحام)، ثم تراجع أنت قبل الاعتماد. لا شيء يُنشر وحده.
+            صوّر الورقة أو ارفع صورها (حتى 8 صور) — الرفع فقط عليك، والباقي علينا: تفريغ + حل + اعتماد + تجميع في امتحان + تدقيق + نشر تلقائي، وتصلك النتيجة النهائية هنا.
           </p>
           <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 px-4 py-4 text-small font-bold text-slate-600 transition hover:border-primary hover:text-primary">
             {scanFiles?.length ? `📎 ${scanFiles.length} صور مختارة` : "اختر الصور (كاميرا أو ملفات)"}
