@@ -210,15 +210,38 @@ export async function searchKnowledge(
 ): Promise<unknown> {
   const q = String(args.query ?? "").trim().slice(0, 100);
   if (q.length < 2) return { error: "need_query" };
+  // كلمات مفتاحية (4+ أحرف) بأولوية الأطول — مطابقة أي كلمة لا العبارة كاملة (ES5 آمن)
+  const stopWords: Record<string, boolean> = { "ماذا": true, "التي": true, "الذي": true, "على": true, "إلى": true, "هذا": true, "هذه": true, "ذلك": true, "ماهي": true, "ماهو": true, "تعرف": true, "عندك": true, "عن": true, "ما": true };
+  const seenW: Record<string, boolean> = {};
+  const words: string[] = [];
+  const parts = q.split(/\s+/);
+  for (let i = 0; i < parts.length; i++) {
+    const w = parts[i];
+    if (w.length >= 4 && !stopWords[w] && !seenW[w]) { seenW[w] = true; words.push(w); }
+  }
+  words.sort((a, b) => b.length - a.length);
+  const top = words.slice(0, 4);
+  if (!top.length) return { error: "need_query" };
+  const orsArr: string[] = [];
+  for (let i = 0; i < top.length; i++) orsArr.push(`title.ilike.%${top[i]}%,body.ilike.%${top[i]}%`);
   let query = admin.from("edu_knowledge").select("kind,system,title,body,source_url,effective_date")
-    .or(`title.ilike.%${q}%,body.ilike.%${q}%`).limit(8);
+    .or(orsArr.join(",")).limit(12);
   if (args.kind) query = query.eq("kind", String(args.kind).slice(0, 30));
   const { data, error } = await query;
   if (error) return { error: "db" };
-  return ((data ?? []) as any[]).map((r) => ({
-    kind: r.kind, title: r.title,
-    body: String(r.body).slice(0, 500),
-    source: r.source_url, date: r.effective_date,
+  // ترتيب حسب عدد الكلمات المطابقة
+  const scored: { r: any; hits: number }[] = [];
+  for (const r of ((data ?? []) as any[])) {
+    const hay = `${r.title} ${r.body}`;
+    let hits = 0;
+    for (let i = 0; i < top.length; i++) if (hay.indexOf(top[i]) >= 0) hits++;
+    if (hits > 0) scored.push({ r, hits });
+  }
+  scored.sort((a, b) => b.hits - a.hits);
+  return scored.slice(0, 6).map((x) => ({
+    kind: x.r.kind, title: x.r.title,
+    body: String(x.r.body).slice(0, 500),
+    source: x.r.source_url, date: x.r.effective_date,
   }));
 }
 

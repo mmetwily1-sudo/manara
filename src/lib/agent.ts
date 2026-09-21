@@ -199,6 +199,10 @@ async function directAnswer(
       return null;
     }
   };
+  // أسئلة الأنظمة والمناهج والوزارة → المعرفة المحلية مباشرة (تعمل بلا ذكاء)
+  if (/بكالوريا|ثانوية|تنسيق|وزارة|أزهر|منهج|نظام التعليم/.test(m)) {
+    return run("search_knowledge", { query: m.split(/\s+/).filter((w) => w.length > 3).slice(0, 4).join(" ") || m.slice(0, 60) });
+  }
   // مساعدة الداشبورد أولاً: صيغة السؤال (فين/إزاي/كيف) تتفوق على الكلمات الموضوعية
   if (/فين|وين|إزاي|ازاي|كيف|شرح|طريقة|داشبورد|لوحة/.test(m)) {
     return run("app_help", { topic: m.slice(0, 100) });
@@ -265,7 +269,7 @@ function pickTools(message: string): unknown[] {
   if (has("راجع", "تدقيق", "دقق")) want.add("review_exam");
   if (has("حضور", "غائب", "غاب")) want.add("attendance_summary");
   if (has("طالب", "طالبة", "مستوى", "نقاط", "درجة")) want.add("student_progress");
-  if (has("كتاب", "قرار", "وزارة", "منهج", "أزهر", "مذاكرة", "أخبار", "جديد")) { want.add("search_knowledge"); want.add("book_guide"); }
+  if (has("كتاب", "قرار", "وزارة", "منهج", "أزهر", "مذاكرة", "أخبار", "جديد", "بكالوريا", "ثانوية", "تنسيق", "نظام التعليم")) { want.add("search_knowledge"); want.add("book_guide"); }
   if (has("حل", "مسألة", "إجابة", "جواب")) want.add("solve_question");
   if (has("فين", "وين", "إزاي", "ازاي", "كيف", "داشبورد", "لوحة", "شرح", "طريقة")) want.add("app_help");
   if (!want.size) return all; // غير واضح — كل الأدوات
