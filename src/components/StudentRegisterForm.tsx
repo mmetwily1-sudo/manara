@@ -27,7 +27,7 @@ export function StudentRegisterForm({ slug, teacherPhone }: { slug: string; teac
       });
       const data = await res.json();
       if (!res.ok || !data.ok) {
-        if (data.error === "email_exists") setMsg("البريد مسجل مسبقاً — جرّب بريداً آخر");
+        if (data.error === "email_exists" || data.error === "phone_exists") setMsg(data.message ?? "مسجل مسبقاً — ادخل مباشرة بدون باسورد من الأسفل 👇");
         else if (data.error === "weak_password") setMsg(data.message ?? "كلمة السر ضعيفة — 8 أحرف على الأقل مع حرف ورقم");
         else setMsg(data.message ?? data.details ?? data.error ?? "حدث خطأ");
         setPhase("error");

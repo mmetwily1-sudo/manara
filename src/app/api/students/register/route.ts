@@ -105,8 +105,14 @@ export async function POST(req: Request) {
 
   if (aue) {
     const isDup = aue.message?.includes("already registered") || aue.message?.includes("already exists");
+    const { logError } = await import("@/lib/api-error");
+    logError("student-register-auth", aue);
     return NextResponse.json(
-      { ok: false, error: isDup ? "email_exists" : "auth_failed", details: aue.message },
+      {
+        ok: false,
+        error: isDup ? "email_exists" : "auth_failed",
+        message: isDup ? "هذا البريد مسجل مسبقاً — ادخل برقم هاتفك من الأسفل بدون باسورد 👇" : undefined,
+      },
       { status: 400 }
     );
   }
@@ -126,8 +132,14 @@ export async function POST(req: Request) {
   if (uErr) {
     await admin.auth.admin.deleteUser(au.user.id);
     const isPhoneDup = uErr.message?.includes("duplicate key") || uErr.message?.includes("users_phone_key");
+    const { logError } = await import("@/lib/api-error");
+    logError("student-register-profile", uErr);
     return NextResponse.json(
-      { ok: false, error: isPhoneDup ? "phone_exists" : "profile_failed", details: uErr.message },
+      {
+        ok: false,
+        error: isPhoneDup ? "phone_exists" : "profile_failed",
+        message: isPhoneDup ? "هذا الرقم مسجل مسبقاً — ادخل به مباشرة بدون باسورد من الأسفل 👇" : undefined,
+      },
       { status: 400 }
     );
   }
