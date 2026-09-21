@@ -88,17 +88,75 @@ function makeSlug(centerName: string): string {
   return latin.length >= 3 ? `${latin}-${rand}` : `mr-${rand}`;
 }
 
+/** محتوى تجريبي لسنتر الجولة الفورية — أسئلة معتمدة + امتحان منشور. يعيد إحصاء ما زُرع. */
+async function seedDemo(admin: any, tenantId: string): Promise<{ questions: number; links: number; step: string }> {
+  const stat = { questions: 0, links: 0, step: "start" };
+  try {
+    const qs = [
+      { subject: "علوم", body: "ما الغاز الذي نتنفسه للبقاء على قيد الحياة؟", options: ["الأكسجين", "ثاني أكسيد الكربون", "الهيليوم"], correct_answer: "الأكسجين", difficulty: 1 },
+      { subject: "علوم", body: "كم عدد كواكب المجموعة الشمسية؟", options: ["سبعة", "ثمانية", "تسعة"], correct_answer: "ثمانية", difficulty: 1 },
+      { subject: "رياضيات", body: "ما ناتج 7 × 8؟", options: ["54", "56", "63"], correct_answer: "56", difficulty: 2 },
+      { subject: "رياضيات", body: "ما العدد الأولي فيما يلي؟", options: ["9", "13", "15"], correct_answer: "13", difficulty: 2 },
+      { subject: "لغة عربية", body: "ما جمع كلمة «كتاب»؟", options: ["كتب", "كاتبون", "مكتبات"], correct_answer: "كتب", difficulty: 1 },
+    ];
+    const rows = qs.map((q) => ({
+      tenant_id: tenantId, subject: q.subject, qtype: "mcq", body: q.body,
+      options: q.options, correct_answer: q.correct_answer, difficulty: q.difficulty,
+      visibility: "private", status: "approved", source: "teacher",
+      source_detail: JSON.stringify({ demo: true }), marks: 1,
+    }));
+    const qi = await admin.from("questions").insert(rows).select("id");
+    if (qi.error) { stat.step = "q:" + String(qi.error.message).slice(0, 60); return stat; }
+    const inserted = (qi.data ?? []) as any[];
+    stat.questions = inserted.length;
+    stat.step = "questions-ok";
+    const { data: ex } = await admin.from("exams").insert({
+      tenant_id: tenantId, title: "امتحان تجريبي — علوم ورياضيات",
+      duration_minutes: 15, total_marks: inserted.length || 0, is_published: true,
+    }).select("id").single();
+    if (ex && inserted.length) {
+      let pos = 0;
+      for (const q of inserted) {
+        const li = await admin.from("exam_questions").insert({
+          tenant_id: tenantId, exam_id: (ex as any).id, question_id: q.id, position: pos++, marks: 1,
+        });
+        if (li.error) { stat.step = "link:" + String(li.error.message).slice(0, 60); break; }
+        stat.links++;
+      }
+      stat.step = "done";
+    }
+    const { data: trow } = await admin.from("tenants").select("settings").eq("id", tenantId).single();
+    await admin.from("tenants").update({ settings: { ...((trow as any)?.settings ?? {}), is_demo: true } }).eq("id", tenantId);
+  } catch (e: any) {
+    stat.step = "throw:" + String(e?.message ?? e).slice(0, 60);
+  }
+  return stat;
+}
+
 export async function POST(req: Request) {
+  let preBody: any = null;
+  try { preBody = await req.json(); } catch {
+    return NextResponse.json({ ok: false, error: "bad_json" }, { status: 400 });
+  }
+  const body = preBody;
+  // الجولة الفورية: حد مستقل 3/ساعة لكل IP (حسابات مؤقتة بأسماء عشوائية)
+  const isDemo = body.demo === true;
+  if (isDemo && isRateLimited(req, "trial-demo", 3)) {
+    return NextResponse.json({ ok: false, error: "too_many_attempts", message: "جولات كثيرة — انتظر ساعة." }, { status: 429 });
+  }
   // حد: 5 محاولات/ساعة لكل IP ضد إغراق إنشاء السناتر
-  if (isRateLimited(req, "trial", 5)) {
+  if (!isDemo && isRateLimited(req, "trial", 5)) {
     return NextResponse.json({ ok: false, error: "too_many_attempts" }, { status: 429 });
   }
 
-  let body: { centerName?: string; phone?: string; email?: string; password?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ ok: false, error: "bad_json" }, { status: 400 });
+  // تحقق بشري (Cloudflare Turnstile) — يُفعَّل بإضافة المفاتيح في البيئة
+  const { verifyCaptcha, captchaRequired } = await import("@/lib/captcha");
+  if (captchaRequired()) {
+    const fwd = req.headers.get("x-forwarded-for");
+    const okHuman = await verifyCaptcha(body.captchaToken, fwd?.split(",")[0]?.trim());
+    if (!okHuman) {
+      return NextResponse.json({ ok: false, error: "captcha_required", message: "تحقق أنك لست روبوتاً ثم أعد المحاولة." }, { status: 403 });
+    }
   }
 
   const centerName = (body.centerName ?? "").trim();
@@ -112,11 +170,16 @@ export async function POST(req: Request) {
       { status: 400 }
     );
   }
-  if (!emailInput || !emailInput.includes("@") || passwordInput.length < 6) {
+  if (!emailInput || !emailInput.includes("@")) {
     return NextResponse.json(
       { ok: false, error: "invalid_credentials" },
       { status: 400 }
     );
+  }
+  const { checkPassword, WEAK_PASSWORD } = await import("@/lib/password");
+  const pwErr = checkPassword(passwordInput);
+  if (pwErr) {
+    return NextResponse.json({ ok: false, error: WEAK_PASSWORD, message: pwErr }, { status: 400 });
   }
 
   // ÙˆØ¶Ø¹ Ø§Ù„Ù…Ø¹Ø§ÙŠÙ†Ø©/Ø§Ù„Ø§Ø³ØªØ¶Ø§ÙØ© Ø§Ù„Ø«Ø§Ø¨ØªØ© â€” Ø¨Ø¯ÙˆÙ† Ù…ÙØ§ØªÙŠØ­
@@ -138,7 +201,7 @@ export async function POST(req: Request) {
         slug,
         plan: "trial",
         status: "active",
-        trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
         settings: { owner_phone: phone, owner_auth_id: null },
       })
       .select("id,slug")
@@ -164,8 +227,10 @@ export async function POST(req: Request) {
             return NextResponse.json({ ok: false, error: "email_exists" }, { status: 400 });
           }
           await admin.from("tenants").delete().eq("id", data.id);
+          const { logError } = await import("@/lib/api-error");
+          logError("trial-auth", aue);
           return NextResponse.json(
-            { ok: false, error: "auth_failed", details: aue.message },
+            { ok: false, error: "auth_failed" },
             { status: 400 }
           );
         }
@@ -185,8 +250,10 @@ export async function POST(req: Request) {
           await admin.auth.admin.deleteUser(au.user.id);
           await admin.from("tenants").delete().eq("id", data.id);
           const isPhoneDup = uErr?.message?.includes("users_phone_key") || uErr?.message?.includes("duplicate key");
+          const { logError } = await import("@/lib/api-error");
+          logError("trial-profile", uErr);
           return NextResponse.json(
-            { ok: false, error: isPhoneDup ? "phone_exists" : "profile_failed", details: uErr?.message },
+            { ok: false, error: isPhoneDup ? "phone_exists" : "profile_failed" },
             { status: 400 }
           );
         }
@@ -197,11 +264,17 @@ export async function POST(req: Request) {
           settings: { owner_phone: phone, owner_auth_id: au.user.id },
         }).eq("id", data.id);
 
+        // الجولة الفورية: ازرع محتوى تجريبياً وعلّم السنتر كتجريبي
+        let seed: { questions: number; links: number; step: string } | undefined;
+        if (isDemo) seed = await seedDemo(admin, data.id);
+
         return NextResponse.json({
           ok: true,
           mode: "live",
           slug: data.slug,
           email: loginEmail,
+          demo: isDemo || undefined,
+          seed,
         });
       } catch (e: any) {
         console.error("trial failed:", e?.message);

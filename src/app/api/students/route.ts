@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { dbFail } from "@/lib/api-error";
 import { requireTeacher } from "@/lib/server-auth";
 
 /** GET /api/students?groupId= — طلاب السنتر مع مجموعاتهم */
@@ -16,7 +17,7 @@ export async function GET(req: Request) {
     .eq("role", "student")
     .order("created_at", { ascending: false })
     .limit(500);
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) return dbFail("students", error);
 
   const { data: enrolls } = await ctx.admin
     .from("enrollments")

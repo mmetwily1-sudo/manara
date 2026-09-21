@@ -1,4 +1,5 @@
 ﻿import { NextResponse } from "next/server";
+import { dbFail } from "@/lib/api-error";
 import { createClient } from "@supabase/supabase-js";
 import { cookies, headers } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
@@ -61,6 +62,10 @@ export async function POST(req: Request) {
   const { data: student } = await admin.from("users").select("id").eq("id", studentId).eq("tenant_id", urow.tenant_id).single();
   if (!student) return NextResponse.json({ ok: false, error: "bad_student" }, { status: 403 });
 
+  // مكافأة الحضور مرة واحدة فقط (إعادة التحضير لا تمنح مجدداً)
+  const { data: prevAtt } = await admin.from("attendance").select("status")
+    .eq("session_id", sessionId).eq("student_id", studentId).single();
+
   const { error } = await admin.from("attendance").upsert({
     tenant_id: urow.tenant_id,
     session_id: sessionId,
@@ -70,7 +75,12 @@ export async function POST(req: Request) {
     recorded_by: urow.id,
   }, { onConflict: "session_id,student_id" });
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) return dbFail("attendance", error);
+
+  if (status === "present" && (!prevAtt || (prevAtt as any).status !== "present")) {
+    const { awardPoints, POINTS } = await import("@/lib/gamification");
+    await awardPoints(admin, urow.tenant_id, studentId, POINTS.present);
+  }
 
   await admin.from("audit_log").insert({
     tenant_id: urow.tenant_id, actor_id: urow.id,

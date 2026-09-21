@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { dbFail } from "@/lib/api-error";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
@@ -90,7 +91,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   const { data: exam } = await admin.from("exams").select("id").eq("id", params.id).eq("tenant_id", res.ctx.tenantId).single();
   if (!exam) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
   const { error } = await admin.from("exams").update(patch).eq("id", params.id).eq("tenant_id", res.ctx.tenantId);
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) return dbFail("exam", error);
   return NextResponse.json({ ok: true, updated: patch });
 }
 
@@ -112,6 +113,6 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
     await sb.from("certificates").delete().in("attempt_id", attemptIds);
   }
   const { error } = await sb.from("exams").delete().eq("id", params.id).eq("tenant_id", urow.tenant_id);
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) return dbFail("exam", error);
   return NextResponse.json({ ok: true, removedAttempts: attemptIds.length });
 }

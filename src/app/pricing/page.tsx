@@ -68,7 +68,7 @@ export default function PricingPage() {
       <div className="mx-auto max-w-6xl">
         <h1 className="section-title">أسعار واضحة — من غير مفاجآت</h1>
         <p className="section-sub">
-          جرّب 7 أيام مجاناً بدون بطاقة. والاشتراك السنوي فيه شهرين مجاناً.
+          جرّب 14 يوم مجاناً بدون بطاقة. والاشتراك السنوي فيه شهرين مجاناً.
           <strong> وسعرك ثابت ما دمت مشترك</strong> — مهما زادت أسعارنا بعدين، حسابك مش هيتمسّ.
         </p>
 
@@ -107,7 +107,7 @@ export default function PricingPage() {
         <div className="card mx-auto mt-10 max-w-3xl bg-surface">
           <h2 className="mb-4 text-center text-h2">ضماناتنا المكتوبة</h2>
           <div className="grid gap-4 sm:grid-cols-3 text-center text-small">
-            <div><div className="text-3xl">🛡️</div><b>ضمان استرداد 7 أيام</b><p className="mt-1 text-slate-600">مش عاجبك؟ فلوسك ترجعلك كاملة بدون أسئلة.</p></div>
+            <div><div className="text-3xl">🛡️</div><b>ضمان استرداد 30 يوم</b><p className="mt-1 text-slate-600">مش عاجبك؟ فلوسك ترجعلك كاملة بدون أسئلة.</p></div>
             <div><div className="text-3xl">🔒</div><b>Price-Lock دائم</b><p className="mt-1 text-slate-600">سعرك ثابت ما دمت مشترك — مهما حصل في السوق.</p></div>
             <div><div className="text-3xl">📤</div><b>بياناتك ليك</b><p className="mt-1 text-slate-600">صدّر كل حاجة Excel في أي وقت — حتى لو وقفت اشتراكك.</p></div>
           </div>

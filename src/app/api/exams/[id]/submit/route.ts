@@ -84,13 +84,19 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     }
   }
 
-  // 5) حفظ المحاولة
+  // 5) حفظ المحاولة (+10 نقاط لأول تسليم لكل امتحان)
+  const { data: prevAtt } = await sb.from("exam_attempts").select("id")
+    .eq("exam_id", params.id).eq("student_id", urow.id).single();
   const { data: att, error: attErr } = await sb.from("exam_attempts").upsert({
     tenant_id: exam.tenant_id, exam_id: params.id, student_id: urow.id,
     answers, score, submitted_at: new Date().toISOString(), tab_switches: tabSwitches ?? 0,
   }, { onConflict: "exam_id,student_id" }).select("id").single();
   if (attErr || !att) {
     return NextResponse.json({ ok: false, error: "save_failed" }, { status: 500 });
+  }
+  if (!prevAtt) {
+    const { awardPoints, POINTS } = await import("@/lib/gamification");
+    await awardPoints(sb, exam.tenant_id, urow.id, POINTS.examAttempt);
   }
 
   // 6) شهادة تلقائية عند ≥ 60%

@@ -1,4 +1,5 @@
 ﻿import { NextResponse } from "next/server";
+import { dbFail } from "@/lib/api-error";
 import { createBunnyVideo, isBunnyLive } from "@/lib/bunny";
 import { decodeSource, encodeYoutube, parseYoutubeId, youtubeThumbnailUrl } from "@/lib/video-source";
 import { getBunnyThumbnailUrl } from "@/lib/bunny";
@@ -33,7 +34,7 @@ export async function GET() {
     .eq("tenant_id", urow.tenant_id)
     .order("created_at", { ascending: false })
     .limit(100);
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) return dbFail("videos", error);
   return NextResponse.json({
     ok: true,
     bunnyConfigured: isBunnyLive(),
@@ -70,7 +71,7 @@ export async function POST(req: Request) {
       tenant_id: urow.tenant_id, title: title.trim(), provider_video_id: encodeYoutube(youtubeId),
       visibility: visibility ?? "group", group_ids: groupIds ?? [],
     }).select("id").single();
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    if (error) return dbFail("videos", error);
     return NextResponse.json({ ok: true, video: { ...row, source: "youtube", youtubeId } });
   }
 
@@ -81,7 +82,7 @@ export async function POST(req: Request) {
     visibility: visibility ?? "group", group_ids: groupIds ?? [],
   }).select("id,provider_video_id").single();
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) return dbFail("videos", error);
   return NextResponse.json({ ok: true, video: row });
 }
 

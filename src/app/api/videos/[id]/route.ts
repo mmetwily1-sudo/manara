@@ -1,4 +1,5 @@
 ﻿import { NextResponse } from "next/server";
+import { dbFail } from "@/lib/api-error";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
@@ -159,7 +160,7 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
 
   const { error } = await admin.from("videos").delete().eq("id", params.id).eq("tenant_id", urow.tenant_id);
   if (error) {
-    return NextResponse.json({ ok: false, error: error.message ?? "delete_failed" }, { status: 500 });
+    return dbFail("video-delete", error, "delete_failed");
   }
   return NextResponse.json({ ok: true, deleted: params.id });
 }

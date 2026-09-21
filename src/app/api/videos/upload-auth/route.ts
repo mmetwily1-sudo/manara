@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logError } from "@/lib/api-error";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
@@ -65,7 +66,8 @@ export async function POST(req: Request) {
     const bv = await (await import("@/lib/bunny")).createBunnyVideo(isReplace ? "replacement" : String(title).trim());
     guid = bv.guid;
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: "bunny_create_failed", details: String(e?.message ?? e).slice(0, 200) }, { status: 502 });
+    logError("bunny-create", e);
+    return NextResponse.json({ ok: false, error: "bunny_create_failed" }, { status: 502 });
   }
 
   let videoId: string;

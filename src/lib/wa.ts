@@ -6,4 +6,4 @@ export function waLink(text: string): string {
   return `https://wa.me/${SUPPORT_WA}?text=${encodeURIComponent(text)}`;
 }
 
-export const WA_TRIAL_TEXT = "أهلاً 👋 عايز أفعل تجربتي المجانية (7 أيام)";
+export const WA_TRIAL_TEXT = "أهلاً 👋 عايز أفعل تجربتي المجانية (14 يوم)";

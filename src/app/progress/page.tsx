@@ -15,6 +15,138 @@ type Progress = {
 
 const PAY_LABELS: Record<string, string> = { instapay: "انستاباي", wallet: "محفظة", fawry: "فوري" };
 
+type Game = {
+  me: { name: string; streak: number; activeDays: number; points: number; trophies: { code: string; name: string; icon: string; desc: string }[] };
+  leaders: { name: string; points: number; me: boolean }[];
+};
+
+function GamificationSection() {
+  const [g, setG] = useState<Game | null>(null);
+  useEffect(() => {
+    fetch("/api/me/gamification", { cache: "no-store" })
+      .then((r) => r.json()).then((j) => { if (j?.ok) setG(j); }).catch(() => {});
+  }, []);
+  if (!g) return null;
+  return (
+    <section className="card space-y-4 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-bold">رحلتي 🏆</h2>
+        <div className="flex gap-2 text-small">
+          <span className="rounded-full bg-danger/10 px-3 py-1 font-bold text-danger">🔥 {g.me.streak} أيام متتالية</span>
+          <span className="rounded-full bg-primary-light px-3 py-1 font-bold text-primary">⭐ {g.me.points} نقطة</span>
+        </div>
+      </div>
+      {g.me.trophies.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          {g.me.trophies.map((t) => (
+            <span key={t.code} title={t.desc} className="rounded-xl bg-warning/10 px-3 py-1.5 text-small font-bold">
+              {t.icon} {t.name}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <p className="text-small text-slate-500">أول وسام بانتظارك — سلّم واجباً أو احضر حصتك 🌱</p>
+      )}
+      {g.leaders.length > 1 && (
+        <div>
+          <h3 className="mb-2 text-small font-bold text-slate-500">المتصدرون 🚀</h3>
+          <ul className="space-y-1.5">
+            {g.leaders.slice(0, 5).map((l, i) => (
+              <li key={i} className={`flex items-center justify-between rounded-xl px-4 py-2 text-small ${l.me ? "bg-primary-light font-bold text-primary" : "bg-slate-50"}`}>
+                <span>{["🥇", "🥈", "🥉", "4.", "5."][i]} {l.name}{l.me ? " (أنت)" : ""}</span>
+                <span>{l.points} نقطة</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
+  );
+}
+
+type Hw = {
+  id: string; group_name: string | null; title: string; description: string | null;
+  due_at: string | null; max_score: number; overdue: boolean;
+  submission: { score: number | null; feedback_text: string | null; status: string; submitted_at: string } | null;
+};
+
+function HomeworkSection() {
+  const [items, setItems] = useState<Hw[] | null>(null);
+  const [files, setFiles] = useState<Record<string, FileList | null>>({});
+  const [busy, setBusy] = useState<string | null>(null);
+  const [msg, setMsg] = useState("");
+
+  async function load() {
+    try {
+      const r = await fetch("/api/me/assignments", { cache: "no-store" });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) setItems(j.assignments ?? []);
+    } catch {}
+  }
+  useEffect(() => { load(); }, []);
+
+  async function submit(id: string) {
+    const fl = files[id];
+    if (!fl?.length) { setMsg("اختر صور الحل أولاً."); return; }
+    setBusy(id); setMsg("");
+    try {
+      const fd = new FormData();
+      Array.from(fl).slice(0, 5).forEach((f) => fd.append("files", f));
+      const r = await fetch(`/api/me/assignments/${id}/submit`, { method: "POST", body: fd });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) {
+        setMsg(j.late ? "تم التسليم (متأخر) ✅" : "تم التسليم ✅");
+        setFiles((p) => ({ ...p, [id]: null }));
+        load();
+      } else setMsg(j?.message ?? "فشل التسليم: " + (j?.error ?? ""));
+    } catch { setMsg("تعذر الاتصال بالخادم."); }
+    finally { setBusy(null); }
+  }
+
+  if (items === null) return null;
+  if (!items.length) return null;
+  return (
+    <section className="card space-y-3 p-5">
+      <h2 className="font-bold">واجباتي 📝</h2>
+      {msg && <p className="text-small font-bold text-primary">{msg}</p>}
+      <ul className="space-y-3">
+        {items.map((a) => (
+          <li key={a.id} className="rounded-xl bg-slate-50 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-small">
+              <span className="font-bold">{a.title}</span>
+              <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${a.submission?.status === "graded" ? "bg-success/10 text-success" : a.submission ? "bg-primary-light text-primary" : a.overdue ? "bg-danger/10 text-danger" : "bg-warning/10 text-warning"}`}>
+                {a.submission?.status === "graded"
+                  ? `مصحح ${a.submission.score}/${a.max_score}`
+                  : a.submission ? "تم التسليم ✓" : a.overdue ? "متأخر!" : "جديد"}
+              </span>
+            </div>
+            {a.description && <p className="mt-1 text-xs text-slate-500">{a.description}</p>}
+            <div className="mt-1 text-xs text-slate-500">
+              {a.group_name ?? ""}{a.due_at ? ` · التسليم: ${new Date(a.due_at).toLocaleString("ar-EG")}` : ""}
+            </div>
+            {a.submission?.status === "graded" && a.submission.feedback_text && (
+              <p className="mt-1 rounded-lg bg-success/10 p-2 text-xs">ملاحظة المعلم: {a.submission.feedback_text}</p>
+            )}
+            {(!a.submission || a.submission.status !== "graded") && (
+              <label className="mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 px-3 py-2 text-xs font-bold text-slate-500 hover:border-primary hover:text-primary">
+                {files[a.id]?.length ? `📎 ${files[a.id]!.length} صور` : "صوّر الحل وارفع الصور"}
+                <input type="file" accept="image/*,.pdf" multiple className="hidden"
+                  onChange={(e) => setFiles((p) => ({ ...p, [a.id]: e.target.files }))} />
+              </label>
+            )}
+            {files[a.id]?.length ? (
+              <button onClick={() => submit(a.id)} disabled={busy === a.id}
+                className="btn-primary mt-2 w-full !py-2 text-small" >
+                {busy === a.id ? "جاري الرفع..." : "تسليم الواجب"}
+              </button>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export default function ProgressPage() {
   const [data, setData] = useState<Progress | null>(null);
   const [err, setErr] = useState("");
@@ -93,6 +225,9 @@ export default function ProgressPage() {
           </ul>
         </section>
       )}
+
+      <HomeworkSection />
+      <GamificationSection />
 
       <section className="card space-y-3 p-5">
         <h2 className="font-bold">نتائج الامتحانات 📝</h2>

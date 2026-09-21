@@ -35,6 +35,13 @@ function apportion(total: number, weights: number[]): number[] {
 }
 
 export async function POST(req: Request) {
+  const { requireTeacher } = await import("@/lib/server-auth");
+  const ares = await requireTeacher(["teacher_admin"]);
+  if ("error" in ares) return ares.error;
+  const { isRateLimited } = await import("@/lib/rate-limit");
+  if (isRateLimited(req, "generate", 30, 60 * 60 * 1000, ares.ctx.tenantId)) {
+    return NextResponse.json({ ok: false, error: "rate_limited", message: "تجاوزت حد التوليد (30/ساعة) — انتظر قليلاً." }, { status: 429 });
+  }
   const body = await req.json().catch(() => ({} as any));
   const { groupId, title, distribution, duration } = body ?? {};
   const { trackCode, subject, lessonCodes, bookIds, qtypeMix, excludeRecent } = body ?? {};
@@ -42,11 +49,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "title+distribution required" }, { status: 400 });
   }
 
-  const { requireTeacher } = await import("@/lib/server-auth");
-  const res = await requireTeacher(["teacher_admin"]);
-  if ("error" in res) return res.error;
-  const admin = res.ctx.admin;
-  const tenantId = res.ctx.tenantId;
+  const admin = ares.ctx.admin;
+  const tenantId = ares.ctx.tenantId;
 
   const levels = Object.entries(distribution as Record<string, number>)
     .map(([k, v]) => ({ diff: Number(k), want: Math.max(0, Number(v) || 0) }))

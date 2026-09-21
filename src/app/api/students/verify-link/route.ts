@@ -38,8 +38,10 @@ export async function POST(req: Request) {
   if (!cleanEmail.includes("@")) {
     return NextResponse.json({ ok: false, error: "invalid_email" }, { status: 400 });
   }
-  if (!password || String(password).length < 6) {
-    return NextResponse.json({ ok: false, error: "weak_password" }, { status: 400 });
+  const { checkPassword, WEAK_PASSWORD } = await import("@/lib/password");
+  const pwErr = checkPassword(password);
+  if (pwErr) {
+    return NextResponse.json({ ok: false, error: WEAK_PASSWORD, message: pwErr }, { status: 400 });
   }
 
   const admin = createClient(SUPA_URL, SERVICE_KEY, { auth: { persistSession: false } });

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { dbFail } from "@/lib/api-error";
 import { requireTeacher } from "@/lib/server-auth";
 
 /** GET /api/payments — سجل الدفعات + ملخص الشهر */
@@ -13,7 +14,7 @@ export async function GET() {
     .eq("tenant_id", ctx.tenantId)
     .order("paid_at", { ascending: false })
     .limit(100);
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) return dbFail("payments", error);
 
   const { data: students } = await ctx.admin
     .from("users")

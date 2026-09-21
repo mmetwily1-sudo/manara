@@ -17,6 +17,11 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const tid = res.ctx.tenantId;
+  // التدقيق يستهلك مكالمة لغوية — 20/ساعة لكل سنتر
+  const { isRateLimited } = await import("@/lib/rate-limit");
+  if (isRateLimited(_req, "audit", 20, 60 * 60 * 1000, tid)) {
+    return NextResponse.json({ ok: false, error: "rate_limited", message: "تجاوزت حد التدقيق (20/ساعة) — انتظر قليلاً." }, { status: 429 });
+  }
 
   const { data: exam } = await admin
     .from("exams").select("id,title").eq("id", params.id).eq("tenant_id", tid).single();

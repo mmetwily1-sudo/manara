@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { dbFail } from "@/lib/api-error";
 import { requireTeacher, isMissingTable } from "@/lib/server-auth";
 
 /** GET /api/curriculum/tracks — المسارات الدراسية النشطة (عام/أزهر) */
@@ -15,7 +16,7 @@ export async function GET() {
     if (isMissingTable(error)) {
       return NextResponse.json({ ok: false, error: "curriculum_not_ready", message: "طبقة المنهج غير منشأة بعد — نفّذ ترحيل 004" }, { status: 500 });
     }
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return dbFail("curriculum-tracks", error);
   }
   return NextResponse.json({ ok: true, tracks: data ?? [] });
 }

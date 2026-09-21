@@ -59,10 +59,18 @@ export async function POST(req: Request) {
   const tres = await requireTeacher(["teacher_admin"]);
   if ("error" in tres) return tres.error;
   const tctx = tres.ctx;
+  const { isRateLimited } = await import("@/lib/rate-limit");
+  if (isRateLimited(req, "import", 20, 60 * 60 * 1000, tctx.tenantId)) {
+    return NextResponse.json({ ok: false, error: "rate_limited", message: "تجاوزت حد الاستيراد (20/ساعة) — انتظر قليلاً." }, { status: 429 });
+  }
 
   const form = await req.formData().catch(() => null);
   const file = form?.get("file") as File | null;
   if (!file) return NextResponse.json({ ok: false, error: "file required" }, { status: 400 });
+  // سقف حجم الملف (2MB) وعدد الصفوف لمنع الإغراق
+  if (file.size > 2 * 1024 * 1024) {
+    return NextResponse.json({ ok: false, error: "too_large", message: "حجم الملف يتجاوز 2MB." }, { status: 400 });
+  }
 
   const buf = Buffer.from(await file.arrayBuffer());
   const mode = (form?.get("mode") as string) || "auto";
@@ -74,13 +82,26 @@ export async function POST(req: Request) {
     rows = parseBulkText(buf.toString("utf8"));
     if (!rows.length) return NextResponse.json({ ok: false, error: "empty" }, { status: 400 });
   } else {
-    // Ø¬Ø±Ù‘Ø¨ xlsx Ø£ÙˆÙ„Ø§Ù‹ (Ø¥Ù† ØªÙˆÙØ±)ØŒ Ø« CSV ÙƒØ¨Ø¯ÙŠÙ„
+    // Excel عبر exceljs (بديل آمن — مكتبة xlsx متروكة بثغرات بلا إصلاح)، ثم CSV كبديل
     try {
-      const XLSX: any = await import("xlsx").catch(() => null);
-      if (XLSX) {
-        const wb = XLSX.read(buf, { type: "buffer" });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+      const ExcelJS: any = await import("exceljs").catch(() => null);
+      if (ExcelJS) {
+        const wb = new ExcelJS.Workbook();
+        await wb.xlsx.load(buf as any);
+        const ws = wb.worksheets?.[0];
+        if (ws) {
+          const headers: string[] = [];
+          ws.getRow(1).eachCell((c: any, col: number) => { headers[col - 1] = String(c.value ?? "").trim(); });
+          ws.eachRow((row: any, n: number) => {
+            if (n === 1) return;
+            const r: any = {};
+            row.eachCell((c: any, col: number) => {
+              const h = headers[col - 1];
+              if (h) r[h] = (c.text ?? String(c.value ?? "")).toString().trim();
+            });
+            rows.push(r);
+          });
+        }
       }
     } catch {}
     if (rows.length === 0) {
@@ -94,6 +115,11 @@ export async function POST(req: Request) {
         return r;
       });
     }
+  }
+
+  // سقف الصفوف ضد ملفات الإغراق
+  if (rows.length > 2000) {
+    return NextResponse.json({ ok: false, error: "too_many", message: "الحد الأقصى 2000 سؤال في الملف الواحد." }, { status: 400 });
   }
 
   const admin = tctx.admin;

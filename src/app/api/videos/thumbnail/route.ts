@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 
 import { THUMBNAIL_BUCKET, publicThumbnailUrl, removeThumbnails, thumbnailPath } from "@/lib/thumbnails";
+import { logError } from "@/lib/api-error";
 
 const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -80,7 +81,8 @@ export async function POST(req: Request) {
     upsert: true,
   });
   if (error) {
-    return NextResponse.json({ ok: false, error: "upload_failed", details: error.message.slice(0, 200) }, { status: 500 });
+    logError("thumbnail", error);
+    return NextResponse.json({ ok: false, error: "upload_failed" }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true, thumbnail_url: publicThumbnailUrl(SUPA_URL!, urow.tenant_id, videoId, ext) });

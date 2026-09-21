@@ -17,7 +17,16 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json().catch(() => null as any);
-  const { slug, name, phone, email, password } = body ?? {};
+  const { slug, name, phone, email, password, captchaToken } = body ?? {};
+
+  const { verifyCaptcha, captchaRequired } = await import("@/lib/captcha");
+  if (captchaRequired()) {
+    const fwd = req.headers.get("x-forwarded-for");
+    const okHuman = await verifyCaptcha(captchaToken, fwd?.split(",")[0]?.trim());
+    if (!okHuman) {
+      return NextResponse.json({ ok: false, error: "captcha_required", message: "تحقق أنك لست روبوتاً ثم أعد المحاولة." }, { status: 403 });
+    }
+  }
 
   if (!slug || !name || name.trim().length < 2) {
     return NextResponse.json({ ok: false, error: "name_required" }, { status: 400 });
@@ -25,8 +34,10 @@ export async function POST(req: Request) {
   if (!email || !email.includes("@")) {
     return NextResponse.json({ ok: false, error: "invalid_email" }, { status: 400 });
   }
-  if (!password || password.length < 6) {
-    return NextResponse.json({ ok: false, error: "weak_password" }, { status: 400 });
+  const { checkPassword, WEAK_PASSWORD } = await import("@/lib/password");
+  const pwErr = checkPassword(password);
+  if (pwErr) {
+    return NextResponse.json({ ok: false, error: WEAK_PASSWORD, message: pwErr }, { status: 400 });
   }
   if (!SUPA_URL || !SERVICE_KEY) {
     return NextResponse.json({ ok: false, error: "not_configured" }, { status: 500 });

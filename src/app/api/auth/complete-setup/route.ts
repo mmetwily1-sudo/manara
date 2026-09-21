@@ -54,7 +54,7 @@ export async function POST(req: Request) {
         slug,
         plan: "trial",
         status: "active",
-        trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
         settings: { owner_phone: phone, owner_auth_id: user.id },
       })
       .select("id,slug")

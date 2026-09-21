@@ -16,6 +16,7 @@ const navMore = [
   { href: "/dashboard/questions", label: "بنك الأسئلة", key: "06" },
   { href: "/dashboard/exams", label: "الامتحانات", key: "07" },
   { href: "/dashboard/videos", label: "الفيديوهات", key: "08" },
+  { href: "/dashboard/assignments", label: "الواجبات", key: "08b" },
   { href: "/dashboard/certificates", label: "التقارير", key: "09" },
   { href: "/dashboard/settings", label: "هويتي والإعدادات", key: "10" },
 ];
@@ -46,7 +47,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <span className="flex h-9 w-9 items-center justify-center rounded-lg font-extrabold text-white" style={{ backgroundColor: t.color }}>ن</span>
             <div>
               <div className="text-small font-bold leading-tight">{t.name}</div>
-              <div className="text-xs text-slate-400">باقة تجريبية · 7 أيام</div>
+              <div className="text-xs text-slate-400">باقة تجريبية · 14 يوم</div>
             </div>
           </div>
           <nav className="flex-1 space-y-1 overflow-y-auto p-4">

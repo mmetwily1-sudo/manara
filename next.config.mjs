@@ -8,9 +8,9 @@ const nextConfig = {
   ...(basePath ? { basePath, assetPrefix: basePath } : {}),
   ...(isExport ? { output: "export", images: { unoptimized: true } } : {
     images: {
+      // نطاق واحد فقط مستخدم فعلياً — تضييق السطح يقلل مخاطر Image Optimizer
       remotePatterns: [
         { protocol: "https", hostname: "**.supabase.co" },
-        { protocol: "https", hostname: "cdn.manara.app" },
       ],
     },
   }),

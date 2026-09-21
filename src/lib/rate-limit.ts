@@ -16,11 +16,12 @@ function clientIp(req: Request): string {
 /**
  * @param limit عدد المحاولات المسموحة
  * @param windowMs نافذة الحد (افتراضي ساعة)
+ * @param scope نطاق إضافي (مثل tenantId) — يمنع معاقبة شبكة كاملة بسبب مستخدم واحد
  * @returns true إذا تجاوز الحد (يجب الرد 429)
  */
-export function isRateLimited(req: Request, key: string, limit: number, windowMs = 60 * 60 * 1000): boolean {
+export function isRateLimited(req: Request, key: string, limit: number, windowMs = 60 * 60 * 1000, scope?: string | null): boolean {
   const now = Date.now();
-  const mapKey = `${key}:${clientIp(req)}`;
+  const mapKey = `${key}:${scope ?? clientIp(req)}`;
   const b = buckets.get(mapKey);
   if (!b || now >= b.resetAt) {
     buckets.set(mapKey, { count: 1, resetAt: now + windowMs });

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { dbFail } from "@/lib/api-error";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -98,6 +99,11 @@ export async function POST(req: Request) {
   if ("error" in res) return res.error;
   const admin = adminClient();
   const tenantId = res.ctx.tenantId;
+  // المسح مكلف (رؤية/OCR) — 20 مسحاً/ساعة لكل سنتر
+  const { isRateLimited } = await import("@/lib/rate-limit");
+  if (isRateLimited(req, "scan", 20, 60 * 60 * 1000, tenantId)) {
+    return NextResponse.json({ ok: false, error: "rate_limited", message: "تجاوزت حد المسح (20/ساعة) — انتظر قليلاً." }, { status: 429 });
+  }
 
   let form: FormData;
   try {
@@ -196,7 +202,7 @@ export async function POST(req: Request) {
     });
     if (rows.length) {
       const { error } = await admin.from("questions").insert(rows);
-      if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+      if (error) return dbFail("scan-insert", error);
     }
     return NextResponse.json({ ok: true, drafts: rows.length, pages: bufs.length, examId, ocr: via !== "manual", via, visionNote });
   } finally {

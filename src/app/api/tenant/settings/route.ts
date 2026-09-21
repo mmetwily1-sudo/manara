@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { dbFail } from "@/lib/api-error";
 import { requireTeacher, adminClient } from "@/lib/server-auth";
 import { isWhatsAppLive } from "@/lib/whatsapp";
 import { isVisionLive } from "@/lib/vision";
@@ -65,6 +66,6 @@ export async function PATCH(req: Request) {
     .from("tenants")
     .update({ settings })
     .eq("id", res.ctx.tenantId);
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) return dbFail("tenant-settings", error);
   return NextResponse.json({ ok: true, settings: patch });
 }

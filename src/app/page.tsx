@@ -27,7 +27,7 @@ const after = [
 ];
 
 const faqs = [
-  { q: "برنامج إدارة السنتر بكام؟", a: "باقاتنا تبدأ من 450 جنيه شهرياً للمعلم الفردي و750 للباقة الاحترافية الكاملة، مع شهرين مجاناً عند الاشتراك السنوي. جرّب 7 أيام مجاناً الأول بدون أي بطاقة." },
+  { q: "برنامج إدارة السنتر بكام؟", a: "باقاتنا تبدأ من 450 جنيه شهرياً للمعلم الفردي و750 للباقة الاحترافية الكاملة، مع شهرين مجاناً عند الاشتراك السنوي. جرّب 14 يوم مجاناً الأول بدون أي بطاقة." },
   { q: "فيه عمولة على الفلوس اللي بحصلها؟", a: "لأ نهائياً. صفر عمولة — فلوسك توصلك كاملة سواء كاش أو تحويل إلكتروني." },
   { q: "محتاج واتساب API ولا رقم شغل تاني؟", a: "لأ. الإشعارات بتوصل أولياء الأمور من داخل التطبيق مباشرة حتى وهو مقفول، ورقمك الشخصي يفضل شخصي. ولو حبيت تبعت واتساب — الرسالة جاهزة بضغطة من رقمك إنت." },
   { q: "لو النت قطع في السنتر؟", a: "التحضير شغال عادي — بيتسجل محلياً وبيتبعت تلقائياً لما النت يرجع. وأي عملية فلوس بتاخد تأكيد السيرفر عشان خزنتك تفضل مظبوطة بالجنيه — ده قرار أمان مقصود." },
@@ -37,9 +37,50 @@ const faqs = [
   { q: "إيه طرق الدفع؟", a: "فودافون كاش، إنستاباي، فوري، أو بطاقة بنكية." },
 ];
 
-export default function HomePage() {
+async function getProofStats(): Promise<{ questions: number; exams: number; centers: number }> {
+  try {
+    const { createClient } = await import("@supabase/supabase-js");
+    const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+      auth: { persistSession: false },
+    });
+    const { data: tenants } = await admin.from("tenants").select("id,settings").eq("status", "active").limit(2000);
+    const realIds = ((tenants ?? []) as any[]).filter((t) => !(t.settings as any)?.is_demo).map((t) => t.id);
+    if (!realIds.length) return { questions: 0, exams: 0, centers: 0 };
+    const [{ count: questions }, { count: exams }] = await Promise.all([
+      admin.from("questions").select("id", { count: "exact", head: true }).eq("status", "approved").in("tenant_id", realIds),
+      admin.from("exams").select("id", { count: "exact", head: true }).eq("is_published", true).in("tenant_id", realIds),
+    ]);
+    return { questions: questions ?? 0, exams: exams ?? 0, centers: realIds.length };
+  } catch {
+    return { questions: 0, exams: 0, centers: 0 };
+  }
+}
+
+const pipelineSteps = [
+  { n: "1", t: "صوّر الورقة", d: "صورة بالموبايل لأي ورقة امتحان — حتى لو بخط اليد أو بزخارف." },
+  { n: "2", t: "تفريغ وحل تلقائي", d: "نستخرج الأسئلة والاختيارات ونحلها — بمفتاحين وتناوب تلقائي." },
+  { n: "3", t: "تدقيق لغوي", d: "مراجعة كل إجابة آلياً، وإصلاح التنسيق قبل النشر." },
+  { n: "4", t: "امتحانك منشور", d: "الأسئلة مربوطة بامتحان واحد — انشره للطلاب بضغطة." },
+];
+
+export default async function HomePage() {
+  const stats = await getProofStats();
   return (
     <main>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "SoftwareApplication",
+            name: "منارة",
+            applicationCategory: "EducationalApplication",
+            operatingSystem: "Web",
+            inLanguage: "ar",
+            offers: { "@type": "Offer", price: "450", priceCurrency: "EGP" },
+          }),
+        }}
+      />
       <header className="sticky top-0 z-40 border-b border-slate-100 bg-white/90 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
           <Link href="/" className="text-xl font-extrabold text-primary">منارة</Link>
@@ -73,7 +114,7 @@ export default function HomePage() {
               <Link href="/pricing" className="btn-secondary">شوف الأسعار</Link>
             </div>
             <p className="rise rise-4 mt-5 text-small text-slate-400">
-              7 أيام تجربة كاملة · بدون بطاقة ائتمان
+              14 يوم تجربة كاملة · بدون بطاقة ائتمان
             </p>
           </div>
 
@@ -113,7 +154,7 @@ export default function HomePage() {
           <span aria-hidden className="text-slate-300">·</span>
           <span>بياناتك ليك وبتتصدر أي وقت</span>
           <span aria-hidden className="text-slate-300">·</span>
-          <span>ضمان استرداد 7 أيام</span>
+          <span>ضمان استرداد 30 يوم</span>
         </div>
       </section>
 
@@ -146,6 +187,38 @@ export default function HomePage() {
             </div>
           </div>
         </div>
+      </section>
+
+      {/* خط الأنابيب: صوّر.. منشور — الميزة التي لا يملكها أحد */}
+      <section className="border-y border-slate-100 bg-white px-4 py-24">
+        <div className="mx-auto max-w-6xl">
+          <h2 className="section-title">صوّر الورقة.. امتحانك منشور</h2>
+          <p className="section-sub">أربع خطوات تلقائية — من غير ما تكتب حرفاً واحداً.</p>
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {pipelineSteps.map((s) => (
+              <div key={s.n} className="card p-6 text-center">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary text-xl font-extrabold text-white">{s.n}</div>
+                <h3 className="mt-4 font-bold">{s.t}</h3>
+                <p className="mt-2 text-small leading-relaxed text-slate-600">{s.d}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-8 text-center">
+            <Link href="/join" className="btn-primary">جرّبها على ورقتك الآن</Link>
+          </div>
+        </div>
+      </section>
+
+      {/* شريط إثبات: أرقام حية من المنصة */}
+      <section className="bg-primary px-4 py-12 text-white">
+        <div className="mx-auto grid max-w-6xl gap-6 text-center sm:grid-cols-3">
+          <div><div className="text-display font-extrabold">{stats.questions.toLocaleString("ar-EG")}+</div><div className="mt-1 text-small opacity-80">سؤال معتمد في البنوك</div></div>
+          <div><div className="text-display font-extrabold">{stats.exams.toLocaleString("ar-EG")}+</div><div className="mt-1 text-small opacity-80">امتحان منشور للطلاب</div></div>
+          <div><div className="text-display font-extrabold">{stats.centers.toLocaleString("ar-EG")}+</div><div className="mt-1 text-small opacity-80">سنتر ومعلم شغالين</div></div>
+        </div>
+        <p className="mx-auto mt-6 max-w-xl text-center text-small opacity-80">
+          منصة جديدة وبنكبر كل يوم — كن من أوائل الشركاء وخد إعداداً مجانياً بمساعدتنا.
+        </p>
       </section>
 
       <section id="tools" className="bg-white px-4 py-24">
@@ -236,7 +309,7 @@ export default function HomePage() {
         <h2 className="mx-auto max-w-2xl text-h1 leading-snug md:text-display md:leading-tight">
           كل يوم بيعدي من غير منارة — وقت وفلوس مش هترجعوا
         </h2>
-        <p className="section-sub mt-4">جرّب 7 أيام على بياناتك الحقيقية. ولو محتاج حد يجهزلك كل حاجة — كلمنا وهنعملها بإيدينا.</p>
+        <p className="section-sub mt-4">جرّب 14 يوم على بياناتك الحقيقية. ولو محتاج حد يجهزلك كل حاجة — كلمنا وهنعملها بإيدينا.</p>
         <Link href="/join" className="btn-primary text-lg">ابدأ مجاناً</Link>
       </section>
 

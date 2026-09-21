@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { dbFail } from "@/lib/api-error";
 import { requirePlatformAdmin } from "@/lib/server-auth";
 
 async function gate() {
@@ -111,7 +112,7 @@ export async function POST(req: Request) {
   // مسودات PDF: اعتماد مع تصحيحات المراجع، أو حذف
   if (action === "delete_draft") {
     const { error } = await admin.from("questions").delete().eq("id", id).is("tenant_id", null).eq("status", "draft");
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    if (error) return dbFail("admin-bank", error);
     return NextResponse.json({ ok: true, action });
   }
   if (action === "approve_draft") {
@@ -132,7 +133,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "incomplete", message: "المسودة تحتاج اختيارات وإجابة صحيحة قبل الاعتماد" }, { status: 400 });
     }
     const { error } = await admin.from("questions").update(patch).eq("id", id).is("tenant_id", null).eq("status", "draft");
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    if (error) return dbFail("admin-bank", error);
     return NextResponse.json({ ok: true, action });
   }
 
@@ -142,7 +143,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "in_use", message: "مستخدم في امتحانات — لا يمكن حذفه" }, { status: 400 });
     }
     const { error } = await admin.from("questions").delete().eq("id", id).is("tenant_id", null);
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    if (error) return dbFail("admin-bank", error);
     return NextResponse.json({ ok: true, action });
   }
 

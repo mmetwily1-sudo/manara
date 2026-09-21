@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { dbFail } from "@/lib/api-error";
 import { requireTeacher } from "@/lib/server-auth";
 
 /**
@@ -37,7 +38,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     })
     .eq("id", params.id)
     .eq("tenant_id", tid);
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) return dbFail("payment-review", error);
 
   if (action === "confirm") {
     try {

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { WA_TRIAL_TEXT, waLink } from "@/lib/wa";
 import { createClient } from "@/lib/supabase";
+import { Turnstile } from "@/components/Turnstile";
 
 /**
  * نموذج تفعيل التجربة — مفيش نهاية عمياء أبداً:
@@ -26,6 +27,7 @@ export function TrialForm() {
   const [signedIn, setSignedIn] = useState(false);
   const [authErr, setAuthErr] = useState("");
   const [formError, setFormError] = useState("");
+  const [captchaToken, setCaptchaToken] = useState("");
 
   async function enterDashboard() {
     if (!creds) return;
@@ -49,6 +51,40 @@ export function TrialForm() {
     }
   }, [phase, slug, creds, signedIn]);
 
+  const [demoBusy, setDemoBusy] = useState(false);
+
+  /** جولة فورية بدون تسجيل: سنتر تجريبي بمحتوى جاهز (أسئلة + امتحان منشور) */
+  async function startDemo() {
+    setDemoBusy(true); setFormError("");
+    try {
+      const rnd = Math.random().toString(36).slice(2, 8);
+      const res = await fetch("/api/trial", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          centerName: "جولة تجريبية",
+          phone: "010" + String(Math.floor(Math.random() * 900000000) + 100000000),
+          email: `demo-${rnd}@demo.manara`,
+          password: `Demo${rnd}25#`,
+          captchaToken,
+          demo: true,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.ok && data.mode === "live" && data.slug) {
+        setSlug(data.slug);
+        setCreds({ email: data.email, password: `Demo${rnd}25#` });
+        setPhase("done-live");
+        return;
+      }
+      setFormError(data?.message ?? "تعذر بدء الجولة — حاول مجدداً.");
+    } catch {
+      setFormError("تعذر الاتصال بالخادم.");
+    } finally {
+      setDemoBusy(false);
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setPhase("sending");
@@ -58,7 +94,7 @@ export function TrialForm() {
       const res = await fetch("/api/trial", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ centerName, phone, email, password }),
+        body: JSON.stringify({ centerName, phone, email, password, captchaToken }),
       });
       const data = await res.json().catch(() => null);
       if (res.ok && data?.ok && data.mode === "live" && data.slug) {
@@ -79,7 +115,12 @@ export function TrialForm() {
         return;
       }
       if (data?.error === "invalid_credentials") {
-        setFormError("تأكد من صحة البريد وكلمة السر (6 أحرف على الأقل)");
+        setFormError("تأكد من صحة البريد الإلكتروني");
+        setPhase("idle");
+        return;
+      }
+      if (data?.error === "weak_password") {
+        setFormError(data.message ?? "كلمة السر ضعيفة — 8 أحرف على الأقل مع حرف ورقم");
         setPhase("idle");
         return;
       }
@@ -89,7 +130,7 @@ export function TrialForm() {
         return;
       }
       if (!res.ok && data?.error) {
-        setFormError(data.details ?? data.error);
+        setFormError(data.message ?? data.details ?? data.error);
         setPhase("idle");
         return;
       }
@@ -119,7 +160,7 @@ export function TrialForm() {
         <div className="text-h1">🎉</div>
         <h3 className="mt-2 text-h2 font-extrabold text-success">سنترك جاهز!</h3>
         <p className="mt-2 text-small text-slate-600">
-          تجربتك شغالة 7 أيام كاملة — منصتك:
+          تجربتك شغالة 14 يوم كاملة — منصتك:
         </p>
         <div className="mt-1 font-mono text-small font-bold" dir="ltr">{slug}.{ROOT_DOMAIN}</div>
 
@@ -218,8 +259,9 @@ export function TrialForm() {
           placeholder="••••••••"
           className="w-full rounded-xl border-2 border-slate-200 px-4 py-3 outline-none transition focus:border-primary"
         />
-        <p className="mt-1 text-xs text-slate-400">6 أحرف على الأقل</p>
+        <p className="mt-1 text-xs text-slate-400">8 أحرف على الأقل — مع حرف ورقم</p>
       </div>
+      <Turnstile onToken={setCaptchaToken} />
       {formError && (
         <div className="rounded-lg bg-danger/10 px-4 py-3 text-sm font-semibold text-danger">
           {formError}
@@ -233,8 +275,12 @@ export function TrialForm() {
       <button type="submit" className="btn-primary w-full text-lg">
         ابدأ دلوقتي مجاناً 🚀
       </button>
+      <button type="button" onClick={startDemo} disabled={demoBusy}
+        className="w-full rounded-xl border-2 border-dashed border-primary/40 px-4 py-3 text-small font-bold text-primary transition hover:bg-primary-light disabled:opacity-50">
+        {demoBusy ? "جاري تجهيز جولتك..." : "👁️ جولة فورية بدون تسجيل — ادخل وشوف بنفسك"}
+      </button>
       <p className="text-center text-xs text-slate-400">
-        بدون بطاقة · تجربة 7 أيام كاملة
+        بدون بطاقة · تجربة 14 يوم كاملة
       </p>
     </form>
   );

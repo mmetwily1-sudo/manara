@@ -10,7 +10,9 @@ import { normalizePhone, sendWhatsAppText, isWhatsAppLive } from "./whatsapp";
 export type NotifyEvent =
   | { kind: "attendance_absent"; studentName: string; centerName: string; sessionLabel: string }
   | { kind: "exam_graded"; studentName: string; examTitle: string; score: number; total: number; certSerial: string | null }
-  | { kind: "payment_received"; studentName: string; amount: number; centerName: string };
+  | { kind: "payment_received"; studentName: string; amount: number; centerName: string }
+  | { kind: "homework_submitted"; studentName: string; hwTitle: string }
+  | { kind: "homework_graded"; studentName: string; hwTitle: string; score: number; total: number };
 
 function renderBody(e: NotifyEvent): string {
   switch (e.kind) {
@@ -22,6 +24,12 @@ function renderBody(e: NotifyEvent): string {
     }
     case "payment_received":
       return `تم استلام دفعة ✅\nالطالب: ${e.studentName}\nالمبلغ: ${e.amount} جنيه\nشكراً لكم — ${e.centerName}`;
+    case "homework_submitted":
+      return `واجب جديد بانتظار التصحيح 📝\nالطالب: ${e.studentName}\nالواجب: «${e.hwTitle}»`;
+    case "homework_graded": {
+      const pct = e.total > 0 ? Math.round((e.score / e.total) * 100) : 0;
+      return `تصحيح واجب 📝\n${e.studentName} حصل على ${e.score}/${e.total} (${pct}%) في «${e.hwTitle}»`;
+    }
   }
 }
 

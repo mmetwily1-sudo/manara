@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { Turnstile } from "@/components/Turnstile";
 
 export function StudentRegisterForm({ slug, teacherPhone }: { slug: string; teacherPhone?: string }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [captchaToken, setCaptchaToken] = useState("");
   const [phase, setPhase] = useState<"idle" | "sending" | "otp" | "verifying" | "done" | "error">("idle");
   const [msg, setMsg] = useState("");
   const [maskedPhone, setMaskedPhone] = useState("");
@@ -21,12 +23,12 @@ export function StudentRegisterForm({ slug, teacherPhone }: { slug: string; teac
       const res = await fetch("/api/students/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug, name, phone, email, password }),
+        body: JSON.stringify({ slug, name, phone, email, password, captchaToken }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) {
         if (data.error === "email_exists") setMsg("البريد مسجل مسبقاً — جرّب بريداً آخر");
-        else if (data.error === "weak_password") setMsg("كلمة السر ضعيفة — 6 أحرف على الأقل");
+        else if (data.error === "weak_password") setMsg(data.message ?? "كلمة السر ضعيفة — 8 أحرف على الأقل مع حرف ورقم");
         else setMsg(data.message ?? data.details ?? data.error ?? "حدث خطأ");
         setPhase("error");
         return;
@@ -144,7 +146,8 @@ export function StudentRegisterForm({ slug, teacherPhone }: { slug: string; teac
       <input required value={name} onChange={(e) => setName(e.target.value)} placeholder="اسمك الكامل" className="w-full rounded-xl border-2 border-slate-200 px-4 py-2.5 outline-none focus:border-primary" />
       <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="رقم الموبايل (اختياري)" dir="ltr" className="w-full rounded-xl border-2 border-slate-200 px-4 py-2.5 text-right outline-none focus:border-primary" />
       <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" dir="ltr" className="w-full rounded-xl border-2 border-slate-200 px-4 py-2.5 text-left outline-none focus:border-primary" />
-      <input required type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="كلمة السر (6+ أحرف)" className="w-full rounded-xl border-2 border-slate-200 px-4 py-2.5 outline-none focus:border-primary" />
+      <input required type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="كلمة السر (8+ أحرف مع حرف ورقم)" className="w-full rounded-xl border-2 border-slate-200 px-4 py-2.5 outline-none focus:border-primary" />
+      <Turnstile onToken={setCaptchaToken} />
       <button disabled={phase === "sending"} className="btn-primary w-full">
         {phase === "sending" ? "جاري التسجيل..." : "سجّل الآن"}
       </button>

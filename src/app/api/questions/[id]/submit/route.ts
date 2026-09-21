@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { dbFail } from "@/lib/api-error";
 
 /**
  * POST /api/questions/[id]/submit — المعلم يرشح سؤاله الخاص للبنك المركزي.
@@ -35,7 +36,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
         { status: 500 }
       );
     }
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return dbFail("question-submit", error);
   }
   return NextResponse.json({ ok: true, pending: true });
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logError } from "@/lib/api-error";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
@@ -70,7 +71,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, video: { id: vid.id }, verified: true, replaced: true, oldDeleted });
     } catch (e: any) {
       await deleteBunnyVideo(newProviderId);
-      return NextResponse.json({ ok: false, error: "verify_failed", details: String(e?.message ?? e).slice(0, 200) }, { status: 502 });
+      logError("bunny-verify", e);
+      return NextResponse.json({ ok: false, error: "verify_failed" }, { status: 502 });
     }
   }
 
@@ -87,6 +89,7 @@ export async function POST(req: Request) {
     // status 0..4,6 = الملف موجود (قد يكون قيد التحويل — المشغل يعرضه تدريجياً)
     return NextResponse.json({ ok: true, video: { id: vid.id }, verified: true, bunnyStatus: st.statusText });
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: "verify_failed", details: String(e?.message ?? e).slice(0, 200) }, { status: 502 });
+    logError("bunny-verify", e);
+    return NextResponse.json({ ok: false, error: "verify_failed" }, { status: 502 });
   }
 }

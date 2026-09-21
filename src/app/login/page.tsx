@@ -135,6 +135,9 @@ export default function LoginPage() {
         <p className="mt-3 text-center text-small text-slate-500">
           أول مرة؟ <Link href="/join" className="font-bold text-primary">اعمل حسابك المجاني</Link>
         </p>
+        <Link href="/join" className="mt-3 block rounded-xl border-2 border-dashed border-primary/40 p-3 text-center text-small font-bold text-primary transition hover:bg-primary-light">
+          👁️ مستعجل؟ جولة فورية بدون تسجيل
+        </Link>
       </div>
     </main>
   );

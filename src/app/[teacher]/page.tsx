@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { StudentRegisterForm } from "@/components/StudentRegisterForm";
+import { PhoneLoginForm } from "@/components/PhoneLoginForm";
 
 /**
  * صفحة المعلم العامة — Programmatic SEO
@@ -74,6 +75,7 @@ export default async function TeacherPage({ params }: Props) {
         </p>
 
         <StudentRegisterForm slug={slug} teacherPhone={teacherPhone} />
+        <PhoneLoginForm slug={slug} />
 
         <div className="mt-14 grid gap-5 sm:grid-cols-3">
           {[["🎬", "حصص مسجلة", "شاهدها في أي وقت من موبايلك"],

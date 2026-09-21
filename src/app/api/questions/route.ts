@@ -1,4 +1,5 @@
 ﻿import { NextResponse } from "next/server";
+import { dbFail } from "@/lib/api-error";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
@@ -88,7 +89,7 @@ export async function POST(req: Request) {
     const retry = await admin.from("questions").insert(base).select("id").single();
     data = retry.data; error = retry.error;
   }
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) return dbFail("questions", error);
   return NextResponse.json({ ok: true, id: (data as any).id, pending_review: wantShare && !error });
 }
 
@@ -107,7 +108,7 @@ export async function DELETE(req: Request) {
   }
   const { error } = await res.ctx.admin
     .from("questions").delete().eq("id", id).eq("tenant_id", res.ctx.tenantId);
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) return dbFail("questions", error);
   return NextResponse.json({ ok: true });
 }
 

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { dbFail } from "@/lib/api-error";
 
 function pageUrl(tenantId: string, ref: string, page: number): string | null {
   const base = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").replace(/\/$/, "");
@@ -106,6 +107,11 @@ export async function POST(req: Request) {
   const vLive = isVisionLive(tenantVisionKey, tenantVisionKey2);
 
   if (action === "retranscribe") {
+    // إعادة التفريغ تستهلك الرؤية — 30/ساعة لكل سنتر
+    const { isRateLimited } = await import("@/lib/rate-limit");
+    if (isRateLimited(req, "retranscribe", 30, 60 * 60 * 1000, tid)) {
+      return NextResponse.json({ ok: false, error: "rate_limited", message: "تجاوزت حد التفريغ (30/ساعة) — انتظر قليلاً." }, { status: 429 });
+    }
     const m = metaOf(d);
     if (!m.ref || !m.page) {
       return NextResponse.json({ ok: false, error: "no_image", message: "لا توجد صورة مخزنة لهذه المسودة." }, { status: 400 });
@@ -139,7 +145,7 @@ export async function POST(req: Request) {
       correct_answer: safeAns,
     };
     const { error } = await admin.from("questions").update(patch).eq("id", id).eq("tenant_id", tid).eq("status", "draft");
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    if (error) return dbFail("drafts", error);
     return NextResponse.json({ ok: true, action, body: patch.body, options: opts ?? [], correct_answer: safeAns });
   }
 
@@ -188,7 +194,7 @@ export async function POST(req: Request) {
     .eq("id", id)
     .eq("tenant_id", tid)
     .eq("status", "draft");
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) return dbFail("drafts", error);
 
   // ربط تلقائي بامتحان المسح إن وُجد
   let linkedExam: string | null = null;

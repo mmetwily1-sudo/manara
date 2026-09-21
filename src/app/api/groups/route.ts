@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { dbFail } from "@/lib/api-error";
 import { requireTeacher } from "@/lib/server-auth";
 
 /** GET /api/groups — مجموعات السنتر مع عدد الطلاب */
@@ -12,7 +13,7 @@ export async function GET() {
     .select("id,name,grade_level,subject,monthly_fee,schedule,created_at")
     .eq("tenant_id", ctx.tenantId)
     .order("created_at", { ascending: true });
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) return dbFail("groups", error);
 
   const { data: enrolls } = await ctx.admin
     .from("enrollments")
@@ -50,7 +51,7 @@ export async function POST(req: Request) {
     schedule: Array.isArray(body?.schedule) ? body.schedule : [],
   }).select("id,name").single();
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) return dbFail("groups", error);
   return NextResponse.json({ ok: true, group: data });
 }
 
@@ -64,6 +65,6 @@ export async function DELETE(req: Request) {
   if (!id) return NextResponse.json({ ok: false, error: "missing_id" }, { status: 400 });
 
   const { error } = await ctx.admin.from("groups").delete().eq("id", id).eq("tenant_id", ctx.tenantId);
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) return dbFail("groups", error);
   return NextResponse.json({ ok: true });
 }

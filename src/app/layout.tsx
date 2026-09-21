@@ -2,16 +2,44 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { FloatingWhatsApp } from "@/components/FloatingWhatsApp";
 
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://manara-mmetwily.vercel.app").replace(/\/$/, "");
+
 export const metadata: Metadata = {
-  title: "منارة — نظام تشغيل المعلم والسنتر",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "منارة — نظام تشغيل المعلم والسنتر",
+    template: "%s · منارة",
+  },
   description:
-    "منصة تعليمية باسمك: تحضير في ثواني، تحصيل بصفر عمولة، إشعارات أولياء الأمور لحظياً، فيديوهات محمية وامتحانات بتتصحح لوحدها. جرّب 7 أيام مجاناً بدون بطاقة.",
+    "منصة تعليمية باسمك: تحضير في ثواني، تحصيل بصفر عمولة، إشعارات أولياء الأمور لحظياً، فيديوهات محمية وامتحانات بتتصحح لوحدها. جرّب 14 يوم مجاناً بدون بطاقة.",
   keywords: [
     "برنامج إدارة سنتر دروس خصوصية",
     "منصة للمعلمين",
     "منصة تعليمية مصر",
     "برنامج حضور وغياب الطلاب",
+    "بنك أسئلة",
+    "تصحيح امتحانات تلقائي",
+    "امتحانات أونلاين مصر",
+    "تحضير QR للسناتر",
+    "متابعة أولياء الأمور واتساب",
+    "نظام إدارة سنتر تعليمي",
   ],
+  openGraph: {
+    type: "website",
+    locale: "ar_EG",
+    siteName: "منارة",
+    title: "منارة · صوّر الورقة.. امتحانك منشور",
+    description:
+      "ارفع صورة ورقة الامتحان — نفرّغها ونحلها وندققها وننشرها تلقائياً. تحضير QR، تحصيل بصفر عمولة، وإشعارات أولياء الأمور. جرّب 14 يوم مجاناً.",
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "منارة — منصة السناتر والمعلمين" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "منارة · صوّر الورقة.. امتحانك منشور",
+    description: "تفريغ وحل وتدقيق ونشر الامتحانات تلقائياً + إدارة كاملة للسنتر. جرّب 14 يوم مجاناً.",
+    images: ["/og.png"],
+  },
+  robots: { index: true, follow: true },
 };
 
 export const viewport: Viewport = {

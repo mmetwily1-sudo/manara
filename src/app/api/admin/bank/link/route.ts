@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { dbFail } from "@/lib/api-error";
 import { requirePlatformAdmin } from "@/lib/server-auth";
 
 /**
@@ -49,7 +50,7 @@ export async function POST(req: Request) {
     })
     .eq("id", id)
     .is("tenant_id", null);
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) return dbFail("bank-link", error);
 
   await admin.from("audit_log").insert({
     actor_id: g.ctx.adminId,
