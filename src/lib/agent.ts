@@ -150,13 +150,15 @@ function oaiTools(): unknown[] {
  */
 async function openaiLoop(
   admin: any, tid: string, history: AgentHistory[], keys: string[],
-  onStep?: (s: { tool: string; ok: boolean }) => void
+  onStep?: (s: { tool: string; ok: boolean }) => void,
+  override?: { base: string; model: string; key?: string }
 ): Promise<{ text: string; steps: { tool: string; ok: boolean }[] } | null> {
-  const base = (process.env.AGENT_LLM_URL ?? "").replace(/\/$/, "");
-  if (!base) return null;
-  const model = process.env.AGENT_LLM_MODEL ?? "qwen3-8b";
+  const base = ((override?.base ?? process.env.AGENT_LLM_URL ?? "").replace(/\/$/, ""));
+  if (!base && !override) return null;
+  const model = override?.model ?? process.env.AGENT_LLM_MODEL ?? "qwen3-8b";
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (process.env.AGENT_LLM_KEY) headers.Authorization = "Bearer " + process.env.AGENT_LLM_KEY;
+  const hk = override?.key ?? process.env.AGENT_LLM_KEY;
+  if (hk) headers.Authorization = "Bearer " + hk;
   const messages: any[] = [
     { role: "system", content: SYSTEM },
     ...history.slice(-10).map((h) => ({ role: h.role, content: h.text.slice(0, 2000) })),
@@ -245,6 +247,30 @@ async function execTool(
   }
 }
 
+/** صياغة حرة لنتيجة أداة عبر Pollinations المجاني (نص فقط — بلا أدوات) */
+async function phraseWithPollinations(tool: string, out: unknown): Promise<string | null> {
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 45000);
+    const r = await fetch("https://text.pollinations.ai/openai", {
+      method: "POST", headers: { "Content-Type": "application/json" }, signal: ctrl.signal,
+      body: JSON.stringify({
+        model: "openai",
+        messages: [
+          { role: "system", content: "أنت مساعد المعلم في منارة. صغ النتيجة التالية ردًا عربيًا مختصرًا مفيدًا (3 أسطر حد أقصى)." },
+          { role: "user", content: `الأداة: ${tool}\nالنتيجة: ${JSON.stringify(out).slice(0, 2000)}` },
+        ],
+        max_tokens: 400,
+      }),
+    }).finally(() => clearTimeout(timer));
+    const j = await r.json().catch(() => null);
+    const t = String(j?.choices?.[0]?.message?.content ?? "").trim();
+    return t.length >= 5 ? t.slice(0, 1000) : null;
+  } catch {
+    return null;
+  }
+}
+
 /** ملخص حتمي من آخر نتيجة أداة — يُستخدم عند تعثر الصياغة اللغوية */
 function fallbackSummary(last: { tool: string; out: unknown } | null): string {
   const o = (last?.out ?? {}) as any;
@@ -277,6 +303,26 @@ function fallbackSummary(last: { tool: string; out: unknown } | null): string {
     if (!o.length) return "لا توجد امتحانات بعد — اطلب إنشاء واحد من بنكك.";
     return "أحدث امتحاناتك: " + o.slice(0, 5).map((e: any) => `«${e.title}» (${e.questions} أسئلة${e.published ? "، منشور" : ""})`).join("؛ ");
   }
+  if (last?.tool === "search_knowledge" && Array.isArray(o)) {
+    if (!o.length) return "لا نتائج في قاعدة المعرفة لهذا الموضوع — جرّب كلمات أخرى أو اسأل عن البنك والامتحانات.";
+    return "من قاعدة المعرفة:\n" + o.slice(0, 4).map((r: any) => `• ${r.title}: ${String(r.body).slice(0, 160)}`).join("\n");
+  }
+  if (last?.tool === "book_guide" && Array.isArray(o.books)) {
+    if (!o.books.length) return `لا كتب مسجلة لمادة «${o.subject}» — اسأل عن مادة أخرى.`;
+    return `أفضل الكتب لمادة «${o.subject}»:\n` + o.books.slice(0, 5).map((b: any) => `• ${b.publisher}${b.notes ? ` — ${b.notes}` : ""}`).join("\n");
+  }
+  if (last?.tool === "attendance_summary" && typeof o.records === "number") {
+    if (!o.records) return "لا سجلات حضور آخر 7 أيام.";
+    return `الحضور آخر 7 أيام: ${o.present} حاضر من ${o.records} (نسبة ${o.rate ?? 0}%).`;
+  }
+  if (last?.tool === "student_progress" && o.name) {
+    const ex = ((o.last_exams ?? []) as any[]).slice(0, 3).map((e: any) => `${e.title} ${e.score}/${e.total}`).join("، ");
+    return `${o.name}: ${o.points} نقطة، ${o.homework_graded} واجبات مصححة${ex ? "، آخر الامتحانات: " + ex : ""}.`;
+  }
+  if (last?.tool === "review_exam" && typeof o.total === "number") {
+    if (o.clean) return `الامتحان سليم (${o.total} أسئلة) — جاهز للنشر.`;
+    return `مراجعة الامتحان (${o.total} أسئلة): ` + ((o.issues ?? []) as string[]).slice(0, 5).join("؛ ");
+  }
   return "تعذر الوصول لخدمة الذكاء حالياً (ازدحام) — حاول بعد قليل.";
 }
 
@@ -285,13 +331,12 @@ export async function runAgent(
   onStep?: (s: { tool: string; ok: boolean }) => void
 ): Promise<{ text: string; steps: { tool: string; ok: boolean }[] }> {
   const keys = visionChain(tenantKey, tenantKey2);
-  // الاستقلال أولاً: نموذج مستضاف ذاتياً (vLLM/Ollama) إن ضُبط — ثم Gemini كاحتياطي
+  // 1) المستضاف ذاتياً (vLLM/Ollama) إن ضُبط — الاستقلال أولاً
   if (process.env.AGENT_LLM_URL) {
     const selfHosted = await openaiLoop(admin, tid, history, keys, onStep);
     if (selfHosted) return selfHosted;
-    // سقط المستضاف → أكمل لـ Gemini أدناه
   }
-  if (!keys.length) return { text: "لا يوجد مفتاح ذكاء — اربط مفتاح Gemini من الإعدادات أو اضبط AGENT_LLM_URL.", steps: [] };
+  if (!keys.length && !process.env.AGENT_LLM_URL) return { text: "لا يوجد مفتاح ذكاء — اربط مفتاح Gemini من الإعدادات أو اضبط AGENT_LLM_URL.", steps: [] };
   const models = ["gemini-flash-latest", "gemini-3-flash-preview"];
 
   const contents: any[] = history.slice(-10).map((h) => ({
@@ -312,6 +357,11 @@ export async function runAgent(
       if (res && (res.call || res.text)) break;
     }
     if (!res || (!res.call && !res.text)) {
+      // صياغة مجانية أولاً (Pollinations نص فقط)، ثم العرض الحتمي المضمون
+      if (lastResult) {
+        const phrased = await phraseWithPollinations(lastResult.tool, lastResult.out);
+        if (phrased) return { text: phrased, steps };
+      }
       return { text: fallbackSummary(lastResult), steps };
     }
     if (!res.call) return { text: res.text || "لم أفهم — أعد الصياغة.", steps };

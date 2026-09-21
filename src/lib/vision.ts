@@ -16,7 +16,8 @@ export function visionKey(tenantKey?: string | null): string | null {
   return envVisionKey();
 }
 
-/** سلسلة المفاتيح بالترتيب: سنتر1، سنتر2، منصة1، منصة2 — تُجرَّب عند نفاد الحصة */
+/** سلسلة المفاتيح بالترتيب — تُجرَّب عند نفاد الحصة.
+ * أضف مفاتيح AI Studio مجانية (حسابات جوجل متعددة) عبر GEMINI_API_KEY_3/4/5 لمضاعفة الحصة مجاناً. */
 export function visionChain(tenantKey?: string | null, tenantKey2?: string | null): string[] {
   const list = [
     tenantKey,
@@ -24,6 +25,9 @@ export function visionChain(tenantKey?: string | null, tenantKey2?: string | nul
     process.env.GEMINI_API_KEY,
     process.env.GOOGLE_AI_KEY,
     process.env.GEMINI_API_KEY_2,
+    process.env.GEMINI_API_KEY_3,
+    process.env.GEMINI_API_KEY_4,
+    process.env.GEMINI_API_KEY_5,
   ]
     .map((k) => String(k ?? "").trim())
     .filter((k) => k.length >= 10);
