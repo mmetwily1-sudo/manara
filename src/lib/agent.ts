@@ -144,6 +144,21 @@ function oaiTools(): unknown[] {
   }));
 }
 
+/** أدوات حسب النية — يقلل التوكنز جذريًا للنماذج المحلية الصغيرة */
+function pickTools(message: string): unknown[] {
+  const all = oaiTools() as any[];
+  const m = message;
+  const has = (...words: string[]) => words.some((w) => m.includes(w));
+  const want = new Set<string>();
+  if (has("امتحان", "اختبار", "بنك", "سؤال", "أسئلة")) { want.add("bank_stats"); want.add("create_exam"); want.add("list_exams"); want.add("generate_drafts"); }
+  if (has("راجع", "تدقيق", "دقق")) want.add("review_exam");
+  if (has("حضور", "غائب", "غاب")) want.add("attendance_summary");
+  if (has("طالب", "طالبة", "مستوى", "نقاط", "درجة")) want.add("student_progress");
+  if (has("كتاب", "قرار", "وزارة", "منهج", "أزهر", "مذاكرة", "أخبار", "جديد")) { want.add("search_knowledge"); want.add("book_guide"); }
+  if (!want.size) return all; // غير واضح — كل الأدوات
+  return all.filter((t) => want.has(t.function.name));
+}
+
 /**
  * حلقة ReAct عبر أي endpoint متوافق مع OpenAI (نموذج مستضاف ذاتياً: vLLM/Ollama).
  * يُفعَّل بـ AGENT_LLM_URL (+ AGENT_LLM_MODEL + AGENT_LLM_KEY اختياري) — الاستقلال الكامل عن Gemini.
@@ -159,20 +174,23 @@ async function openaiLoop(
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   const hk = override?.key ?? process.env.AGENT_LLM_KEY;
   if (hk) headers.Authorization = "Bearer " + hk;
+  const timeoutMs = Number(process.env.AGENT_LLM_TIMEOUT_MS ?? 90000) || 90000;
+  const userText = history.filter((h) => h.role === "user").map((h) => h.text).join(" ").slice(-500);
+  const tools = pickTools(userText);
   const messages: any[] = [
     { role: "system", content: SYSTEM },
-    ...history.slice(-10).map((h) => ({ role: h.role, content: h.text.slice(0, 2000) })),
+    ...history.slice(-6).map((h) => ({ role: h.role, content: h.text.slice(0, 1000) })),
   ];
   const steps: { tool: string; ok: boolean }[] = [];
   let lastResult: { tool: string; out: unknown } | null = null;
   for (let s = 0; s < MAX_STEPS; s++) {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 90000);
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     let j: any = null;
     try {
       const r = await fetch(base + "/chat/completions", {
         method: "POST", headers, signal: ctrl.signal,
-        body: JSON.stringify({ model, messages, tools: oaiTools(), tool_choice: "auto", temperature: 0.3, max_tokens: 2000 }),
+        body: JSON.stringify({ model, messages, tools, tool_choice: "auto", temperature: 0.3, max_tokens: 800 }),
       });
       j = await r.json().catch(() => null);
       if (!r.ok) return null; // فشل النقطة — السقوط لـ Gemini
