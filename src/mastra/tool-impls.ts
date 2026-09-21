@@ -210,6 +210,17 @@ export async function searchKnowledge(
 ): Promise<unknown> {
   const q = String(args.query ?? "").trim().slice(0, 100);
   if (q.length < 2) return { error: "need_query" };
+  // أولاً: بحث دلالي pg_trgm بالعبارة كاملة (أدق للعربية)
+  try {
+    const rpc = await admin.rpc("match_knowledge", { q, lim: 6 });
+    if (!rpc.error && (rpc.data ?? []).length) {
+      return (rpc.data as any[]).map((r) => ({
+        kind: r.kind, title: r.title,
+        body: String(r.body).slice(0, 500),
+        source: r.source_url, date: r.effective_date, score: r.score,
+      }));
+    }
+  } catch {}
   // كلمات مفتاحية (4+ أحرف) بأولوية الأطول — مطابقة أي كلمة لا العبارة كاملة (ES5 آمن)
   const stopWords: Record<string, boolean> = { "ماذا": true, "التي": true, "الذي": true, "على": true, "إلى": true, "هذا": true, "هذه": true, "ذلك": true, "ماهي": true, "ماهو": true, "تعرف": true, "عندك": true, "عن": true, "ما": true };
   const seenW: Record<string, boolean> = {};

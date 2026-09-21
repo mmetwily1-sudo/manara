@@ -8,8 +8,9 @@ import { visionChain } from "./vision";
 
 const MAX_STEPS = 5;
 
-const SYSTEM = `أنت مساعد المعلم في منصة منارة (عربي، مختصر، عملي).
-لديك أدوات حقيقية لبنك الأسئلة والامتحانات — استخدمها بدل التخمين.
+const SYSTEM = `أنت مساعد المعلم في منصة منارة.
+REPLY IN ARABIC ONLY — ALWAYS. NEVER use any other language (no English, no Chinese, no Korean). الرد بالعربية فقط حصراً دائماً.
+لديك أدوات حقيقية لبنك الأسئلة والامتحانات — استخدمها بدل التخمين. مختصر وعملي.
 قواعد صارمة:
 - إذا طلب امتحاناً مباشرة (مادة/عدد/عنوان) استدعِ create_exam فوراً دون إحصاء مسبق — الأداة تتحقق من البنك بنفسها.
 - استدعِ bank_stats فقط عند السؤال عن محتوى البنك («عندنا إيه؟»).
@@ -241,7 +242,14 @@ async function directAnswer(
           const r = await TOOL_IMPLS.create_exam(admin, tid, {
             title: `امتحان ${subj}`, subject: subj, count: numM ? Number(numM[1]) : 5,
           }, { keys: [] });
-          if ((r as any)?.error) return null;
+          const rAny = r as any;
+          // فراغ البنك إجابة صادقة فورية (لا ننتظر LLM)
+          if (rAny?.error === "empty_bank") {
+            const st = { tool: "create_exam", ok: false };
+            try { onStep?.(st); } catch {}
+            return { text: fallbackSummary({ tool: "create_exam", out: r }), steps: [st] };
+          }
+          if (rAny?.error) return null;
           const st = { tool: "create_exam", ok: true };
           try { onStep?.(st); } catch {}
           return { text: fallbackSummary({ tool: "create_exam", out: r }), steps: [st] };
@@ -249,6 +257,13 @@ async function directAnswer(
       })();
       if (out) return out;
     }
+  }
+  // طلب النشر: حتمي وصادق دائماً (النشر يدوي — لا نتركها لتخيل النموذج)
+  if (/انشر|أنشر|للطلاب|متاح للإجابة|جاهز للطلاب/.test(m)) {
+    return {
+      text: "النشر بيدك دائماً: افتح صفحة الامتحانات واضغط «نشر» على الامتحان بعد مراجعته. لا أنشر تلقائياً أبداً.",
+      steps: [],
+    };
   }
   return null;
 }
@@ -322,7 +337,11 @@ async function openaiLoop(
     const msg = j?.choices?.[0]?.message;
     if (!msg) return null;
     const calls = Array.isArray(msg.tool_calls) ? msg.tool_calls : [];
-    if (!calls.length) return { text: String(msg.content ?? "").trim() || "لم أفهم — أعد الصياغة.", steps };
+    if (!calls.length) {
+      const t = String(msg.content ?? "").trim();
+      if (!t || hasCJK(t)) return null; // رد ملوث/فارغ → إعادة المحاولة أو السقوط الصادق
+      return { text: t || "لم أفهم — أعد الصياغة.", steps };
+    }
     messages.push({ role: "assistant", content: msg.content ?? null, tool_calls: calls.map((c: any) => ({ id: c.id, type: "function", function: c.function })) });
     for (const c of calls) {
       const name = String(c?.function?.name ?? "");
@@ -407,6 +426,11 @@ async function phraseWithPollinations(tool: string, out: unknown): Promise<strin
   } catch {
     return null;
   }
+}
+
+/** كشف لغات CJK (صيني/كوري/ياباني) — رفض أي رد ملوث بها */
+export function hasCJK(s: string): boolean {
+  return /[\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF\uFF00-\uFFEF]/.test(s ?? "");
 }
 
 /** ملخص حتمي من آخر نتيجة أداة — يُستخدم عند تعثر الصياغة اللغوية */
@@ -513,6 +537,16 @@ export async function runAgent(
       if (res && (res.call || res.text)) break;
     }
     if (!res || (!res.call && !res.text)) {
+      // Gemini عبر بوابة OpenAI المتوافقة (حصة مستقلة غالباً) — لكل مفتاح
+      for (const key of keys) {
+        try {
+          const compat = await openaiLoop(admin, tid, history, keys, onStep, {
+            base: "https://generativelanguage.googleapis.com/v1beta/openai",
+            model: "gemini-flash-latest", key,
+          });
+          if (compat && (compat.text.trim() || compat.steps.length)) return compat;
+        } catch {}
+      }
       // صياغة مجانية أولاً (Pollinations نص فقط)، ثم العرض الحتمي المضمون
       if (lastResult) {
         const phrased = await phraseWithPollinations(lastResult.tool, lastResult.out);
@@ -520,7 +554,10 @@ export async function runAgent(
       }
       return { text: fallbackSummary(lastResult), steps };
     }
-    if (!res.call) return { text: res.text || "لم أفهم — أعد الصياغة.", steps };
+    if (!res.call) {
+      if (!res.text || hasCJK(res.text)) continue; // رد ملوث → محاولة أخرى ثم السقوط الصادق
+      return { text: res.text || "لم أفهم — أعد الصياغة.", steps };
+    }
     // تنفيذ الأداة وإرجاع نتيجتها للحلقة
     let out: unknown;
     try {

@@ -118,7 +118,10 @@ export async function POST(req: Request) {
               } catch {}
             }
             (controller as any).__shapes = (((controller as any).__shapes ?? "") + "|seen:" + seenTypes.join(",")).slice(0, 500);
-            usedMastra = text.length > 0 || steps.length > 0;
+            const { hasCJK } = await import("@/lib/agent");
+            if (hasCJK(text)) text = ""; // رد ملوث بلغات أخرى → يُسقط للمسار الصادق
+            // نص فقط هو المعيار (خطوات بلا نص تُعاد عبر الحلقة الخام التي تعرض حتمياً)
+            usedMastra = text.length > 0;
             if (usedMastra) via = "mastra";
           } catch (e: any) {
             try {
