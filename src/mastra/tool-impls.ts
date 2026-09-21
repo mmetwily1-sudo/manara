@@ -204,6 +204,46 @@ export async function generateDrafts(
   return { drafts: rows.length, with_answers: withAns, subject, note: "بانتظار مراجعتك واعتمادها من بنك الأسئلة" };
 }
 
+/** بحث قاعدة المعرفة المحلية — يعمل بلا أي AI خارجي (SQL مباشر) */
+export async function searchKnowledge(
+  admin: any, _tid: string, args: { query: string; kind?: string }
+): Promise<unknown> {
+  const q = String(args.query ?? "").trim().slice(0, 100);
+  if (q.length < 2) return { error: "need_query" };
+  let query = admin.from("edu_knowledge").select("kind,system,title,body,source_url,effective_date")
+    .or(`title.ilike.%${q}%,body.ilike.%${q}%`).limit(8);
+  if (args.kind) query = query.eq("kind", String(args.kind).slice(0, 30));
+  const { data, error } = await query;
+  if (error) return { error: "db" };
+  return ((data ?? []) as any[]).map((r) => ({
+    kind: r.kind, title: r.title,
+    body: String(r.body).slice(0, 500),
+    source: r.source_url, date: r.effective_date,
+  }));
+}
+
+/** دليل الكتب الخارجية لمادة وصف (مرجع شراء للمدرس/ولي الأمر) */
+export async function bookGuide(
+  admin: any, _tid: string, args: { subject: string; grade?: string; system?: string }
+): Promise<unknown> {
+  const subject = String(args.subject ?? "").trim().slice(0, 40);
+  if (subject.length < 2) return { error: "need_subject" };
+  let q = admin.from("external_books").select("publisher,subject,grade,notes")
+    .ilike("subject", `%${subject}%`).limit(20);
+  if (args.grade) q = q.ilike("grade", `%${String(args.grade).slice(0, 20)}%`);
+  if (args.system) q = q.eq("system", String(args.system).slice(0, 10));
+  const { data, error } = await q;
+  if (error) return { error: "db" };
+  const seen: Record<string, string> = {};
+  for (const r of (data ?? []) as any[]) {
+    if (!(r.publisher in seen)) seen[r.publisher] = r.notes ?? "";
+  }
+  return {
+    subject,
+    books: Object.keys(seen).map((publisher) => ({ publisher, notes: seen[publisher] })),
+  };
+}
+
 export const TOOL_IMPLS: Record<string, (admin: any, tid: string, args: Record<string, unknown>, ctx?: ToolCtx) => Promise<unknown>> = {
   bank_stats: (a, t, x) => bankStats(a, t, x as { subject?: string }),
   create_exam: (a, t, x) => createExam(a, t, x as { title: string; subject?: string; count?: number }),
@@ -212,4 +252,6 @@ export const TOOL_IMPLS: Record<string, (admin: any, tid: string, args: Record<s
   student_progress: (a, t, x) => studentProgress(a, t, x as { name: string }),
   review_exam: (a, t, x) => reviewExam(a, t, x as { exam_id?: string }),
   generate_drafts: (a, t, x, c) => generateDrafts(a, t, x as { subject: string; count?: number }, c),
+  search_knowledge: (a, t, x) => searchKnowledge(a, t, x as { query: string; kind?: string }),
+  book_guide: (a, t, x) => bookGuide(a, t, x as { subject: string; grade?: string; system?: string }),
 };

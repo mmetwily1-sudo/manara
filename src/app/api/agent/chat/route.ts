@@ -61,9 +61,11 @@ export async function POST(req: Request) {
         let text = "";
         let usedMastra = false;
         let via: "mastra" | "raw" = "raw";
-        // المسار الأول: Mastra (بث حي + ذاكرة) — تناوب المفاتيح عند الحصة، فالسقوط للraw
+        // الاستقلال أولاً: نموذج مستضاف ذاتياً يغني عن Mastra وGemini معاً
+        const selfHosted = !!process.env.AGENT_LLM_URL;
+        // المسار الأول: Mastra (بث حي + ذاكرة) — يُتخطى عند وجود مستضاف ذاتي (الحلقة الخام تستخدمه مباشرة)
         // (التناوب فقط ما لم يُرسل شيء بعد — تفادياً لتكرار المحتوى)
-        for (let ki = 0; ki < keys.length && !usedMastra && text.length === 0 && steps.length === 0; ki++) {
+        for (let ki = 0; ki < keys.length && !usedMastra && text.length === 0 && steps.length === 0 && !selfHosted; ki++) {
           try {
             const { getManaraAgent } = await import("@/mastra/agent");
             const agent = getManaraAgent(keys[ki], admin, tid, keys);

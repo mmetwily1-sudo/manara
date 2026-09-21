@@ -74,5 +74,24 @@ export function buildManaraTools(admin: any, tid: string, keys: string[] = []) {
       }),
       (args) => TOOL_IMPLS.generate_drafts(admin, tid, args, { keys })
     ),
+    search_knowledge: wrap(
+      "search_knowledge",
+      "البحث في قاعدة معرفة منارة المحلية (قرارات/كتب/مذاكرة/مناهج) — يعمل دائماً.",
+      z.object({
+        query: z.string().describe("كلمة البحث"),
+        kind: z.string().optional().describe("النوع (اختياري)"),
+      }),
+      (args) => TOOL_IMPLS.search_knowledge(admin, tid, args)
+    ),
+    book_guide: wrap(
+      "book_guide",
+      "ترشيح الكتب الخارجية لمادة وصف.",
+      z.object({
+        subject: z.string().describe("المادة"),
+        grade: z.string().optional().describe("الصف"),
+        system: z.string().optional().describe("moe أو azhar"),
+      }),
+      (args) => TOOL_IMPLS.book_guide(admin, tid, args)
+    ),
   };
 }

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 type Msg = { role: "user" | "assistant"; text: string; steps?: { tool: string; ok: boolean }[]; suggest?: string[] };
 
-const TOOL_AR: Record<string, string> = { bank_stats: "إحصاء البنك", create_exam: "إنشاء امتحان", list_exams: "قائمة الامتحانات", attendance_summary: "ملخص الحضور", student_progress: "نبذة طالب", review_exam: "مراجعة امتحان", generate_drafts: "تأليف مسودات" };
+const TOOL_AR: Record<string, string> = { bank_stats: "إحصاء البنك", create_exam: "إنشاء امتحان", list_exams: "قائمة الامتحانات", attendance_summary: "ملخص الحضور", student_progress: "نبذة طالب", review_exam: "مراجعة امتحان", generate_drafts: "تأليف مسودات", search_knowledge: "بحث المعرفة", book_guide: "دليل الكتب" };
 
 export default function AgentPage() {
   const [threads, setThreads] = useState<{ id: string; title: string }[]>([]);

@@ -18,7 +18,8 @@ const SYSTEM = `أنت مساعد المعلم في منصة منارة (عرب�
 - أجب بالعربية الفصحى المبسطة بجمل قصيرة، واذكر ما فعلته بأدواتك.
 - review_exam هو المدقق الثاني: بعد إنشاء أي امتحان راجعه به قبل تسليم الإجابة.
 - attendance_summary وstudent_progress للأسئلة عن الحضور والطلاب — لا تخترع أرقاماً أبداً.
-- عند فراغ البنك وطلب المعلم أسئلة: استدعِ generate_drafts لتأليف مسودات من المنهج (تُحفظ للمراجعة فقط)، ثم اطلب منه اعتمادها من بنك الأسئلة قبل بناء الامتحان.`;
+- عند فراغ البنك وطلب المعلم أسئلة: استدعِ generate_drafts لتأليف مسودات من المنهج (تُحفظ للمراجعة فقط)، ثم اطلب منه اعتمادها من بنك الأسئلة قبل بناء الامتحان.
+- للأسئلة المعرفية (قرارات/كتب/طرق مذاكرة/مناهج): استدعِ search_knowledge أو book_guide أولاً — المعرفة المحلية دقيقة ومجانية.`;
 
 /** اقتراحات متابعة حتمية (بلا تكلفة) حسب آخر أداة ناجحة */
 export function followUps(steps: { tool: string; ok: boolean }[]): string[] {
@@ -94,9 +95,111 @@ const DECLARATIONS = [
       required: ["subject"],
     },
   },
+  {
+    name: "search_knowledge",
+    description: "البحث في قاعدة معرفة منارة المحلية (قرارات وزارية، أدلة كتب، طرق مذاكرة، نصائح امتحانات) — يعمل دائماً بلا إنترنت ذكي.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        query: { type: "STRING", description: "كلمة البحث" },
+        kind: { type: "STRING", description: "النوع: ministry_decree, azhar_update, book_guide, teaching_guide, curriculum_note, exam_tip (اختياري)" },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "book_guide",
+    description: "ترشيح الكتب الخارجية لمادة وصف (الناشرون وتغطيتهم وملاحظات).",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        subject: { type: "STRING", description: "المادة" },
+        grade: { type: "STRING", description: "الصف: ابتدائي/إعدادي/ثانوي (اختياري)" },
+        system: { type: "STRING", description: "moe أو azhar (اختياري)" },
+      },
+      required: ["subject"],
+    },
+  },
 ];
 
 export type AgentHistory = { role: "user" | "assistant"; text: string };
+
+/** تحويل سكيما Gemini (OBJECT/STRING) لصيغة OpenAI (object/string) */
+function toOaiSchema(s: unknown): unknown {
+  if (Array.isArray(s)) return s.map(toOaiSchema);
+  if (s && typeof s === "object") {
+    const o: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(s as Record<string, unknown>)) {
+      o[k] = k === "type" && typeof v === "string" ? v.toLowerCase() : toOaiSchema(v);
+    }
+    return o;
+  }
+  return s;
+}
+
+function oaiTools(): unknown[] {
+  return DECLARATIONS.map((d: any) => ({
+    type: "function",
+    function: { name: d.name, description: d.description, parameters: toOaiSchema(d.parameters) },
+  }));
+}
+
+/**
+ * حلقة ReAct عبر أي endpoint متوافق مع OpenAI (نموذج مستضاف ذاتياً: vLLM/Ollama).
+ * يُفعَّل بـ AGENT_LLM_URL (+ AGENT_LLM_MODEL + AGENT_LLM_KEY اختياري) — الاستقلال الكامل عن Gemini.
+ */
+async function openaiLoop(
+  admin: any, tid: string, history: AgentHistory[], keys: string[],
+  onStep?: (s: { tool: string; ok: boolean }) => void
+): Promise<{ text: string; steps: { tool: string; ok: boolean }[] } | null> {
+  const base = (process.env.AGENT_LLM_URL ?? "").replace(/\/$/, "");
+  if (!base) return null;
+  const model = process.env.AGENT_LLM_MODEL ?? "qwen3-8b";
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (process.env.AGENT_LLM_KEY) headers.Authorization = "Bearer " + process.env.AGENT_LLM_KEY;
+  const messages: any[] = [
+    { role: "system", content: SYSTEM },
+    ...history.slice(-10).map((h) => ({ role: h.role, content: h.text.slice(0, 2000) })),
+  ];
+  const steps: { tool: string; ok: boolean }[] = [];
+  let lastResult: { tool: string; out: unknown } | null = null;
+  for (let s = 0; s < MAX_STEPS; s++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 90000);
+    let j: any = null;
+    try {
+      const r = await fetch(base + "/chat/completions", {
+        method: "POST", headers, signal: ctrl.signal,
+        body: JSON.stringify({ model, messages, tools: oaiTools(), tool_choice: "auto", temperature: 0.3, max_tokens: 2000 }),
+      });
+      j = await r.json().catch(() => null);
+      if (!r.ok) return null; // فشل النقطة — السقوط لـ Gemini
+    } catch {
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+    const msg = j?.choices?.[0]?.message;
+    if (!msg) return null;
+    const calls = Array.isArray(msg.tool_calls) ? msg.tool_calls : [];
+    if (!calls.length) return { text: String(msg.content ?? "").trim() || "لم أفهم — أعد الصياغة.", steps };
+    messages.push({ role: "assistant", content: msg.content ?? null, tool_calls: calls.map((c: any) => ({ id: c.id, type: "function", function: c.function })) });
+    for (const c of calls) {
+      const name = String(c?.function?.name ?? "");
+      let args: Record<string, unknown> = {};
+      try { args = JSON.parse(String(c?.function?.arguments ?? "{}")) || {}; } catch {}
+      const out = await execTool(admin, tid, name, args, keys);
+      const ok = !(out as any)?.error;
+      const st = { tool: name, ok };
+      steps.push(st);
+      try { onStep?.(st); } catch {}
+      lastResult = { tool: name, out };
+      messages.push({ role: "tool", tool_call_id: c.id, content: JSON.stringify(out).slice(0, 4000) });
+    }
+  }
+  void lastResult;
+  return { text: "نفذت الخطوات لكن المهمة تحتاج تبسيطاً.", steps };
+}
 
 async function gemini(
   key: string, model: string, contents: unknown[], timeoutMs = 60000
@@ -182,7 +285,13 @@ export async function runAgent(
   onStep?: (s: { tool: string; ok: boolean }) => void
 ): Promise<{ text: string; steps: { tool: string; ok: boolean }[] }> {
   const keys = visionChain(tenantKey, tenantKey2);
-  if (!keys.length) return { text: "لا يوجد مفتاح رؤية — اربط مفتاح Gemini من الإعدادات أولاً.", steps: [] };
+  // الاستقلال أولاً: نموذج مستضاف ذاتياً (vLLM/Ollama) إن ضُبط — ثم Gemini كاحتياطي
+  if (process.env.AGENT_LLM_URL) {
+    const selfHosted = await openaiLoop(admin, tid, history, keys, onStep);
+    if (selfHosted) return selfHosted;
+    // سقط المستضاف → أكمل لـ Gemini أدناه
+  }
+  if (!keys.length) return { text: "لا يوجد مفتاح ذكاء — اربط مفتاح Gemini من الإعدادات أو اضبط AGENT_LLM_URL.", steps: [] };
   const models = ["gemini-flash-latest", "gemini-3-flash-preview"];
 
   const contents: any[] = history.slice(-10).map((h) => ({
