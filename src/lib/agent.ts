@@ -19,7 +19,10 @@ const SYSTEM = `أنت مساعد المعلم في منصة منارة (عرب�
 - review_exam هو المدقق الثاني: بعد إنشاء أي امتحان راجعه به قبل تسليم الإجابة.
 - attendance_summary وstudent_progress للأسئلة عن الحضور والطلاب — لا تخترع أرقاماً أبداً.
 - عند فراغ البنك وطلب المعلم أسئلة: استدعِ generate_drafts لتأليف مسودات من المنهج (تُحفظ للمراجعة فقط)، ثم اطلب منه اعتمادها من بنك الأسئلة قبل بناء الامتحان.
-- للأسئلة المعرفية (قرارات/كتب/طرق مذاكرة/مناهج): استدعِ search_knowledge أو book_guide أولاً — المعرفة المحلية دقيقة ومجانية.`;
+- للأسئلة المعرفية (قرارات/كتب/طرق مذاكرة/مناهج): استدعِ search_knowledge أو book_guide أولاً — المعرفة المحلية دقيقة ومجانية.
+- لحل مسألة: استدعِ solve_question (من البنك فقط — لا تحل من عندك أبداً).
+- لحل امتحان كامل للمراجعة: استدعِ solve_exam.
+- لأسئلة «فين/إزاي» عن الداشبورد: استدعِ app_help أولاً.`;
 
 /** اقتراحات متابعة حتمية (بلا تكلفة) حسب آخر أداة ناجحة */
 export function followUps(steps: { tool: string; ok: boolean }[]): string[] {
@@ -120,6 +123,32 @@ const DECLARATIONS = [
       required: ["subject"],
     },
   },
+  {
+    name: "solve_question",
+    description: "حل مسألة: يبحث في البنك عن سؤال مشابه محلول ويعيد إجابته. إن لم يوجد يقول ذلك بصراحة ولا يخمن.",
+    parameters: {
+      type: "OBJECT",
+      properties: { question: { type: "STRING", description: "نص المسألة" } },
+      required: ["question"],
+    },
+  },
+  {
+    name: "solve_exam",
+    description: "حل امتحان كامل للمراجعة: يعرض كل الأسئلة بإجاباتها الصحيحة (للمعلم فقط).",
+    parameters: {
+      type: "OBJECT",
+      properties: { exam_id: { type: "STRING", description: "المعرف (اختياري — الأحدث)" } },
+    },
+  },
+  {
+    name: "app_help",
+    description: "شرح استخدام المنصة: أين كل صفحة في الداشبورد وكيف تُنجز المهام (حضور/امتحانات/واجبات/دفع/تقارير...).",
+    parameters: {
+      type: "OBJECT",
+      properties: { topic: { type: "STRING", description: "الموضوع (مثال: الحضور، النشر، الواجبات)" } },
+      required: ["topic"],
+    },
+  },
 ];
 
 export type AgentHistory = { role: "user" | "assistant"; text: string };
@@ -170,6 +199,10 @@ async function directAnswer(
       return null;
     }
   };
+  // مساعدة الداشبورد أولاً: صيغة السؤال (فين/إزاي/كيف) تتفوق على الكلمات الموضوعية
+  if (/فين|وين|إزاي|ازاي|كيف|شرح|طريقة|داشبورد|لوحة/.test(m)) {
+    return run("app_help", { topic: m.slice(0, 100) });
+  }
   // أفضل كتاب لمادة → دليل الكتب مباشرة
   if (/كتاب|أفضل|أحسن/.test(m)) {
     const s = findSubject(m);
@@ -186,6 +219,10 @@ async function directAnswer(
   // قائمة الامتحانات
   if (/امتحاناتي|اعرض الامتحانات|الامتحانات الموجودة|قائمة الامتحانات/.test(m)) {
     return run("list_exams", {});
+  }
+  // حل امتحان كامل للمراجعة
+  if (/حل الامتحان|حل الاختبار/.test(m)) {
+    return run("solve_exam", {});
   }
   // إنشاء امتحان بصيغة مباشرة: "اعمل امتحان <مادة> [من] <عدد> [أسئلة]"
   const mk = m.match(/اعمل|أنشئ|انشئ/);
@@ -229,6 +266,8 @@ function pickTools(message: string): unknown[] {
   if (has("حضور", "غائب", "غاب")) want.add("attendance_summary");
   if (has("طالب", "طالبة", "مستوى", "نقاط", "درجة")) want.add("student_progress");
   if (has("كتاب", "قرار", "وزارة", "منهج", "أزهر", "مذاكرة", "أخبار", "جديد")) { want.add("search_knowledge"); want.add("book_guide"); }
+  if (has("حل", "مسألة", "إجابة", "جواب")) want.add("solve_question");
+  if (has("فين", "وين", "إزاي", "ازاي", "كيف", "داشبورد", "لوحة", "شرح", "طريقة")) want.add("app_help");
   if (!want.size) return all; // غير واضح — كل الأدوات
   return all.filter((t) => want.has(t.function.name));
 }
@@ -416,6 +455,19 @@ function fallbackSummary(last: { tool: string; out: unknown } | null): string {
   if (last?.tool === "review_exam" && typeof o.total === "number") {
     if (o.clean) return `الامتحان سليم (${o.total} أسئلة) — جاهز للنشر.`;
     return `مراجعة الامتحان (${o.total} أسئلة): ` + ((o.issues ?? []) as string[]).slice(0, 5).join("؛ ");
+  }
+  if (last?.tool === "solve_question" && o.answer) {
+    const opts = Array.isArray(o.options) ? `\nالاختيارات: ${o.options.join("، ")}` : "";
+    return `وجدت سؤالاً مشابهاً في بنكك (${o.subject ?? ""}): «${String(o.matched).slice(0, 150)}»${opts}\nالإجابة الصحيحة: ${o.answer}`;
+  }
+  if (last?.tool === "solve_question" && o.error) {
+    return "لا يوجد سؤال مشابه محلول في بنكك — أضف السؤال أولاً أو اطلب تأليف مسودات.";
+  }
+  if (last?.tool === "solve_exam" && typeof o.total === "number") {
+    return `حل الامتحان (${o.total} أسئلة):\n` + ((o.solved ?? []) as any[]).slice(0, 10).map((s: any) => `${s.n}) ${String(s.q).slice(0, 80)} ← ${s.answer ?? "؟"}`).join("\n");
+  }
+  if (last?.tool === "app_help" && Array.isArray(o.answers)) {
+    return o.answers.slice(0, 3).join("\n\n");
   }
   return "تعذر الوصول لخدمة الذكاء حالياً (ازدحام) — حاول بعد قليل.";
 }

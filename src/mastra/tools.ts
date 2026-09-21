@@ -93,5 +93,23 @@ export function buildManaraTools(admin: any, tid: string, keys: string[] = []) {
       }),
       (args) => TOOL_IMPLS.book_guide(admin, tid, args)
     ),
+    solve_question: wrap(
+      "solve_question",
+      "حل مسألة من البنك (بحث عن مشابه محلول — لا تخمين).",
+      z.object({ question: z.string().describe("نص المسألة") }),
+      (args) => TOOL_IMPLS.solve_question(admin, tid, args)
+    ),
+    solve_exam: wrap(
+      "solve_exam",
+      "حل امتحان كامل للمراجعة (أسئلة بإجاباتها).",
+      z.object({ exam_id: z.string().optional().describe("المعرف — الأحدث") }),
+      (args) => TOOL_IMPLS.solve_exam(admin, tid, args)
+    ),
+    app_help: wrap(
+      "app_help",
+      "شرح استخدام المنصة والداشبورد.",
+      z.object({ topic: z.string().describe("الموضوع") }),
+      (args) => TOOL_IMPLS.app_help(admin, tid, args)
+    ),
   };
 }

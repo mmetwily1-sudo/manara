@@ -244,6 +244,77 @@ export async function bookGuide(
   };
 }
 
+/** حل مسألة من البنك: بحث عن سؤال مشابه معتمد بإجابته (RAG محلي صادق — لا تخمين) */
+export async function solveQuestion(
+  admin: any, tid: string, args: { question: string }
+): Promise<unknown> {
+  const q = String(args.question ?? "").trim().slice(0, 300);
+  if (q.length < 5) return { error: "need_question" };
+  const words = q.split(/\s+/).filter((w) => w.length > 3).slice(0, 4);
+  if (!words.length) return { error: "need_question" };
+  let query = admin.from("questions").select("body,options,correct_answer,subject")
+    .eq("tenant_id", tid).eq("status", "approved").limit(50);
+  for (const w of words.slice(0, 2)) query = query.ilike("body", `%${w}%`);
+  const { data, error } = await query;
+  if (error) return { error: "db" };
+  const rows = ((data ?? []) as any[]).filter((r) => Array.isArray(r.options) && r.options.length >= 2 && r.correct_answer);
+  if (!rows.length) return { error: "not_found", message: "لا يوجد سؤال مشابه محلول في بنكك" };
+  const best = rows[0];
+  return {
+    matched: String(best.body).slice(0, 300),
+    subject: best.subject, options: best.options, answer: best.correct_answer,
+  };
+}
+
+/** حل امتحان كامل للمراجعة (معلم فقط — يعرض الأسئلة بإجاباتها) */
+export async function solveExam(admin: any, tid: string, args: { exam_id?: string }): Promise<unknown> {
+  let eid = String(args.exam_id ?? "");
+  if (!eid) {
+    const { data: latest } = await admin.from("exams").select("id").eq("tenant_id", tid)
+      .order("created_at", { ascending: false }).limit(1).single();
+    eid = (latest as any)?.id ?? "";
+  }
+  if (!eid) return { error: "no_exams" };
+  const { data: eqs } = await admin.from("exam_questions")
+    .select("questions(body,options,correct_answer)").eq("exam_id", eid).eq("tenant_id", tid).limit(100);
+  const rows = ((eqs ?? []) as any[]).map((r) => r.questions).filter(Boolean);
+  if (!rows.length) return { error: "empty_exam" };
+  return {
+    total: rows.length,
+    solved: rows.map((q: any, i: number) => ({
+      n: i + 1, q: String(q.body ?? "").slice(0, 200),
+      options: Array.isArray(q.options) ? q.options : [],
+      answer: q.correct_answer ?? null,
+    })),
+  };
+}
+
+/** مساعدة التطبيق: أين كل صفحة وكيف تُنجز المهام (معرفة ثابتة منظمة) */
+const APP_HELP: { keys: string[]; text: string }[] = [
+  { keys: ["حضور", "تحضير", "غاب"], text: "الحضور: الداشبورد ← التحضير ← اختر المجموعة والحصة ← علّم حاضر/غائب. يدعم QR والكود. كل حضور يمنح الطالب نقطتين." },
+  { keys: ["امتحان", "اختبار", "انشر", "نشر"], text: "الامتحانات: الداشبورد ← الامتحانات. الإنشاء: من بنك الأسئلة (مسح ورقة ← اعتماد) أو من المساعد «اعمل امتحان». النشر بزر «نشر» في بطاقة الامتحان بعد مراجعته." },
+  { keys: ["واجب", "واجبات"], text: "الواجبات: الداشبورد ← الواجبات ← اختر المجموعة وحدد الموعد. الطالب يصوّر حله من صفحة تقدمه، وأنت تصحح بالدرجة وملاحظة من نفس الصفحة." },
+  { keys: ["بابل", "omr"], text: "البابل شيت: الداشبورد ← بابل شيت OMR ← أنشئ ورقة بنموذج إجابة ← اطبعها ← صوّر الورق المظلل ← تصحيح فوري، والغامض يُعلَّم للمراجعة." },
+  { keys: ["دفع", "اشتراك", "باقة", "سعر"], text: "الأسعار: 450/750/1500 شهريًا + 14 يوم تجربة + استرداد 30 يوم. الدفع أونلاين (Paymob) من صفحة الأسعار، أو واتساب للتحويل اليدوي." },
+  { keys: ["طالب", "تسجيل طالب", "إضافة طالب"], text: "الطالب يسجل من رابط سنترك العام (صفحة المعلم) بالاسم ورقم الهاتف، أو تدخله برقم هاتفه للدخول بدون باسورد. تابعهم من الداشبورد ← الطلاب." },
+  { keys: ["تقرير", "تقارير", "ولي الأمر"], text: "التقارير: الداشبورد ← التقارير (درجات/حضور/مدفوعات). تقارير ولي الأمر تصل واتساب تلقائيًا عند الغياب والنتائج والتصحيح." },
+  { keys: ["فيديو", "حصص مسجلة"], text: "الفيديوهات: الداشبورد ← الفيديوهات ← ارفع برابط Bunny أو يوتيوب. الطالب يشاهدها من صفحة تقدمه بروابط موقعة آمنة." },
+  { keys: ["متجر", "مذكرة", "بيع"], text: "المتجر: الداشبورد ← المتجر ← انشر مذكرة بسعر. الطالب يطلب من صفحته وأنت تؤكد، ثم يحمّل برابط آمن." },
+  { keys: ["مساعد", "بوت", "ذكاء"], text: "أنا المساعد 🤖: ابنِ امتحانات من بنكك، ألف مسودات من المنهج، راجع الامتحانات، واسألني عن البنك والحضور والطلاب والوزارة والكتب." },
+];
+
+export async function appHelp(_admin: any, _tid: string, args: { topic: string }): Promise<unknown> {
+  const t = String(args.topic ?? "").trim().slice(0, 100);
+  if (t.length < 2) return { error: "need_topic" };
+  const hits = APP_HELP.filter((h) => h.keys.some((k) => t.includes(k)));
+  if (!hits.length) {
+    return {
+      hint: "مواضيع المساعدة: الحضور، الامتحانات، الواجبات، بابل شيت، الدفع، الطلاب، التقارير، الفيديو، المتجر.",
+    };
+  }
+  return { answers: hits.slice(0, 3).map((h) => h.text) };
+}
+
 export const TOOL_IMPLS: Record<string, (admin: any, tid: string, args: Record<string, unknown>, ctx?: ToolCtx) => Promise<unknown>> = {
   bank_stats: (a, t, x) => bankStats(a, t, x as { subject?: string }),
   create_exam: (a, t, x) => createExam(a, t, x as { title: string; subject?: string; count?: number }),
@@ -252,6 +323,9 @@ export const TOOL_IMPLS: Record<string, (admin: any, tid: string, args: Record<s
   student_progress: (a, t, x) => studentProgress(a, t, x as { name: string }),
   review_exam: (a, t, x) => reviewExam(a, t, x as { exam_id?: string }),
   generate_drafts: (a, t, x, c) => generateDrafts(a, t, x as { subject: string; count?: number }, c),
+  solve_question: (a, t, x) => solveQuestion(a, t, x as { question: string }),
+  solve_exam: (a, t, x) => solveExam(a, t, x as { exam_id?: string }),
+  app_help: (a, t, x) => appHelp(a, t, x as { topic: string }),
   search_knowledge: (a, t, x) => searchKnowledge(a, t, x as { query: string; kind?: string }),
   book_guide: (a, t, x) => bookGuide(a, t, x as { subject: string; grade?: string; system?: string }),
 };
