@@ -1,13 +1,13 @@
 import { createHmac } from "crypto";
 
 /**
- * Paymob Accept — تحصيل اشتراكات المنصة (بطاقات/محافظ) أونلاين.
- * البيئة المطلوبة (Vercel): PAYMOB_API_KEY, PAYMOB_HMAC_SECRET,
- * PAYMOB_CARD_INTEGRATION_ID, PAYMOB_IFRAME_ID (+ PAYMOB_WALLET_INTEGRATION_ID اختياري).
+ * Paymob Intention API (v1) — تحصيل اشتراكات المنصة (بطاقات/محافظ) أونلاين.
+ * البيئة المطلوبة (Vercel): PAYMOB_SECRET_KEY, PAYMOB_PUBLIC_KEY,
+ * PAYMOB_CARD_INTEGRATION_ID, PAYMOB_HMAC_SECRET (+ PAYMOB_WALLET_INTEGRATION_ID اختياري).
  * بدونها: isPaymobLive()=false وتبقى الطرق اليدوية.
  */
 
-const BASE = "https://accept.paymob.com/api";
+const BASE = "https://accept.paymob.com";
 
 export const PLAN_PRICES: Record<string, { monthly: number; yearly: number }> = {
   starter: { monthly: 450, yearly: 4500 },
@@ -17,66 +17,53 @@ export const PLAN_PRICES: Record<string, { monthly: number; yearly: number }> = 
 
 export function isPaymobLive(): boolean {
   return !!(
-    process.env.PAYMOB_API_KEY &&
-    process.env.PAYMOB_HMAC_SECRET &&
+    process.env.PAYMOB_SECRET_KEY &&
+    process.env.PAYMOB_PUBLIC_KEY &&
     process.env.PAYMOB_CARD_INTEGRATION_ID &&
-    process.env.PAYMOB_IFRAME_ID
+    process.env.PAYMOB_HMAC_SECRET
   );
 }
 
-async function postJson(path: string, body: unknown): Promise<any> {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 20000);
-  try {
-    const r = await fetch(BASE + path, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body), signal: ctrl.signal,
-    });
-    const j = await r.json().catch(() => null);
-    if (!r.ok) throw new Error("paymob_" + r.status);
-    return j;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-/** ينشئ نية دفع ويرجع رابط الـ iframe */
+/** ينشئ نية دفع ويرجع رابط الدفع الموحد (يُفتح في تبويب جديد) */
 export async function createIntention(opts: {
   amountEgp: number; merchantOrderId: string; customerName: string; customerPhone?: string; customerEmail?: string; method?: "card" | "wallet";
 }): Promise<{ iframeUrl: string; orderId: number }> {
-  const apiKey = process.env.PAYMOB_API_KEY!;
+  const secret = process.env.PAYMOB_SECRET_KEY!;
   const integrationId = opts.method === "wallet"
     ? (process.env.PAYMOB_WALLET_INTEGRATION_ID || process.env.PAYMOB_CARD_INTEGRATION_ID!)
     : process.env.PAYMOB_CARD_INTEGRATION_ID!;
-  const auth = await postJson("/auth/tokens", { api_key: apiKey });
-  const order = await postJson("/ecommerce/orders", {
-    auth_token: auth.token,
-    delivery_needed: false,
-    amount_cents: Math.round(opts.amountEgp * 100),
-    currency: "EGP",
-    merchant_order_id: opts.merchantOrderId,
-    items: [{ name: "Manara subscription", amount_cents: Math.round(opts.amountEgp * 100), description: opts.merchantOrderId, quantity: 1 }],
-  });
-  const key = await postJson("/acceptance/payment_keys", {
-    auth_token: auth.token,
-    amount_cents: Math.round(opts.amountEgp * 100),
-    expiration: 3600,
-    order_id: order.id,
-    billing_data: {
-      first_name: opts.customerName.slice(0, 30) || "Teacher",
-      last_name: "Manara",
-      email: opts.customerEmail || "noreply@manara.app",
-      phone_number: (opts.customerPhone || "+201000000000").slice(0, 15),
-      apartment: "NA", floor: "NA", street: "NA", building: "NA",
-      city: "Cairo", country: "EG", state: "Cairo", postal_code: "NA",
-    },
-    currency: "EGP",
-    integration_id: Number(integrationId),
-  });
-  return {
-    iframeUrl: `${BASE}/acceptance/iframes/${process.env.PAYMOB_IFRAME_ID}?payment_token=${key.token}`,
-    orderId: order.id,
-  };
+  const cents = Math.round(opts.amountEgp * 100);
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 25000);
+  try {
+    const r = await fetch(BASE + "/v1/intention/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Token " + secret },
+      signal: ctrl.signal,
+      body: JSON.stringify({
+        amount: cents,
+        currency: "EGP",
+        payment_methods: [Number(integrationId)],
+        items: [{ name: "Manara subscription", amount: cents, description: opts.merchantOrderId.slice(0, 100), quantity: 1 }],
+        billing_data: {
+          apartment: "NA", first_name: opts.customerName.slice(0, 30) || "Teacher", last_name: "Manara",
+          street: "NA", building: "NA", phone_number: (opts.customerPhone || "+201000000000").slice(0, 15),
+          city: "Cairo", country: "EG", email: opts.customerEmail || "noreply@manara.app",
+          floor: "NA", state: "Cairo",
+        },
+        customer: { first_name: opts.customerName.slice(0, 30) || "Teacher", last_name: "Manara", email: opts.customerEmail || "noreply@manara.app" },
+        extras: { merchant_order_id: opts.merchantOrderId },
+      }),
+    });
+    const j = await r.json().catch(() => null);
+    if (!r.ok || !(j as any)?.client_secret) throw new Error("paymob_" + r.status);
+    return {
+      iframeUrl: `${BASE}/unifiedcheckout/?publicKey=${process.env.PAYMOB_PUBLIC_KEY}&clientSecret=${(j as any).client_secret}`,
+      orderId: Number((j as any).intention_order_id ?? (j as any).id ?? 0),
+    };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 const HMAC_FIELDS = [
