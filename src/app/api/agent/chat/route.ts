@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { dbFail } from "@/lib/api-error";
 import { isMissingTable } from "@/lib/server-auth";
-import { runAgent, type AgentHistory } from "@/lib/agent";
+import { runAgent, followUps, type AgentHistory } from "@/lib/agent";
 
 /**
  * POST /api/agent/chat { thread_id?, message } — دور محادثة مع الوكيل.
@@ -47,17 +47,28 @@ export async function POST(req: Request) {
     history.push({ role: "user", text: message });
 
     const { data: trow } = await admin.from("tenants").select("settings").eq("id", tid).single();
-    const out = await runAgent(
-      admin, tid, history,
-      (trow as any)?.settings?.vision_key ?? null,
-      (trow as any)?.settings?.vision_key_2 ?? null
-    );
-
-    await admin.from("agent_messages").insert([
-      { tenant_id: tid, thread_id: threadId, role: "user", content: message },
-      { tenant_id: tid, thread_id: threadId, role: "assistant", content: out.text },
-    ]);
-    return NextResponse.json({ ok: true, thread_id: threadId, text: out.text, steps: out.steps });
+    const stream = new ReadableStream({
+      async start(controller) {
+        const enc = new TextEncoder();
+        const send = (o: unknown) => controller.enqueue(enc.encode(`data: ${JSON.stringify(o)}\n\n`));
+        send({ type: "thread", thread_id: threadId });
+        const out = await runAgent(
+          admin, tid, history,
+          (trow as any)?.settings?.vision_key ?? null,
+          (trow as any)?.settings?.vision_key_2 ?? null,
+          (s) => send({ type: "step", ...s })
+        );
+        await admin.from("agent_messages").insert([
+          { tenant_id: tid, thread_id: threadId, role: "user", content: message },
+          { tenant_id: tid, thread_id: threadId, role: "assistant", content: out.text },
+        ]);
+        send({ type: "done", thread_id: threadId, text: out.text, steps: out.steps, suggest: followUps(out.steps) });
+        controller.close();
+      },
+    });
+    return new Response(stream, {
+      headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" },
+    });
   } catch (e: any) {
     if (isMissingTable(e)) {
       return NextResponse.json({ ok: false, error: "not_ready", message: "نفّذ ترحيل 007 أولاً." }, { status: 400 });

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-type Msg = { role: "user" | "assistant"; text: string; steps?: { tool: string; ok: boolean }[] };
+type Msg = { role: "user" | "assistant"; text: string; steps?: { tool: string; ok: boolean }[]; suggest?: string[] };
 
 const TOOL_AR: Record<string, string> = { bank_stats: "إحصاء البنك", create_exam: "إنشاء امتحان", list_exams: "قائمة الامتحانات" };
 
@@ -25,22 +25,51 @@ export default function AgentPage() {
   useEffect(() => { loadThreads(); }, []);
   useEffect(() => { bottom.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs]);
 
-  async function send(e?: React.FormEvent) {
+  async function send(e?: React.FormEvent, preset?: string) {
     e?.preventDefault();
-    const text = input.trim();
+    const text = (preset ?? input).trim();
     if (!text || busy) return;
     setInput(""); setErr(""); setBusy(true);
     setMsgs((p) => [...p, { role: "user", text }]);
+    // بطاقة مساعدة تُملأ تدريجياً مع أحداث البث
+    const idxRef = { i: -1 };
     try {
       const r = await fetch("/api/agent/chat", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ thread_id: threadId, message: text }),
       });
-      const j = await r.json().catch(() => null);
-      if (r.ok && j?.ok) {
-        if (!threadId && j.thread_id) { setThreadId(j.thread_id); loadThreads(); }
-        setMsgs((p) => [...p, { role: "assistant", text: j.text, steps: j.steps ?? [] }]);
-      } else setErr(j?.message ?? "فشل: " + (j?.error ?? ""));
+      if (!r.ok || !r.body) {
+        const j = await r.json().catch(() => null);
+        setErr(j?.message ?? "فشل: " + (j?.error ?? ""));
+        setBusy(false);
+        return;
+      }
+      setMsgs((p) => { idxRef.i = p.length; return [...p, { role: "assistant", text: "", steps: [] }]; });
+      const reader = r.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      const patch = (fn: (m: Msg) => Msg) =>
+        setMsgs((p) => p.map((m, i) => (i === idxRef.i ? fn(m) : m)));
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const parts = buf.split("\n\n");
+        buf = parts.pop() ?? "";
+        for (const part of parts) {
+          const line = part.trim();
+          if (!line.startsWith("data:")) continue;
+          const j = JSON.parse(line.slice(5)) as any;
+          if (j.type === "thread" && j.thread_id && !threadId) {
+            setThreadId(j.thread_id); loadThreads();
+          } else if (j.type === "step") {
+            patch((m) => ({ ...m, steps: [...(m.steps ?? []), { tool: j.tool, ok: j.ok }] }));
+          } else if (j.type === "done") {
+            if (j.thread_id && !threadId) { setThreadId(j.thread_id); loadThreads(); }
+            patch(() => ({ role: "assistant", text: j.text ?? "", steps: j.steps ?? [], suggest: j.suggest ?? [] }));
+          }
+        }
+      }
     } catch { setErr("تعذر الاتصال بالخادم."); }
     finally { setBusy(false); }
   }
@@ -79,13 +108,23 @@ export default function AgentPage() {
           )}
           {msgs.map((m, i) => (
             <div key={i} className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-small leading-relaxed ${m.role === "user" ? "mr-auto bg-primary text-white" : "bg-slate-100"}`}>
-              <div className="whitespace-pre-wrap">{m.text}</div>
+              <div className="whitespace-pre-wrap">{m.text || (m.role === "assistant" ? "…" : "")}</div>
               {(m.steps ?? []).length > 0 && (
                 <div className="mt-1.5 flex flex-wrap gap-1">
                   {(m.steps ?? []).map((s, k) => (
                     <span key={k} className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${s.ok ? "bg-success/15 text-success" : "bg-danger/10 text-danger"}`}>
                       🔧 {TOOL_AR[s.tool] ?? s.tool}
                     </span>
+                  ))}
+                </div>
+              )}
+              {(m.suggest ?? []).length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {(m.suggest ?? []).map((s, k) => (
+                    <button key={k} onClick={() => send(undefined, s)} disabled={busy}
+                      className="rounded-full border border-primary/30 px-3 py-1 text-[11px] font-bold text-primary transition hover:bg-primary-light disabled:opacity-50">
+                      {s}
+                    </button>
                   ))}
                 </div>
               )}

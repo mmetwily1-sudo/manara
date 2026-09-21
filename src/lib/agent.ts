@@ -15,7 +15,21 @@ const SYSTEM = `أنت مساعد المعلم في منصة منارة (عرب�
 - استدعِ bank_stats فقط عند السؤال عن محتوى البنك («عندنا إيه؟»).
 - لا تنشر أي امتحان أبداً — أنشئه غير منشور واذكر أنه بانتظار مراجعته ونشره.
 - لا تخترع أسئلة من عندك — ابنِ من البنك فقط، وإن كان فارغاً قل ذلك بوضوح.
-- أجب بالعربية الفصحى المبسطة بجمل قصيرة، واذكر ما فعلته بأدواتك.`;
+- أجب بالعربية الفصحى المبسطة بجمل قصيرة، واذكر ما فعلته بأدواتك.
+- review_exam هو المدقق الثاني: بعد إنشاء أي امتحان راجعه به قبل تسليم الإجابة.
+- attendance_summary وstudent_progress للأسئلة عن الحضور والطلاب — لا تخترع أرقاماً أبداً.`;
+
+/** اقتراحات متابعة حتمية (بلا تكلفة) حسب آخر أداة ناجحة */
+export function followUps(steps: { tool: string; ok: boolean }[]): string[] {
+  const last = [...steps].reverse().find((s) => s.ok)?.tool;
+  if (last === "create_exam") return ["راجع الامتحان الجديد", "اعمل امتحانًا لمادة أخرى", "عندنا إيه في البنك؟"];
+  if (last === "bank_stats") return ["اعمل امتحان من البنك", "اعرض أحدث الامتحانات"];
+  if (last === "review_exam") return ["اعرض أحدث الامتحانات", "اعمل امتحانًا جديدًا"];
+  if (last === "attendance_summary") return ["تفاصيل طالب معين", "اعرض أحدث الامتحانات"];
+  if (last === "student_progress") return ["ملخص الحضور", "اعمل امتحانًا جديدًا"];
+  if (last === "list_exams") return ["راجع أحدث امتحان", "اعمل امتحانًا جديدًا"];
+  return ["عندنا إيه في البنك؟", "اعمل امتحان علوم 5 أسئلة", "ملخص الحضور"];
+}
 
 const DECLARATIONS = [
   {
@@ -43,6 +57,28 @@ const DECLARATIONS = [
     name: "list_exams",
     description: "أحدث الامتحانات: العنوان وعدد الأسئلة وحالة النشر.",
     parameters: { type: "OBJECT", properties: {} },
+  },
+  {
+    name: "attendance_summary",
+    description: "ملخص الحضور: إجمالي المسجلين ونسبة الحضور آخر 7 أيام.",
+    parameters: { type: "OBJECT", properties: {} },
+  },
+  {
+    name: "student_progress",
+    description: "نبذة طالب بالاسم: نقاطه وأوسمته وآخر نتائجه وواجباته.",
+    parameters: {
+      type: "OBJECT",
+      properties: { name: { type: "STRING", description: "اسم الطالب (جزء من الاسم يكفي)" } },
+      required: ["name"],
+    },
+  },
+  {
+    name: "review_exam",
+    description: "مراجعة امتحان (مدقق ثانٍ): أسئلة بلا إجابة، إجابة لا تطابق الخيارات، تكرار، نص ناقص.",
+    parameters: {
+      type: "OBJECT",
+      properties: { exam_id: { type: "STRING", description: "معرف الامتحان (اختياري — الأحدث إن ترك فارغاً)" } },
+    },
   },
 ];
 
@@ -123,6 +159,72 @@ async function execTool(admin: any, tid: string, name: string, args: Record<stri
     if (!linked) return { error: "link_failed", message: linkErr ?? "تعذر ربط الأسئلة" };
     return { exam_id: (ex as any).id, title, count: linked, total_marks: total, published: false };
   }
+  if (name === "attendance_summary") {
+    const week = new Date(Date.now() - 7 * 86400000).toISOString();
+    const { data, error } = await admin.from("attendance").select("status")
+      .eq("tenant_id", tid).gte("recorded_at", week).limit(2000);
+    if (error) return { error: "db" };
+    const rows = (data ?? []) as any[];
+    const present = rows.filter((r) => r.status === "present").length;
+    return {
+      records: rows.length,
+      present,
+      rate: rows.length ? Math.round((present / rows.length) * 100) : null,
+      window: "7d",
+    };
+  }
+  if (name === "student_progress") {
+    const needle = String(args.name ?? "").trim().slice(0, 60);
+    if (needle.length < 2) return { error: "need_name" };
+    const { data: students } = await admin.from("users").select("id,full_name,points")
+      .eq("tenant_id", tid).eq("role", "student").ilike("full_name", `%${needle}%`).limit(5);
+    const list = (students ?? []) as any[];
+    if (!list.length) return { error: "not_found", message: "لا يوجد طالب بهذا الاسم" };
+    if (list.length > 1) return { multiple: list.map((s) => s.full_name), message: "أسماء متعددة — حدد واحداً" };
+    const st = list[0];
+    const [{ data: subs }, { data: attempts }] = await Promise.all([
+      admin.from("submissions").select("status,score").eq("tenant_id", tid).eq("student_id", st.id).limit(50),
+      admin.from("exam_attempts").select("score,exams(title,total_marks)").eq("tenant_id", tid).eq("student_id", st.id).order("submitted_at", { ascending: false }).limit(5),
+    ]);
+    const graded = ((subs ?? []) as any[]).filter((s) => s.status === "graded");
+    return {
+      name: st.full_name, points: Number(st.points ?? 0) || 0,
+      homework_graded: graded.length,
+      last_exams: ((attempts ?? []) as any[]).map((a) => ({
+        title: (a.exams as any)?.title ?? "امتحان",
+        score: a.score, total: Number((a.exams as any)?.total_marks ?? 0) || 0,
+      })),
+    };
+  }
+  if (name === "review_exam") {
+    let eid = String(args.exam_id ?? "");
+    if (!eid) {
+      const { data: latest } = await admin.from("exams").select("id").eq("tenant_id", tid)
+        .order("created_at", { ascending: false }).limit(1).single();
+      eid = (latest as any)?.id ?? "";
+    }
+    if (!eid) return { error: "no_exams" };
+    const { data: eqs } = await admin.from("exam_questions")
+      .select("questions(id,body,options,correct_answer)").eq("exam_id", eid).eq("tenant_id", tid).limit(100);
+    const rows = ((eqs ?? []) as any[]).map((r) => r.questions).filter(Boolean);
+    if (!rows.length) return { error: "empty_exam", message: "الامتحان بلا أسئلة مربوطة" };
+    const issues: string[] = [];
+    const seen = new Set<string>();
+    rows.forEach((q: any, i: number) => {
+      const n = i + 1;
+      const body = String(q.body ?? "").trim();
+      const opts = Array.isArray(q.options) ? q.options : [];
+      const ans = String(q.correct_answer ?? "").trim();
+      if (!body || body.length < 5 || body.startsWith("[صفحة")) issues.push(`س${n}: نص ناقص`);
+      if (opts.length < 2) issues.push(`س${n}: خيارات ناقصة`);
+      if (!ans) issues.push(`س${n}: بلا إجابة`);
+      else if (opts.length >= 2 && !opts.includes(ans)) issues.push(`س${n}: الإجابة لا تطابق الخيارات`);
+      const k = body.slice(0, 80);
+      if (k && seen.has(k)) issues.push(`س${n}: مكرر`);
+      else if (k) seen.add(k);
+    });
+    return { total: rows.length, clean: issues.length === 0, issues: issues.slice(0, 15) };
+  }
   if (name === "list_exams") {
     const { data: exams } = await admin.from("exams").select("id,title,is_published,created_at")
       .eq("tenant_id", tid).order("created_at", { ascending: false }).limit(10);
@@ -169,7 +271,8 @@ function fallbackSummary(last: { tool: string; out: unknown } | null): string {
 }
 
 export async function runAgent(
-  admin: any, tid: string, history: AgentHistory[], tenantKey?: string | null, tenantKey2?: string | null
+  admin: any, tid: string, history: AgentHistory[], tenantKey?: string | null, tenantKey2?: string | null,
+  onStep?: (s: { tool: string; ok: boolean }) => void
 ): Promise<{ text: string; steps: { tool: string; ok: boolean }[] }> {
   const keys = visionChain(tenantKey, tenantKey2);
   if (!keys.length) return { text: "لا يوجد مفتاح رؤية — اربط مفتاح Gemini من الإعدادات أولاً.", steps: [] };
@@ -204,7 +307,9 @@ export async function runAgent(
       out = { error: "tool_failed" };
     }
     const ok = !(out as any)?.error;
-    steps.push({ tool: res.call.name, ok });
+    const st = { tool: res.call.name, ok };
+    steps.push(st);
+    try { onStep?.(st); } catch {}
     lastResult = { tool: res.call.name, out };
     contents.push({ role: "model", parts: [{ functionCall: res.call }] });
     contents.push({ role: "user", parts: [{ functionResponse: { name: res.call.name, response: out as object } }] });
