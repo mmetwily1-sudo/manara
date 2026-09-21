@@ -124,6 +124,9 @@ const DECLARATIONS = [
 
 export type AgentHistory = { role: "user" | "assistant"; text: string };
 
+/** نسخة مختصرة من التعليمات للنماذج المحلية الصغيرة */
+const SYSTEM_SLIM = `أنت مساعد المعلم (عربي مختصر). لديك أدوات: bank_stats, create_exam, list_exams, attendance_summary, student_progress, review_exam, generate_drafts, search_knowledge, book_guide. استدعِ الأداة المناسبة مباشرة. لا تنشر أبداً. لا تخترع أرقاماً.`;
+
 /** تحويل سكيما Gemini (OBJECT/STRING) لصيغة OpenAI (object/string) */
 function toOaiSchema(s: unknown): unknown {
   if (Array.isArray(s)) return s.map(toOaiSchema);
@@ -135,6 +138,77 @@ function toOaiSchema(s: unknown): unknown {
     return o;
   }
   return s;
+}
+
+const SUBJECTS = ["فيزياء", "كيمياء", "أحياء", "رياضيات", "علوم", "عربي", "إنجليزي", "دراسات", "تاريخ", "جغرافيا", "فلسفة", "فرنساوي", "دين"];
+
+function findSubject(m: string): string | null {
+  for (const s of SUBJECTS) if (m.includes(s)) return s;
+  return null;
+}
+
+/**
+ * المسار المباشر: أسئلة شائعة تُجاب من الأدوات فوراً بلا أي LLM (فوري + مجاني).
+ * يرجع null عندما يحتاج الأمر استدلالاً (إنشاء/تأليف/صياغة حرة).
+ */
+async function directAnswer(
+  admin: any, tid: string, message: string,
+  onStep?: (s: { tool: string; ok: boolean }) => void
+): Promise<{ text: string; steps: { tool: string; ok: boolean }[] } | null> {
+  const m = message;
+  const run = async (tool: string, args: Record<string, unknown>) => {
+    const { TOOL_IMPLS } = await import("@/mastra/tool-impls");
+    const fn = TOOL_IMPLS[tool];
+    if (!fn) return null;
+    try {
+      const out = await fn(admin, tid, args, { keys: [] });
+      if ((out as any)?.error) return null;
+      const st = { tool, ok: true };
+      try { onStep?.(st); } catch {}
+      return { text: fallbackSummary({ tool, out }), steps: [st] };
+    } catch {
+      return null;
+    }
+  };
+  // أفضل كتاب لمادة → دليل الكتب مباشرة
+  if (/كتاب|أفضل|أحسن/.test(m)) {
+    const s = findSubject(m);
+    if (s) return run("book_guide", { subject: s });
+  }
+  // محتوى البنك
+  if (/البنك|عندك إيه|إيه عندك|كم سؤال|إحصا/.test(m)) {
+    return run("bank_stats", { subject: findSubject(m) ?? undefined });
+  }
+  // الحضور
+  if (/حضور|الغياب|غاب|نسبة الحضور/.test(m) && !/طالب/.test(m)) {
+    return run("attendance_summary", {});
+  }
+  // قائمة الامتحانات
+  if (/امتحاناتي|اعرض الامتحانات|الامتحانات الموجودة|قائمة الامتحانات/.test(m)) {
+    return run("list_exams", {});
+  }
+  // إنشاء امتحان بصيغة مباشرة: "اعمل امتحان <مادة> [من] <عدد> [أسئلة]"
+  const mk = m.match(/اعمل|أنشئ|انشئ/);
+  if (mk && /امتحان|اختبار/.test(m)) {
+    const subj = findSubject(m);
+    const numM = m.match(/(\d+)\s*(سؤال|أسئلة|اسئلة)?/);
+    if (subj) {
+      const out = await (async () => {
+        const { TOOL_IMPLS } = await import("@/mastra/tool-impls");
+        try {
+          const r = await TOOL_IMPLS.create_exam(admin, tid, {
+            title: `امتحان ${subj}`, subject: subj, count: numM ? Number(numM[1]) : 5,
+          }, { keys: [] });
+          if ((r as any)?.error) return null;
+          const st = { tool: "create_exam", ok: true };
+          try { onStep?.(st); } catch {}
+          return { text: fallbackSummary({ tool: "create_exam", out: r }), steps: [st] };
+        } catch { return null; }
+      })();
+      if (out) return out;
+    }
+  }
+  return null;
 }
 
 function oaiTools(): unknown[] {
@@ -177,9 +251,11 @@ async function openaiLoop(
   const timeoutMs = Number(process.env.AGENT_LLM_TIMEOUT_MS ?? 90000) || 90000;
   const userText = history.filter((h) => h.role === "user").map((h) => h.text).join(" ").slice(-500);
   const tools = pickTools(userText);
+  // النماذج المحلية الصغيرة: سياق مخفف (أسرع بكثير على CPU)
+  const isLocal = /localhost|127\.0\.0\.1/.test(base);
   const messages: any[] = [
-    { role: "system", content: SYSTEM },
-    ...history.slice(-6).map((h) => ({ role: h.role, content: h.text.slice(0, 1000) })),
+    { role: "system", content: isLocal ? SYSTEM_SLIM : SYSTEM },
+    ...(isLocal ? history.slice(-2).map((h) => ({ role: h.role, content: h.text.slice(0, 400) })) : history.slice(-6).map((h) => ({ role: h.role, content: h.text.slice(0, 1000) }))),
   ];
   const steps: { tool: string; ok: boolean }[] = [];
   let lastResult: { tool: string; out: unknown } | null = null;
@@ -349,6 +425,11 @@ export async function runAgent(
   onStep?: (s: { tool: string; ok: boolean }) => void
 ): Promise<{ text: string; steps: { tool: string; ok: boolean }[] }> {
   const keys = visionChain(tenantKey, tenantKey2);
+  // 0) المسار المباشر الحتمي أولاً: فوري ومجاني وبلا أخطاء هلوسة
+  try {
+    const direct = await directAnswer(admin, tid, history.filter((h) => h.role === "user").map((h) => h.text).join(" ").slice(-500), onStep);
+    if (direct) return direct;
+  } catch {}
   // 1) المستضاف ذاتياً (vLLM/Ollama) إن ضُبط — الاستقلال أولاً
   if (process.env.AGENT_LLM_URL) {
     const selfHosted = await openaiLoop(admin, tid, history, keys, onStep);
