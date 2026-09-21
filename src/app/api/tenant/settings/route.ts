@@ -41,6 +41,21 @@ export async function PATCH(req: Request) {
     }
     patch.pay_numbers = pn;
   }
+  // رابط المنصة العام (slug مخصص): حروف لاتينية صغيرة وأرقام وشرطات — فريد ولا يتغير إلا هنا
+  if (typeof body.slug !== "undefined") {
+    const sl = String(body.slug ?? "").trim().toLowerCase();
+    if (!/^[a-z0-9][a-z0-9-]{2,29}$/.test(sl)) {
+      return NextResponse.json({ ok: false, error: "bad_slug", message: "الرابط 3-30 حرفًا: حروف إنجليزية صغيرة وأرقام وشرطات." }, { status: 400 });
+    }
+    const admin0 = adminClient();
+    const { data: taken } = await admin0.from("tenants").select("id").eq("slug", sl).neq("id", res.ctx.tenantId).limit(1);
+    if (taken?.length) {
+      return NextResponse.json({ ok: false, error: "slug_taken", message: "هذا الرابط محجوز — اختر غيره." }, { status: 400 });
+    }
+    const { error: slugErr } = await admin0.from("tenants").update({ slug: sl }).eq("id", res.ctx.tenantId);
+    if (slugErr) return NextResponse.json({ ok: false, error: "slug_failed" }, { status: 500 });
+    patch._slug = sl;
+  }
   // ثيم صفحة المعلم العامة: default | dark | minimal
   if (typeof body.theme !== "undefined") {
     const th = String(body.theme ?? "");
@@ -69,11 +84,12 @@ export async function PATCH(req: Request) {
     .select("settings")
     .eq("id", res.ctx.tenantId)
     .single();
-  const settings = { ...(((t?.settings as any) ?? {}) as object), ...patch };
+  const { _slug, ...settingsPatch } = patch as Record<string, unknown>;
+  const settings = { ...(((t?.settings as any) ?? {}) as object), ...settingsPatch };
   const { error } = await admin
     .from("tenants")
     .update({ settings })
     .eq("id", res.ctx.tenantId);
   if (error) return dbFail("tenant-settings", error);
-  return NextResponse.json({ ok: true, settings: patch });
+  return NextResponse.json({ ok: true, settings: { ...settingsPatch, ...(_slug ? { slug: _slug } : {}) } });
 }

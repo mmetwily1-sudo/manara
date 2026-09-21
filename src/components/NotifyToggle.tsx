@@ -67,6 +67,43 @@ export function NotifyToggle() {
   );
 }
 
+/** رابط المنصة العام المخصص (slug ثابت باختيارك — ينهي مشكلة تغير الروابط) */
+export function SlugForm({ current }: { current: string }) {
+  const [slug, setSlug] = useState(current);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState("");
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true); setMsg("");
+    try {
+      const r = await fetch("/api/tenant/settings", {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug: slug.trim().toLowerCase() }),
+      });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) {
+        setSlug(j.settings.slug);
+        setMsg("تم تثبيت رابطك ✅ — شاركه بثقة، لن يتغير بعد اليوم.");
+      } else setMsg(j?.message ?? "فشل الحفظ.");
+    } catch { setMsg("تعذر الاتصال."); }
+    finally { setSaving(false); }
+  }
+  return (
+    <form onSubmit={save} className="space-y-2">
+      <div className="text-small font-bold">رابط منصتك العام 🔗</div>
+      <div className="flex items-center gap-2" dir="ltr">
+        <span className="text-xs text-slate-400">manara.app/</span>
+        <input value={slug} onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+          placeholder="mohamed-physics" dir="ltr"
+          className="w-full rounded-xl border border-slate-200 px-4 py-2 text-left text-small outline-none focus:border-primary" />
+      </div>
+      <p className="text-xs text-slate-500">حروف إنجليزية صغيرة وأرقام وشرطات (3-30). اختر اسمًا يمثل سنترك — ثابت دائمًا.</p>
+      <button className="btn-primary !py-2 text-small" disabled={saving}>{saving ? "جاري الحفظ..." : "تثبيت الرابط"}</button>
+      {msg && <span className="block text-xs font-bold text-primary">{msg}</span>}
+    </form>
+  );
+}
+
 /** ثيم صفحة المعلم العامة (default/dark/minimal) */
 export function ThemeForm() {
   const [theme, setTheme] = useState("default");

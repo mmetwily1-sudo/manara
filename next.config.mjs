@@ -5,6 +5,13 @@ const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 const nextConfig = {
   reactStrictMode: true,
+  async redirects() {
+    return [
+      // صفحة المساعد القديمة أُدمجت في الودجت العائم — لا 404 للروابط المحفوظة
+      { source: "/dashboard/agent", destination: "/dashboard", permanent: false },
+      { source: "/dashboard/agent/:path*", destination: "/dashboard", permanent: false },
+    ];
+  },
   ...(basePath ? { basePath, assetPrefix: basePath } : {}),
   ...(isExport ? { output: "export", images: { unoptimized: true } } : {
     images: {
