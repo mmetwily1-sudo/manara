@@ -125,11 +125,91 @@ export async function reviewExam(admin: any, tid: string, args: { exam_id?: stri
   return { total: rows.length, clean: issues.length === 0, issues: issues.slice(0, 15) };
 }
 
-export const TOOL_IMPLS: Record<string, (admin: any, tid: string, args: Record<string, unknown>) => Promise<unknown>> = {
+export type ToolCtx = { keys: string[] };
+
+export async function generateDrafts(
+  admin: any, tid: string, args: { subject: string; count?: number }, ctx?: ToolCtx
+): Promise<unknown> {
+  const subject = String(args.subject ?? "").trim().slice(0, 60);
+  if (subject.length < 2) return { error: "need_subject", message: "حدد المادة أولاً" };
+  const count = Math.min(10, Math.max(1, Math.floor(Number(args.count ?? 5)) || 5));
+  const keys = ctx?.keys ?? [];
+  if (!keys.length) return { error: "no_key" };
+
+  // سياق المنهج للتأليف المرجعي
+  let lessons: { lesson_title: string; code: string }[] = [];
+  try {
+    const { data } = await admin.from("curriculum_lessons").select("lesson_title,code")
+      .ilike("subject", `%${subject}%`).limit(30);
+    lessons = ((data ?? []) as any[]).map((l) => ({ lesson_title: l.lesson_title, code: l.code }));
+  } catch {}
+
+  const lessonCtx = lessons.length
+    ? "الدروس المرجعية:\n" + lessons.map((l) => `- ${l.lesson_title} (${l.code})`).join("\n")
+    : "بدون قائمة دروس — ألف من المنهج المصري العام لهذه المادة.";
+  const prompt =
+    `You are an expert Egyptian curriculum teacher. Author ${count} original Arabic multiple-choice questions ` +
+    `for subject "${subject}" (Egyptian curriculum). ${lessonCtx}\n` +
+    `Rules: each question has EXACTLY 4 options, exactly one correct, varied difficulty, no duplicates. ` +
+    `Return ONLY a JSON array, no markdown: [{"q": "...", "options": ["..","..","..",".."], "answer": "exact correct option text", "lesson": "lesson code or empty"}]`;
+
+  let items: any[] = [];
+  let lastErr = "";
+  for (const key of keys) {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 90000);
+      const r = await fetch(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=" + key,
+        {
+          method: "POST", headers: { "Content-Type": "application/json" }, signal: ctrl.signal,
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.7, maxOutputTokens: 4000 },
+          }),
+        }
+      ).finally(() => clearTimeout(timer));
+      const j = await r.json().catch(() => null);
+      const text: string = j?.candidates?.[0]?.content?.parts?.map((p: any) => p.text ?? "").join("") ?? "";
+      if (r.ok && text) {
+        const clean = text.replace(/```json|```/g, "").trim();
+        const arr = JSON.parse(clean.slice(clean.indexOf("["), clean.lastIndexOf("]") + 1));
+        if (Array.isArray(arr) && arr.length) { items = arr; break; }
+      }
+      lastErr = String((j as any)?.error?.message ?? r.status).slice(0, 60);
+      if (r.status !== 429) break;
+    } catch { lastErr = "network"; break; }
+  }
+  if (!items.length) return { error: "gen_failed", message: lastErr || "تعذر التوليد" };
+
+  const { normOption } = await import("@/lib/vision");
+  const rows: Record<string, unknown>[] = [];
+  for (const it of items.slice(0, count)) {
+    const body = String(it?.q ?? "").trim().slice(0, 2000);
+    const opts = Array.isArray(it?.options) ? it.options.map((o: any) => String(o ?? "").trim()).filter(Boolean).slice(0, 4) : [];
+    if (body.length < 5 || opts.length !== 4) continue;
+    const ans = String(it?.answer ?? "").trim();
+    const match = ans ? (opts.find((o: string) => o === ans || normOption(o) === normOption(ans)) ?? null) : null;
+    rows.push({
+      tenant_id: tid, subject, qtype: "mcq", body, options: opts,
+      correct_answer: match, difficulty: 3, visibility: "private", status: "draft",
+      source: "teacher", source_detail: JSON.stringify({ ai_generated: true }),
+      lesson_code: String(it?.lesson ?? "").slice(0, 40) || null, marks: 1,
+    });
+  }
+  if (!rows.length) return { error: "gen_failed", message: "ناتج غير صالح" };
+  const { error } = await admin.from("questions").insert(rows);
+  if (error) return { error: "db" };
+  const withAns = rows.filter((r) => r.correct_answer).length;
+  return { drafts: rows.length, with_answers: withAns, subject, note: "بانتظار مراجعتك واعتمادها من بنك الأسئلة" };
+}
+
+export const TOOL_IMPLS: Record<string, (admin: any, tid: string, args: Record<string, unknown>, ctx?: ToolCtx) => Promise<unknown>> = {
   bank_stats: (a, t, x) => bankStats(a, t, x as { subject?: string }),
   create_exam: (a, t, x) => createExam(a, t, x as { title: string; subject?: string; count?: number }),
   list_exams: (a, t) => listExams(a, t),
   attendance_summary: (a, t) => attendanceSummary(a, t),
   student_progress: (a, t, x) => studentProgress(a, t, x as { name: string }),
   review_exam: (a, t, x) => reviewExam(a, t, x as { exam_id?: string }),
+  generate_drafts: (a, t, x, c) => generateDrafts(a, t, x as { subject: string; count?: number }, c),
 };

@@ -12,6 +12,7 @@ const SYSTEM = `أنت مساعد المعلم في منصة منارة (عرب�
 - لا تنشر أي امتحان أبداً — أنشئه غير منشور واذكر مراجعته ونشره يدوياً.
 - لا تخترع أسئلة أو أرقاماً — ابنِ من البنك فقط، وإن كان فارغاً قل ذلك بوضوح مع البديل.
 - attendance_summary وstudent_progress للأسئلة عن الحضور والطلاب.
+- عند فراغ البنك وطلب المعلم أسئلة: استدعِ generate_drafts لتأليف مسودات من المنهج (تُحفظ للمراجعة فقط)، ثم اطلب منه اعتمادها من بنك الأسئلة قبل بناء الامتحان.
 - أجب بالعربية الفصحى المبسطة بجمل قصيرة، واذكر ما فعلته بأدواتك.`;
 
 let storeInit: Promise<unknown> | null = null;
@@ -40,7 +41,7 @@ const memory = new Memory({
  * وكيل Mastra مربوط بمفتاح المستأجر (rotation خارجي) وسياق السنتر.
  * الذاكرة: Postgres (جداول Mastra) بمفتاح thread = محادثتنا وresource = السنتر:المستخدم.
  */
-export function getManaraAgent(apiKey: string, admin: any, tid: string) {
+export function getManaraAgent(apiKey: string, admin: any, tid: string, keys: string[] = []) {
   const google = createGoogleGenerativeAI({ apiKey });
   // cast مقصود: توافق إصدارات AI SDK بين مزود Google وMastra — أي عطل يسقط للمسار الاحتياطي
   const model = google("gemini-flash-latest") as any;
@@ -49,7 +50,7 @@ export function getManaraAgent(apiKey: string, admin: any, tid: string) {
     name: "مساعد منارة",
     instructions: SYSTEM,
     model,
-    tools: buildManaraTools(admin, tid),
+    tools: buildManaraTools(admin, tid, keys.length ? keys : [apiKey]),
     memory,
   });
 }

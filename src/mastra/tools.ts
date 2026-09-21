@@ -6,7 +6,7 @@ import { TOOL_IMPLS } from "./tool-impls";
  * أدوات وكيل منارة بصيغة Mastra (Zod) — نفس التنفيذ في tool-impls.
  * تُبنى لكل طلب مع سياق السنتر (admin, tid) المربوط بالـ closure.
  */
-export function buildManaraTools(admin: any, tid: string) {
+export function buildManaraTools(admin: any, tid: string, keys: string[] = []) {
   const wrap = (
     id: string, description: string, schema: z.ZodTypeAny,
     run: (args: Record<string, unknown>) => Promise<unknown>
@@ -64,6 +64,15 @@ export function buildManaraTools(admin: any, tid: string) {
       "مراجعة امتحان (مدقق ثانٍ): نص ناقص/خيارات/إجابة/تكرار. راجعه بعد كل إنشاء.",
       z.object({ exam_id: z.string().optional().describe("المعرف — الأحدث إن ترك فارغاً") }),
       (args) => TOOL_IMPLS.review_exam(admin, tid, args)
+    ),
+    generate_drafts: wrap(
+      "generate_drafts",
+      "تأليف مسودات أسئلة جديدة من المنهج عند فراغ البنك (تُحفظ للمراجعة البشرية فقط).",
+      z.object({
+        subject: z.string().describe("المادة"),
+        count: z.number().min(1).max(10).optional().describe("العدد (افتراضي 5)"),
+      }),
+      (args) => TOOL_IMPLS.generate_drafts(admin, tid, args, { keys })
     ),
   };
 }

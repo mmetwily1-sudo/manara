@@ -66,7 +66,7 @@ export async function POST(req: Request) {
         for (let ki = 0; ki < keys.length && !usedMastra && text.length === 0 && steps.length === 0; ki++) {
           try {
             const { getManaraAgent } = await import("@/mastra/agent");
-            const agent = getManaraAgent(keys[ki], admin, tid);
+            const agent = getManaraAgent(keys[ki], admin, tid, keys);
             const full: any = await agent.stream(message, {
               resourceId: `${tid}:${uid}`,
               threadId,
