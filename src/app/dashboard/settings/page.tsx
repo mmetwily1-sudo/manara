@@ -24,6 +24,14 @@ export default async function SettingsPage() {
             <dd className="font-mono text-xs font-bold" dir="ltr">{t.slug}.manara.app</dd>
           </div>
           <div className="flex items-center justify-between gap-3">
+            <dt className="text-slate-500">موقعك العام</dt>
+            <dd>
+              <a href={`/${t.slug}`} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-primary-light px-3 py-1.5 text-xs font-bold text-primary transition hover:bg-primary hover:text-white">
+                عرض موقعي 🌐
+              </a>
+            </dd>
+          </div>
+          <div className="flex items-center justify-between gap-3">
             <dt className="text-slate-500">الباقة</dt>
             <dd className="font-bold">{t.plan}</dd>
           </div>
