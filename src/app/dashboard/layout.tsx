@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getTenantInfoDB } from "@/lib/data";
 import { getSessionUser, adminClient } from "@/lib/server-auth";
 import { AuthGate, SignOutButton } from "@/components/AuthGate";
+import { AgentWidget } from "@/components/AgentWidget";
 
 const nav = [
   { href: "/dashboard", label: "الرئيسية", key: "01" },
@@ -20,7 +21,6 @@ const navMore = [
   { href: "/dashboard/omr", label: "بابل شيت OMR", key: "08c" },
   { href: "/dashboard/announcements", label: "الإعلانات", key: "08d" },
   { href: "/dashboard/store", label: "المتجر", key: "08e" },
-  { href: "/dashboard/agent", label: "المساعد 🤖", key: "08f" },
   { href: "/dashboard/certificates", label: "التقارير", key: "09" },
   { href: "/dashboard/settings", label: "هويتي والإعدادات", key: "10" },
 ];
@@ -90,6 +90,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             </Link>
           ))}
         </nav>
+        <AgentWidget />
       </div>
     </AuthGate>
   );
