@@ -41,6 +41,14 @@ export async function PATCH(req: Request) {
     }
     patch.pay_numbers = pn;
   }
+  // ثيم صفحة المعلم العامة: default | dark | minimal
+  if (typeof body.theme !== "undefined") {
+    const th = String(body.theme ?? "");
+    if (!["default", "dark", "minimal"].includes(th)) {
+      return NextResponse.json({ ok: false, error: "bad_theme" }, { status: 400 });
+    }
+    patch.theme = th;
+  }
   // مفتاحا Gemini للسنتر (تفريغ مرئي دقيق + تناوب عند نفاد الحصة) — فارغ = مسح
   // ملاحظة: مفاتيح AI Studio تحتوي نقاطاً (AQ.xxx) لذا تُقبل [A-Za-z0-9_.~-]
   for (const f of ["vision_key", "vision_key_2"]) {

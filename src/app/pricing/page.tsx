@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { PayOnlineButton } from "@/components/PayOnlineButton";
 
 export const metadata: Metadata = {
   title: "الأسعار — منارة",
@@ -100,6 +101,7 @@ export default function PricingPage() {
               <Link href="/join" className={p.highlight ? "btn-primary w-full" : "btn-secondary w-full"}>
                 {p.cta}
               </Link>
+              <PayOnlineButton plan={p.monthly === 450 ? "starter" : p.monthly === 750 ? "pro" : "scale"} />
             </div>
           ))}
         </div>

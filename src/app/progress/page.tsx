@@ -15,6 +15,87 @@ type Progress = {
 
 const PAY_LABELS: Record<string, string> = { instapay: "انستاباي", wallet: "محفظة", fawry: "فوري" };
 
+function StoreCatalog() {
+  const [items, setItems] = useState<{ id: string; title: string; description: string | null; price: number; my_status: string | null; my_order_id: string | null }[] | null>(null);
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  async function load() {
+    try {
+      const r = await fetch("/api/store", { cache: "no-store" });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) setItems(j.products ?? []);
+    } catch {}
+  }
+  useEffect(() => { load(); }, []);
+  async function order(id: string) {
+    setBusy(id); setMsg("");
+    try {
+      const r = await fetch(`/api/store/${id}/order`, { method: "POST" });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) {
+        setMsg(j.status === "confirmed" ? "أصبح المنتج لك ✅ — حمّله الآن." : "تم إرسال طلبك — بانتظار تأكيد المعلم.");
+        load();
+      } else setMsg(j?.message ?? "فشل الطلب.");
+    } catch { setMsg("تعذر الاتصال."); }
+    finally { setBusy(null); }
+  }
+  async function download(id: string) {
+    try {
+      const r = await fetch(`/api/store/download/${id}`, { cache: "no-store" });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) window.open(j.url, "_blank", "noopener");
+      else setMsg(j?.message ?? "تعذر التحميل.");
+    } catch { setMsg("تعذر الاتصال."); }
+  }
+  if (!items?.length) return null;
+  return (
+    <section className="card space-y-3 p-5">
+      <h2 className="font-bold">متجر السنتر 🛍️</h2>
+      {msg && <p className="text-small font-bold text-primary">{msg}</p>}
+      <ul className="space-y-2">
+        {items.map((p) => (
+          <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 px-4 py-2.5 text-small">
+            <span><b>{p.title}</b> · {Number(p.price) <= 0 ? "مجاني" : `${p.price} جنيه`}</span>
+            {!p.my_status ? (
+              <button onClick={() => order(p.id)} disabled={busy === p.id} className="rounded-lg bg-primary px-3 py-1 text-xs font-bold text-white disabled:opacity-50">
+                {busy === p.id ? "..." : Number(p.price) <= 0 ? "احصل عليه" : "اطلب"}
+              </button>
+            ) : p.my_status === "confirmed" && p.my_order_id ? (
+              <button onClick={() => download(p.my_order_id!)} className="rounded-lg bg-success/10 px-3 py-1 text-xs font-bold text-success">تحميل ⬇️</button>
+            ) : p.my_status === "pending" ? (
+              <span className="text-xs font-bold text-warning">بانتظار التأكيد</span>
+            ) : (
+              <button onClick={() => order(p.id)} className="rounded-lg bg-primary-light px-3 py-1 text-xs font-bold text-primary">اطلب مجدداً</button>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function AnnouncementsFeed() {
+  const [items, setItems] = useState<{ id: string; group_name: string; body: string; created_at: string | null }[] | null>(null);
+  useEffect(() => {
+    fetch("/api/announcements", { cache: "no-store" })
+      .then((r) => r.json()).then((j) => { if (j?.ok) setItems((j.announcements ?? []).slice(0, 5)); }).catch(() => {});
+  }, []);
+  if (!items?.length) return null;
+  return (
+    <section className="card space-y-3 p-5">
+      <h2 className="font-bold">إعلانات السنتر 📢</h2>
+      <ul className="space-y-2">
+        {items.map((a) => (
+          <li key={a.id} className="rounded-xl bg-primary-light/50 px-4 py-2.5 text-small">
+            <div className="leading-relaxed">{a.body}</div>
+            <div className="mt-1 text-[11px] text-slate-500">{a.group_name}</div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 type Game = {
   me: { name: string; streak: number; activeDays: number; points: number; trophies: { code: string; name: string; icon: string; desc: string }[] };
   leaders: { name: string; points: number; me: boolean }[];
@@ -228,6 +309,8 @@ export default function ProgressPage() {
 
       <HomeworkSection />
       <GamificationSection />
+      <AnnouncementsFeed />
+      <StoreCatalog />
 
       <section className="card space-y-3 p-5">
         <h2 className="font-bold">نتائج الامتحانات 📝</h2>

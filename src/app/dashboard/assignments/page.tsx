@@ -12,6 +12,24 @@ type Submission = {
   feedback_text: string | null; status: string; submitted_at: string; file_urls: string[];
 };
 
+function FileLink({ path, label }: { path: string; label: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+  async function open(e: React.MouseEvent) {
+    e.preventDefault();
+    if (url) { window.open(url, "_blank", "noopener"); return; }
+    try {
+      const r = await fetch(`/api/files/sign?path=${encodeURIComponent(path)}`, { cache: "no-store" });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) { setUrl(j.url); window.open(j.url, "_blank", "noopener"); }
+    } catch {}
+  }
+  return (
+    <a href="#" onClick={open} className="rounded-lg bg-primary-light px-2.5 py-1 text-[11px] font-bold text-primary hover:underline">
+      📎 {label}
+    </a>
+  );
+}
+
 export default function AssignmentsPage() {
   const [list, setList] = useState<Assignment[] | null>(null);
   const [groups, setGroups] = useState<{ id: string; name: string }[]>([]);
@@ -160,6 +178,13 @@ export default function AssignmentsPage() {
                           </span>
                         </div>
                         <div className="mt-1 text-xs text-slate-500">سُلّم: {new Date(s.submitted_at).toLocaleString("ar-EG")} · {s.file_urls.length} ملفات</div>
+                        {s.file_urls.length > 0 && (
+                          <div className="mt-1 flex flex-wrap gap-1.5">
+                            {s.file_urls.map((f: string, i: number) => (
+                              <FileLink key={i} path={f} label={`ملف ${i + 1}`} />
+                            ))}
+                          </div>
+                        )}
                         <div className="mt-2 grid gap-2 sm:grid-cols-[100px_1fr_auto]">
                           <input value={g.score} onChange={(e) => setGrades((p) => ({ ...p, [k]: { ...g, score: e.target.value } }))}
                             placeholder="الدرجة" inputMode="decimal" className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-small outline-none" />

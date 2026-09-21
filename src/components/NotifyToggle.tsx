@@ -67,6 +67,38 @@ export function NotifyToggle() {
   );
 }
 
+/** ثيم صفحة المعلم العامة (default/dark/minimal) */
+export function ThemeForm() {
+  const [theme, setTheme] = useState("default");
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState("");
+  async function save(v: string) {
+    setTheme(v); setSaving(true); setMsg("");
+    try {
+      const r = await fetch("/api/tenant/settings", {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ theme: v }),
+      });
+      setMsg(r.ok ? "تم ✅" : "فشل الحفظ.");
+    } catch { setMsg("تعذر الاتصال."); }
+    finally { setSaving(false); }
+  }
+  return (
+    <div>
+      <div className="text-small font-bold">شكل صفحتك العامة 🎨</div>
+      <div className="mt-2 flex gap-2">
+        {[["default", "افتراضي"], ["dark", "داكن 🌙"], ["minimal", "بسيط"]].map(([v, l]) => (
+          <button key={v} onClick={() => save(v)} disabled={saving}
+            className={`rounded-xl border-2 px-4 py-2 text-small font-bold transition ${theme === v ? "border-primary bg-primary-light text-primary" : "border-slate-200 text-slate-500 hover:border-primary"}`}>
+            {l}
+          </button>
+        ))}
+      </div>
+      {msg && <span className="mt-1 block text-xs font-bold text-primary">{msg}</span>}
+    </div>
+  );
+}
+
 /** مفتاح التفريغ المرئي (Gemini مجاني) — يحوّل المسح لاستخراج دقيق */
 export function VisionKeyForm() {
   const [key, setKey] = useState("");
