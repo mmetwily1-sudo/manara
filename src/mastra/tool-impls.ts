@@ -238,6 +238,18 @@ export async function searchKnowledge(
     if (hits > 0) scored.push({ r, hits });
   }
   scored.sort((a, b) => b.hits - a.hits);
+  // حلقة التعلم الذاتي: لا نتائج → سجّل الفجوة ليحصدها المراقب لاحقاً
+  if (!scored.length) {
+    try {
+      const gq = top.join(" ").slice(0, 100);
+      const { data: g } = await admin.from("knowledge_gaps").select("id,hits").eq("query", gq).single();
+      if (g) {
+        await admin.from("knowledge_gaps").update({ hits: Number((g as any).hits ?? 0) + 1, updated_at: new Date().toISOString() }).eq("id", (g as any).id);
+      } else {
+        await admin.from("knowledge_gaps").insert({ query: gq, status: "open" });
+      }
+    } catch {}
+  }
   return scored.slice(0, 6).map((x) => ({
     kind: x.r.kind, title: x.r.title,
     body: String(x.r.body).slice(0, 500),
