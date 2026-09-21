@@ -20,6 +20,7 @@ const navMore = [
   { href: "/dashboard/omr", label: "بابل شيت OMR", key: "08c" },
   { href: "/dashboard/announcements", label: "الإعلانات", key: "08d" },
   { href: "/dashboard/store", label: "المتجر", key: "08e" },
+  { href: "/dashboard/agent", label: "المساعد 🤖", key: "08f" },
   { href: "/dashboard/certificates", label: "التقارير", key: "09" },
   { href: "/dashboard/settings", label: "هويتي والإعدادات", key: "10" },
 ];
