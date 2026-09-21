@@ -97,7 +97,14 @@ async function execTool(admin: any, tid: string, name: string, args: Record<stri
     const { data, error } = await q;
     if (error) return { error: "db" };
     const pool = ((data ?? []) as any[]).sort(() => Math.random() - 0.5).slice(0, count);
-    if (!pool.length) return { error: "empty_bank", message: "البنك فارغ لهذا الاختيار" };
+    if (!pool.length) {
+      // هل توجد مسودات غير معتمدة لنفس المادة؟ (توجيه عملي بدل الرفض الصامت)
+      let q2 = admin.from("questions").select("id", { count: "exact", head: true })
+        .eq("tenant_id", tid).eq("status", "draft");
+      if (args.subject) q2 = q2.ilike("subject", `%${String(args.subject).slice(0, 40)}%`);
+      const { count: drafts } = await q2;
+      return { error: "empty_bank", drafts: drafts ?? 0, subject: args.subject ?? null };
+    }
     const { data: ex, error: e2 } = await admin.from("exams").insert({
       tenant_id: tid, title, duration_minutes: 30, total_marks: 0, is_published: false,
     }).select("id").single();
@@ -135,6 +142,17 @@ async function execTool(admin: any, tid: string, name: string, args: Record<stri
 /** ملخص حتمي من آخر نتيجة أداة — يُستخدم عند تعثر الصياغة اللغوية */
 function fallbackSummary(last: { tool: string; out: unknown } | null): string {
   const o = (last?.out ?? {}) as any;
+  if (last?.tool === "create_exam" && o.error === "empty_bank") {
+    const subj = o.subject ? ` لمادة «${o.subject}»` : "";
+    const subjName = o.subject ? ` ${o.subject}` : "";
+    const draftHint = o.drafts > 0
+      ? ` عندك ${o.drafts} مسودات${subjName} بانتظار الاعتماد في بنك الأسئلة — اعتمدها أولاً ثم اطلب الامتحان.`
+      : ` الحل: امسح ورقة${subjName || " المادة"} بالكاميرا من بنك الأسئلة وسأتولى الباقي.`;
+    return `لا توجد أسئلة معتمدة${subj} في بنكك.${draftHint}`;
+  }
+  if (last?.tool === "create_exam" && o.error) {
+    return "تعذر إنشاء الامتحان لعطل تقني — حاول بعد قليل، وإن تكرر أخبر الدعم.";
+  }
   if (last?.tool === "create_exam" && o.exam_id) {
     return `تم إنشاء امتحان «${o.title}» (${o.count} أسئلة، ${o.total_marks} درجات) — غير منشور. راجعه من صفحة الامتحانات ثم انشره.`;
   }
