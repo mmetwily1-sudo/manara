@@ -13,7 +13,45 @@ export default function AgentPage() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [listening, setListening] = useState(false);
+  const [speaking, setSpeaking] = useState<string | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
+
+  // إدخال صوتي: Web Speech API (مجاني، بلا مفاتيح — يعمل على Chrome/Edge)
+  function toggleListen() {
+    const SR: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) { setErr("المتصفح لا يدعم الإدخال الصوتي — استخدم Chrome."); return; }
+    if (listening) return;
+    try {
+      const rec = new SR();
+      rec.lang = "ar-EG";
+      rec.interimResults = false;
+      rec.maxAlternatives = 1;
+      setListening(true);
+      rec.onresult = (e: any) => {
+        const t = e.results?.[0]?.[0]?.transcript ?? "";
+        if (t) setInput((p) => (p ? p + " " : "") + t);
+      };
+      rec.onend = () => setListening(false);
+      rec.onerror = () => setListening(false);
+      rec.start();
+    } catch { setListening(false); }
+  }
+
+  // قراءة صوتية للرد: speechSynthesis (مجاني، بلا مفاتيح)
+  function speak(key: string, text: string) {
+    try {
+      const synth = window.speechSynthesis;
+      if (!synth) { setErr("المتصفح لا يدعم القراءة الصوتية."); return; }
+      if (speaking === key) { synth.cancel(); setSpeaking(null); return; }
+      synth.cancel();
+      const u = new SpeechSynthesisUtterance(text.slice(0, 600));
+      u.lang = "ar-SA";
+      u.onend = () => setSpeaking(null);
+      setSpeaking(key);
+      synth.speak(u);
+    } catch {}
+  }
 
   async function loadThreads() {
     try {
@@ -62,6 +100,8 @@ export default function AgentPage() {
           const j = JSON.parse(line.slice(5)) as any;
           if (j.type === "thread" && j.thread_id && !threadId) {
             setThreadId(j.thread_id); loadThreads();
+          } else if (j.type === "token" && typeof j.text === "string") {
+            patch((m) => ({ ...m, text: m.text + j.text }));
           } else if (j.type === "step") {
             patch((m) => ({ ...m, steps: [...(m.steps ?? []), { tool: j.tool, ok: j.ok }] }));
           } else if (j.type === "done") {
@@ -108,7 +148,15 @@ export default function AgentPage() {
           )}
           {msgs.map((m, i) => (
             <div key={i} className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-small leading-relaxed ${m.role === "user" ? "mr-auto bg-primary text-white" : "bg-slate-100"}`}>
-              <div className="whitespace-pre-wrap">{m.text || (m.role === "assistant" ? "…" : "")}</div>
+              <div className="whitespace-pre-wrap">
+                {m.role === "assistant" && m.text ? (
+                  <button onClick={() => speak(`${i}`, m.text)} title="استماع للرد"
+                    className="float-left ml-2 rounded-full bg-white px-2 py-0.5 text-xs shadow-sm transition hover:scale-110">
+                    {speaking === `${i}` ? "⏹️" : "🔊"}
+                  </button>
+                ) : null}
+                {m.text || (m.role === "assistant" ? "…" : "")}
+              </div>
               {(m.steps ?? []).length > 0 && (
                 <div className="mt-1.5 flex flex-wrap gap-1">
                   {(m.steps ?? []).map((s, k) => (
@@ -135,7 +183,11 @@ export default function AgentPage() {
         </div>
         {err && <p className="pb-2 text-small font-bold text-danger">{err}</p>}
         <form onSubmit={send} className="flex gap-2 border-t border-slate-100 pt-3">
-          <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="اكتب طلبك..."
+          <button type="button" onClick={toggleListen} title="إدخال صوتي"
+            className={`shrink-0 rounded-xl border-2 px-3 text-lg transition ${listening ? "animate-pulse border-danger bg-danger/10" : "border-slate-200 hover:border-primary"}`}>
+            {listening ? "🔴" : "🎤"}
+          </button>
+          <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="اكتب طلبك... أو تحدث 🎤"
             className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:border-primary" />
           <button className="btn-primary" disabled={busy || !input.trim()}>{busy ? "..." : "إرسال"}</button>
         </form>

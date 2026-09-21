@@ -47,22 +47,105 @@ export async function POST(req: Request) {
     history.push({ role: "user", text: message });
 
     const { data: trow } = await admin.from("tenants").select("settings").eq("id", tid).single();
+    const { visionChain } = await import("@/lib/vision");
+    const keys = visionChain(
+      (trow as any)?.settings?.vision_key ?? null,
+      (trow as any)?.settings?.vision_key_2 ?? null
+    );
     const stream = new ReadableStream({
       async start(controller) {
         const enc = new TextEncoder();
         const send = (o: unknown) => controller.enqueue(enc.encode(`data: ${JSON.stringify(o)}\n\n`));
         send({ type: "thread", thread_id: threadId });
-        const out = await runAgent(
-          admin, tid, history,
-          (trow as any)?.settings?.vision_key ?? null,
-          (trow as any)?.settings?.vision_key_2 ?? null,
-          (s) => send({ type: "step", ...s })
-        );
+        const steps: { tool: string; ok: boolean }[] = [];
+        let text = "";
+        let usedMastra = false;
+        let via: "mastra" | "raw" = "raw";
+        // المسار الأول: Mastra (بث حي + ذاكرة) — تناوب المفاتيح عند الحصة، فالسقوط للraw
+        // (التناوب فقط ما لم يُرسل شيء بعد — تفادياً لتكرار المحتوى)
+        for (let ki = 0; ki < keys.length && !usedMastra && text.length === 0 && steps.length === 0; ki++) {
+          try {
+            const { getManaraAgent } = await import("@/mastra/agent");
+            const agent = getManaraAgent(keys[ki], admin, tid);
+            const full: any = await agent.stream(message, {
+              resourceId: `${tid}:${uid}`,
+              threadId,
+              maxSteps: 5,
+            } as any);
+            const seenTypes: string[] = [];
+            const feed = full?.fullStream ?? full?.textStream ?? [];
+            for await (const chunk of feed) {
+              const c = chunk as any;
+              const t = String(c?.type ?? "unknown");
+              if (seenTypes.indexOf(t) < 0) seenTypes.push(t);
+              const txt: string =
+                (typeof c.textDelta === "string" && c.textDelta) ||
+                (typeof c.delta === "string" && c.delta) ||
+                (typeof c.text === "string" && t !== "tool-call" ? c.text : "") ||
+                "";
+              if (txt) {
+                text += txt;
+                send({ type: "token", text: txt });
+              }
+              if (t === "error") {
+                let em = "";
+                try {
+                  const p = c.payload;
+                  em = String(
+                    (p && (p.message || p.error)) ??
+                    c.error?.message ?? c.message ?? c.error ?? JSON.stringify(p ?? "").slice(0, 200) ?? "unknown"
+                  ).slice(0, 250);
+                } catch { em = "unreadable"; }
+                (controller as any).__shapes = (((controller as any).__shapes ?? "") + "|err:" + em).slice(0, 400);
+              }
+              const toolName = String(c.toolName ?? c.name ?? c.tool ?? "");
+              if (/tool[-_]?call/i.test(t) && toolName) {
+                steps.push({ tool: toolName, ok: true });
+                send({ type: "step", tool: toolName, ok: true });
+              } else if (/tool[-_ ]?(result|error|output)/i.test(t)) {
+                const failed = /error/i.test(t) || c.isError === true;
+                for (let si = steps.length - 1; si >= 0; si--) {
+                  if (steps[si].tool === toolName) { if (failed) steps[si].ok = false; break; }
+                }
+              }
+            }
+            if (!text && typeof full?.text !== "undefined") {
+              try {
+                const fin = await full.text;
+                if (typeof fin === "string" && fin.trim()) text = fin;
+              } catch {}
+            }
+            (controller as any).__shapes = (((controller as any).__shapes ?? "") + "|seen:" + seenTypes.join(",")).slice(0, 500);
+            usedMastra = text.length > 0 || steps.length > 0;
+            if (usedMastra) via = "mastra";
+          } catch (e: any) {
+            try {
+              const msg = String(e?.message ?? e).slice(0, 300);
+              console.error("[agent:mastra]", msg);
+              (controller as any).__mastraErr = (((controller as any).__mastraErr ?? "") + "|throw:" + msg).slice(0, 300);
+            } catch {}
+          }
+        }
+        // المسار الاحتياطي: الحلقة الخام المختبرة
+        if (!usedMastra) {
+          const out = await runAgent(
+            admin, tid, history,
+            (trow as any)?.settings?.vision_key ?? null,
+            (trow as any)?.settings?.vision_key_2 ?? null,
+            (s) => {
+              steps.push(s);
+              send({ type: "step", ...s });
+            }
+          );
+          text = out.text;
+          steps.length = 0;
+          steps.push(...out.steps);
+        }
         await admin.from("agent_messages").insert([
           { tenant_id: tid, thread_id: threadId, role: "user", content: message },
-          { tenant_id: tid, thread_id: threadId, role: "assistant", content: out.text },
+          { tenant_id: tid, thread_id: threadId, role: "assistant", content: text },
         ]);
-        send({ type: "done", thread_id: threadId, text: out.text, steps: out.steps, suggest: followUps(out.steps) });
+        send({ type: "done", thread_id: threadId, text, steps, suggest: followUps(steps), via, debug: [((controller as any).__mastraErr ?? ""), ((controller as any).__shapes ?? "")].filter(Boolean).join(" | ") || null });
         controller.close();
       },
     });
