@@ -26,7 +26,7 @@ export async function GET() {
 
   const { data: exams } = await sb
     .from("exams")
-    .select("id,title,duration_minutes,total_marks,is_published,created_at")
+    .select("id,title,duration_minutes,total_marks,is_published,created_at,require_code")
     .eq("tenant_id", urow.tenant_id)
     .order("created_at", { ascending: false })
     .limit(50);

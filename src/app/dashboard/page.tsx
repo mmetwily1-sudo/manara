@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getKpis, getGroups, getEarlyWarning, getFeed } from "@/lib/data";
+import ReferralCard from "@/components/ReferralCard";
 
 export default async function DashboardHome() {
   const [kpis, groups, warnings, feed] = await Promise.all([getKpis(), getGroups(), getEarlyWarning(), getFeed()]);
@@ -35,6 +36,8 @@ export default async function DashboardHome() {
           </div>
         ))}
       </section>
+
+      <ReferralCard />
 
       {/* إنذار مبكر */}
       {warnings.length > 0 && (

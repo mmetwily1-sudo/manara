@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import ExamCodesManager from "@/components/ExamCodesManager";
 
 type ExamRow = {
   id: string; title: string; duration_minutes: number; total_marks: number;
-  is_published: boolean; questions_count: number; attempts_count: number; pending_drafts?: number;
+  is_published: boolean; require_code?: boolean; questions_count: number; attempts_count: number; pending_drafts?: number;
 };
 type AuditReport = {
   total: number; fixed: string[];
@@ -178,6 +179,21 @@ export default function ExamsListPage() {
       setNotice({ kind: "err", text: "انتهت مهلة الاتصال — تحقق من الإنترنت وحاول مجدداً. لو تكرر، قلل عدد الأسئلة." });
     } finally {
       setGenerating(false);
+    }
+  }
+
+  async function onRequireCode(id: string, v: boolean) {
+    try {
+      const { r, j } = await apiFetch(`/api/exams/${id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ require_code: v }),
+      });
+      if (r.ok && j?.ok) {
+        setExams((prev) => (prev ?? []).map((e) => (e.id === id ? { ...e, require_code: v } : e)));
+        setNotice({ kind: "ok", text: v ? "تم تفعيل الدخول بالأكواد — ولّد أكواد الطلاب من إدارة الأكواد." : "تم إيقاف الدخول بالأكواد." });
+      } else setNotice({ kind: "err", text: "فشل التحديث." });
+    } catch {
+      setNotice({ kind: "err", text: "تعذر الاتصال بالخادم." });
     }
   }
 
@@ -423,6 +439,9 @@ export default function ExamsListPage() {
                     ) : (
                       <span className="rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-bold text-success">منشور</span>
                     )}
+                    {ex.require_code && (
+                      <span className="rounded-full bg-primary-light px-2 py-0.5 text-[11px] font-bold text-primary">🔐 بالأكواد</span>
+                    )}
                   </div>
                   <div className="mt-1 text-xs text-slate-500">
                     {ex.questions_count} أسئلة · {ex.duration_minutes} دقيقة
@@ -462,6 +481,7 @@ export default function ExamsListPage() {
                   </button>
                 </div>
               </div>
+              <ExamCodesManager examId={ex.id} required={!!ex.require_code} onToggleRequire={(v) => onRequireCode(ex.id, v)} />
               {audits[ex.id] && (
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed">
                   <div className="font-bold">نتيجة التدقيق ({audits[ex.id].total} أسئلة، تحقق لغوي: {audits[ex.id].llm.checked}

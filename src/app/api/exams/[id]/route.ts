@@ -28,13 +28,13 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   // الامتحان نفسه (البحث بالمعرف أولاً)
   const { data: exam } = await sb
     .from("exams")
-    .select("id,tenant_id,title,duration_minutes,total_marks,is_published")
+    .select("id,tenant_id,title,duration_minutes,total_marks,is_published,require_code")
     .eq("id", params.id)
     .single();
   if (!exam) return NextResponse.json({ ok: false, error: "exam_not_found" }, { status: 404 });
 
   // صلاحية: يجب أن ينتمي المستخدم لنفس السنتر (أو يُسجَّل تلقائياً عند التسليم)
-  const { data: urow } = await sb.from("users").select("tenant_id,role").eq("auth_user_id", user.id).single();
+  const { data: urow } = await sb.from("users").select("id,tenant_id,role").eq("auth_user_id", user.id).single();
   if (urow && urow.tenant_id !== exam.tenant_id) {
     return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
   }
@@ -44,6 +44,14 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   }
   if (urow && (urow as any).role !== "teacher_admin" && !(exam as any).is_published) {
     return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  }
+  // بوابة الكود: الطالب يحتاج جلسة مفعّلة سارية (المعلم يستعرض بحرية)
+  if ((exam as any).require_code && urow && (urow as any).role !== "teacher_admin") {
+    const { data: sess } = await sb.from("exam_codes").select("id,expires_at")
+      .eq("exam_id", params.id).eq("student_id", (urow as any).id).eq("status", "started").single();
+    if (!sess || ((sess as any).expires_at && new Date((sess as any).expires_at) < new Date())) {
+      return NextResponse.json({ ok: false, error: "code_required" }, { status: 403 });
+    }
   }
 
   const { data: eqs } = await sb
@@ -86,6 +94,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   if (typeof body.duration_minutes === "number" && body.duration_minutes >= 1 && body.duration_minutes <= 180) {
     patch.duration_minutes = Math.floor(body.duration_minutes);
   }
+  if (typeof body.require_code === "boolean") patch.require_code = body.require_code;
   if (!Object.keys(patch).length) return NextResponse.json({ ok: false, error: "nothing_to_update" }, { status: 400 });
 
   const { data: exam } = await admin.from("exams").select("id").eq("id", params.id).eq("tenant_id", res.ctx.tenantId).single();

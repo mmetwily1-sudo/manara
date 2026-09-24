@@ -4,6 +4,10 @@
     {
       "path": "/api/knowledge/refresh",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/referrals/settle",
+      "schedule": "30 6 * * *"
     }
   ]
 }

@@ -32,6 +32,15 @@ export async function POST(req: Request) {
       txn_id: String(obj.id ?? ""),
     }).eq("id", invId);
     if (success) {
+      // الإحالة: أول فاتورة مدفوعة للمُحال → qualified (المكافأة بعد فترة الحماية عبر settle)
+      try {
+        const { count: priorPaid } = await admin.from("platform_payments").select("id", { count: "exact", head: true })
+          .eq("tenant_id", (inv as any).tenant_id).eq("status", "paid").neq("id", invId);
+        if (!priorPaid) {
+          await admin.from("referrals").update({ status: "qualified", qualified_at: new Date().toISOString() })
+            .eq("referee_tenant_id", (inv as any).tenant_id).eq("status", "pending");
+        }
+      } catch {}
       const { data: t } = await admin.from("tenants").select("settings").eq("id", (inv as any).tenant_id).single();
       const paidUntil = new Date(Date.now() + Number((inv as any).months || 1) * 30 * 24 * 60 * 60 * 1000).toISOString();
       await admin.from("tenants").update({

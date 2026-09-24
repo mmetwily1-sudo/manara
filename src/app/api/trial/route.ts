@@ -264,6 +264,25 @@ export async function POST(req: Request) {
           settings: { owner_phone: phone, owner_auth_id: au.user.id },
         }).eq("id", data.id);
 
+        // الإحالة: اربط السنتر الجديد بكود الداعي (pending — لا مكافأة قبل أول دفعة)
+        let referredBy: string | undefined;
+        const refCode = String(body.ref ?? "").trim().toUpperCase().slice(0, 24);
+        if (refCode && !isDemo) {
+          try {
+            const { data: refRow } = await admin.from("referrals").select("referrer_tenant_id")
+              .eq("code", refCode).is("referee_tenant_id", null).limit(1).single();
+            const rid = (refRow as any)?.referrer_tenant_id as string | undefined;
+            if (rid && rid !== data.id) {
+              const { phoneHash } = await import("@/lib/referral");
+              const { error: refErr } = await admin.from("referrals").insert({
+                referrer_tenant_id: rid, code: refCode,
+                referee_tenant_id: data.id, referee_phone_hash: phoneHash(phone),
+              });
+              if (!refErr) referredBy = refCode;
+            }
+          } catch {}
+        }
+
         // الجولة الفورية: ازرع محتوى تجريبياً وعلّم السنتر كتجريبي
         let seed: { questions: number; links: number; step: string } | undefined;
         if (isDemo) seed = await seedDemo(admin, data.id);
@@ -275,6 +294,7 @@ export async function POST(req: Request) {
           email: loginEmail,
           demo: isDemo || undefined,
           seed,
+          referredBy,
         });
       } catch (e: any) {
         console.error("trial failed:", e?.message);

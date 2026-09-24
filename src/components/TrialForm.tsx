@@ -28,6 +28,15 @@ export function TrialForm() {
   const [authErr, setAuthErr] = useState("");
   const [formError, setFormError] = useState("");
   const [captchaToken, setCaptchaToken] = useState("");
+  const [refCode, setRefCode] = useState<string | null>(null);
+
+  // كود الإحالة من الرابط (?ref=CODE)
+  useEffect(() => {
+    try {
+      const q = new URLSearchParams(window.location.search).get("ref");
+      if (q && q.trim()) setRefCode(q.trim().toUpperCase().slice(0, 24));
+    } catch {}
+  }, []);
 
   async function enterDashboard() {
     if (!creds) return;
@@ -94,7 +103,7 @@ export function TrialForm() {
       const res = await fetch("/api/trial", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ centerName, phone, email, password, captchaToken }),
+        body: JSON.stringify({ centerName, phone, email, password, captchaToken, ref: refCode }),
       });
       const data = await res.json().catch(() => null);
       if (res.ok && data?.ok && data.mode === "live" && data.slug) {
@@ -202,6 +211,11 @@ export function TrialForm() {
 
   return (
     <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
+      {refCode && phase !== "done-live" && (
+        <div className="rounded-xl border border-success/30 bg-success/5 px-4 py-2.5 text-small font-bold text-success">
+          🎁 مسجّل بدعوة — كود الإحالة <span className="font-mono" dir="ltr">{refCode}</span>
+        </div>
+      )}
       <div>
         <label htmlFor="centerName" className="mb-1 block text-small font-bold">
           اسم سنترك أو اسمك كمدرس

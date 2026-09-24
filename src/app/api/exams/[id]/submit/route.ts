@@ -36,7 +36,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   // 1) الامتحان أولاً — هو مصدر الحقيقة للسنتر
   const { data: exam } = await sb
     .from("exams")
-    .select("id,tenant_id,title,is_published")
+    .select("id,tenant_id,title,is_published,require_code,duration_minutes")
     .eq("id", params.id)
     .single();
   if (!exam) return NextResponse.json({ ok: false, error: "exam_not_found" }, { status: 404 });
@@ -63,6 +63,19 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   }
   if (urow.tenant_id !== exam.tenant_id) {
     return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  }
+
+  // 2.5) بوابة الكود: جلسة سارية + مؤقت السيرفر (لا يُعتمد على مؤقت المتصفح)
+  let codeRow: any = null;
+  if ((exam as any).require_code) {
+    const { data: sess } = await sb.from("exam_codes").select("*")
+      .eq("exam_id", params.id).eq("student_id", urow.id).eq("status", "started").single();
+    if (!sess) return NextResponse.json({ ok: false, error: "code_required" }, { status: 403 });
+    if ((sess as any).expires_at && new Date((sess as any).expires_at) < new Date()) {
+      await sb.from("exam_codes").update({ status: "expired" }).eq("id", (sess as any).id);
+      return NextResponse.json({ ok: false, error: "expired" }, { status: 410 });
+    }
+    codeRow = sess;
   }
 
   // 3) أسئلة الامتحان بإجاباتها الصحيحة
@@ -93,6 +106,10 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   }, { onConflict: "exam_id,student_id" }).select("id").single();
   if (attErr || !att) {
     return NextResponse.json({ ok: false, error: "save_failed" }, { status: 500 });
+  }
+  if (codeRow) {
+    // استهلاك الكود لمرة واحدة (يمنع إعادة الاستخدام — Replay)
+    await sb.from("exam_codes").update({ status: "submitted", submitted_at: new Date().toISOString() }).eq("id", codeRow.id);
   }
   if (!prevAtt) {
     const { awardPoints, POINTS } = await import("@/lib/gamification");

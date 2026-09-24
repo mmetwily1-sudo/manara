@@ -12,7 +12,26 @@ const ERROR_MESSAGES: Record<string, string> = {
   answers_required: "لم تصل أي إجابات — حاول مرة أخرى.",
   enroll_failed: "تعذر تسجيلك في السنتر — حاول مرة أخرى.",
   save_failed: "تعذر حفظ المحاولة — تحقق من الاتصال وحاول مجدداً.",
+  code_required: "هذا الامتحان محمي بكود دخول — أدخل كودك الخاص.",
+  bad_code: "الكود غير صحيح — تحقق منه وحاول مجدداً.",
+  not_yours: "هذا الكود يخص طالباً آخر.",
+  code_in_use: "الكود مستخدم على جهاز آخر — تواصل مع معلمك.",
+  used: "هذا الكود استُخدم من قبل.",
+  expired: "انتهت مدة الجلسة — تواصل مع معلمك.",
+  revoked: "تم إلغاء هذا الكود — تواصل مع معلمك.",
+  taken: "الكود قيد الاستخدام حالياً.",
+  already_started: "لديك جلسة نشطة بالفعل.",
 };
+
+function deviceFp(): string {
+  try {
+    const s = [navigator.userAgent, screen.width + "x" + screen.height,
+      Intl.DateTimeFormat().resolvedOptions().timeZone ?? "", navigator.language ?? ""].join("|");
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+    return "w" + h.toString(36);
+  } catch { return "w0"; }
+}
 
 export default function ExamPage({ params }: { params: { id: string } }) {
   const [title, setTitle] = useState("");
@@ -23,21 +42,53 @@ export default function ExamPage({ params }: { params: { id: string } }) {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [result, setResult] = useState<{ score: number; total: number; certSerial: string | null } | null>(null);
   const [secLeft, setSecLeft] = useState<number | null>(null);
+  const [needCode, setNeedCode] = useState(false);
+  const [code, setCode] = useState("");
+  const [codeBusy, setCodeBusy] = useState(false);
+  const [codeErr, setCodeErr] = useState("");
+  const [tabSwitches, setTabSwitches] = useState(0);
 
-  useEffect(() => {
+  function load() {
     fetch(`/api/exams/${params.id}`)
       .then(async (r) => {
         const j = await r.json().catch(() => null);
         if (!r.ok || !j?.ok) {
+          if (j?.error === "code_required") { setNeedCode(true); setLoadError(null); return; }
           setLoadError(ERROR_MESSAGES[j?.error] ?? "تعذر تحميل الامتحان — حاول مرة أخرى.");
           return;
         }
+        setNeedCode(false);
         setTitle(j.exam.title);
         setQs(j.questions);
         setSecLeft((j.exam.duration_minutes ?? 30) * 60);
       })
       .catch(() => setLoadError("تعذر الاتصال بالخادم — تحقق من الإنترنت."));
-  }, [params.id]);
+  }
+
+  useEffect(() => { load(); }, [params.id]);
+
+  // عدّاد تبديل التبويب (مؤشر اشتباه يُرسل مع التسليم — يُرى في سجل المعلم)
+  useEffect(() => {
+    const onVis = () => { if (document.hidden && qs) setTabSwitches((n) => n + 1); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [qs]);
+
+  async function claim(e: React.FormEvent) {
+    e.preventDefault();
+    if (!code.trim()) return;
+    setCodeBusy(true); setCodeErr("");
+    try {
+      const r = await fetch(`/api/exams/${params.id}/claim`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: code.trim(), device_fp: deviceFp() }),
+      });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) { load(); return; }
+      setCodeErr(ERROR_MESSAGES[j?.error] ?? j?.message ?? "فشل تفعيل الكود.");
+    } catch { setCodeErr("تعذر الاتصال بالخادم."); }
+    finally { setCodeBusy(false); }
+  }
 
   useEffect(() => {
     if (secLeft === null) return;
@@ -54,7 +105,7 @@ export default function ExamPage({ params }: { params: { id: string } }) {
     try {
       const r = await fetch(`/api/exams/${params.id}/submit`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ answers }),
+        body: JSON.stringify({ answers, tabSwitches, device_fp: deviceFp() }),
       });
       const j = await r.json().catch(() => null);
       if (j?.ok) setResult(j);
@@ -95,14 +146,38 @@ export default function ExamPage({ params }: { params: { id: string } }) {
     );
   }
 
+  if (needCode) {
+    return (
+      <div className="mx-auto max-w-md space-y-4 p-8">
+        <div className="card space-y-4 p-6 text-center">
+          <div className="text-h1">🔐</div>
+          <h1 className="font-bold">امتحان محمي بكود دخول</h1>
+          <p className="text-small text-slate-500">أدخل الكود الخاص بك (6 رموز) — جلسة واحدة على جهازك.</p>
+          {codeErr && <div className="rounded-xl bg-danger/10 px-4 py-2 text-sm font-bold text-danger">{codeErr}</div>}
+          <form onSubmit={claim} className="flex gap-2" dir="ltr">
+            <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^2-9A-HJ-NP-Z]/g, "").slice(0, 6))}
+              placeholder="••••••" maxLength={6}
+              className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-center font-mono text-xl font-bold tracking-[0.3em] outline-none focus:border-primary" />
+            <button disabled={codeBusy || code.length < 6} className="btn-primary shrink-0">{codeBusy ? "..." : "دخول"}</button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   if (!qs || secLeft === null) return <div className="p-8 text-center text-slate-400">جاري تحميل الامتحان...</div>;
 
   const mm = String(Math.floor(secLeft / 60)).padStart(2, "0");
   const ss = String(secLeft % 60).padStart(2, "0");
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4 p-4">
-      <div className="sticky top-0 z-10 flex items-center justify-between rounded-xl bg-white p-3 shadow">
+    <div className="mx-auto max-w-2xl space-y-4 p-4" onCopy={(e) => e.preventDefault()} onContextMenu={(e) => e.preventDefault()}>
+      {tabSwitches > 0 && (
+        <div className="rounded-xl bg-warning/10 px-4 py-2 text-center text-xs font-bold text-warning">
+          ⚠️ غادرت صفحة الامتحان {tabSwitches} {tabSwitches === 1 ? "مرة" : "مرات"} — يُسجَّل ذلك في تقرير معلمك.
+        </div>
+      )}
+      <div className="sticky top-0 z-10 flex items-center justify-between rounded-xl bg-white p-3 shadow select-none">
         <div className="text-right">
           <div className="text-small font-bold">{title}</div>
           <span className="font-mono text-h2 font-bold" dir="ltr">{mm}:{ss}</span>
