@@ -249,8 +249,18 @@ export async function searchKnowledge(
     if (hits > 0) scored.push({ r, hits });
   }
   scored.sort((a, b) => b.hits - a.hits);
-  // حلقة التعلم الذاتي: لا نتائج → سجّل الفجوة ليحصدها المراقب لاحقاً
-  if (!scored.length) {
+  // عتبة الصلة: تجاهل المطابقات الضعيفة (كلمة عابرة واحدة) — الصدق قبل الحشو
+  const strong: { r: any; hits: number }[] = [];
+  for (let i = 0; i < scored.length; i++) {
+    const x = scored[i];
+    let titleHit = false;
+    for (let k = 0; k < top.length; k++) {
+      if (top[k].length >= 6 && (x.r.title ?? "").indexOf(top[k]) >= 0) { titleHit = true; break; }
+    }
+    if (x.hits >= 2 || titleHit) strong.push(x);
+  }
+  // حلقة التعلم الذاتي: لا نتائج قوية → سجّل الفجوة ليحصدها المراقب لاحقاً
+  if (!strong.length) {
     try {
       const gq = top.join(" ").slice(0, 100);
       const { data: g } = await admin.from("knowledge_gaps").select("id,hits").eq("query", gq).single();
@@ -260,8 +270,9 @@ export async function searchKnowledge(
         await admin.from("knowledge_gaps").insert({ query: gq, status: "open" });
       }
     } catch {}
+    return [];
   }
-  return scored.slice(0, 6).map((x) => ({
+  return strong.slice(0, 6).map((x) => ({
     kind: x.r.kind, title: x.r.title,
     body: String(x.r.body).slice(0, 500),
     source: x.r.source_url, date: x.r.effective_date,
@@ -272,7 +283,7 @@ export async function searchKnowledge(
 export async function bookGuide(
   admin: any, _tid: string, args: { subject: string; grade?: string; system?: string }
 ): Promise<unknown> {
-  const subject = String(args.subject ?? "").trim().slice(0, 40);
+  const subject = coreSubject(args.subject);
   if (subject.length < 2) return { error: "need_subject" };
   let q = admin.from("external_books").select("publisher,subject,grade,notes")
     .ilike("subject", `%${subject}%`).limit(20);
@@ -287,6 +298,51 @@ export async function bookGuide(
   return {
     subject,
     books: Object.keys(seen).map((publisher) => ({ publisher, notes: seen[publisher] })),
+  };
+}
+
+/** خريطة إنجليزي→عربي للمواد (النموذج يفكر بالإنجليزية أحياناً) */
+const EN_AR: Record<string, string> = {
+  physics: "فيزياء", chemistry: "كيمياء", biology: "أحياء", mathematics: "رياضيات", math: "رياضيات",
+  arabic: "عربي", english: "إنجليزي", history: "تاريخ", geography: "جغرافيا", philosophy: "فلسفة",
+  science: "علوم", religion: "دين", french: "فرنساوي", sociology: "اجتماع", psychology: "نفس",
+  geology: "جيولوجيا", programming: "برمجة", computer: "حاسب",
+};
+
+/** يستخرج جوهر اسم المادة ("منهج الفيزياء"/"Physics" → "فيزياء") */
+export function coreSubject(raw: string): string {
+  let s = String(raw ?? "").trim().slice(0, 40);
+  const low = s.toLowerCase();
+  for (const k of Object.keys(EN_AR)) {
+    if (low.indexOf(k) >= 0) return EN_AR[k];
+  }
+  s = s.replace(/^(منهج|مادة|مقرر|دروس|كتاب)\s+/g, "").trim();
+  const words = s.split(/\s+/).filter((w) => w.length >= 2 && !/^(الصف|للصف|مستوى|عام|أول|ثاني|ثالث)/.test(w))
+    // تطبيع أداة التعريف: "الفيزياء"→"فيزياء" لتطابق قيم subject المخزنة + إسقاط ؟ الزائدة
+    .map((w) => w.replace(/^[؟?]+|[؟?]+$/g, "").replace(/^ال(?=.{3})/, ""));
+  return (words.slice(0, 2).join(" ") || s).slice(0, 40);
+}
+
+/** منهج مادة من قاعدة المناهج: الوحدات والدروس والأكواد (إجابة مباشرة عن "ماذا تعرف عن منهج X") */
+export async function curriculumOutline(
+  admin: any, _tid: string, args: { subject: string }
+): Promise<unknown> {
+  const rawIn = String(args.subject ?? "");
+  const subject = coreSubject(rawIn);
+  if (subject.length < 2) return { error: "need_subject", received: rawIn.slice(0, 60) };
+  const { data, error } = await admin.from("curriculum_lessons").select("lesson_title,code,unit_title")
+    .ilike("subject", `%${subject}%`).limit(60);
+  if (error) return { error: "db" };
+  const rows = (data ?? []) as any[];
+  if (!rows.length) return { error: "no_outline", subject, received: rawIn.slice(0, 60), message: "لا يوجد مخطط لهذه المادة في قاعدة المناهج" };
+  const units: Record<string, string[]> = {};
+  for (const r of rows) {
+    const u = String(r.unit_title ?? "عام");
+    (units[u] ??= []).push(String(r.lesson_title));
+  }
+  return {
+    subject, lessons: rows.length,
+    units: Object.keys(units).map((u) => ({ unit: u, lessons: units[u].slice(0, 12) })),
   };
 }
 
@@ -372,6 +428,7 @@ export const TOOL_IMPLS: Record<string, (admin: any, tid: string, args: Record<s
   solve_question: (a, t, x) => solveQuestion(a, t, x as { question: string }),
   solve_exam: (a, t, x) => solveExam(a, t, x as { exam_id?: string }),
   app_help: (a, t, x) => appHelp(a, t, x as { topic: string }),
+  curriculum_outline: (a, t, x) => curriculumOutline(a, t, x as { subject: string }),
   search_knowledge: (a, t, x) => searchKnowledge(a, t, x as { query: string; kind?: string }),
   book_guide: (a, t, x) => bookGuide(a, t, x as { subject: string; grade?: string; system?: string }),
 };

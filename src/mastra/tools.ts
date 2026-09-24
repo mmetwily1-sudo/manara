@@ -15,9 +15,12 @@ export function buildManaraTools(admin: any, tid: string, keys: string[] = []) {
       id,
       description,
       inputSchema: schema,
-      execute: async ({ context }: any) => {
+      // Mastra v1: execute(inputData, context) — الوسيط الأول هو مُدخلات الأداة نفسها
+      execute: async (inputData: any, context: any) => {
         try {
-          return await run((context ?? {}) as Record<string, unknown>);
+          try { console.error(`[tool:${id}] input=`, JSON.stringify(inputData ?? null).slice(0, 300)); } catch {}
+          const args = (inputData && typeof inputData === "object" && !Array.isArray(inputData) ? inputData : {}) as Record<string, unknown>;
+          return await run(args);
         } catch {
           return { error: "tool_failed" };
         }
@@ -92,6 +95,12 @@ export function buildManaraTools(admin: any, tid: string, keys: string[] = []) {
         system: z.string().optional().describe("moe أو azhar"),
       }),
       (args) => TOOL_IMPLS.book_guide(admin, tid, args)
+    ),
+    curriculum_outline: wrap(
+      "curriculum_outline",
+      "مخطط منهج مادة: الوحدات والدروس من قاعدة المناهج.",
+      z.object({ subject: z.string().describe("المادة") }),
+      (args) => TOOL_IMPLS.curriculum_outline(admin, tid, args)
     ),
     solve_question: wrap(
       "solve_question",

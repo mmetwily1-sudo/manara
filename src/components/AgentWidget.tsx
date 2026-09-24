@@ -9,6 +9,7 @@ const TOOL_AR: Record<string, string> = {
   attendance_summary: "الحضور", student_progress: "طالب", review_exam: "مراجعة",
   generate_drafts: "تأليف", search_knowledge: "المعرفة", book_guide: "الكتب",
   solve_question: "حل مسألة", solve_exam: "حل امتحان", app_help: "مساعدة",
+  curriculum_outline: "مخطط المنهج",
 };
 
 /**

@@ -20,7 +20,8 @@ REPLY IN ARABIC ONLY — ALWAYS. NEVER use any other language (no English, no Ch
 - review_exam هو المدقق الثاني: بعد إنشاء أي امتحان راجعه به قبل تسليم الإجابة.
 - attendance_summary وstudent_progress للأسئلة عن الحضور والطلاب — لا تخترع أرقاماً أبداً.
 - عند فراغ البنك وطلب المعلم أسئلة: استدعِ generate_drafts لتأليف مسودات من المنهج (تُحفظ للمراجعة فقط)، ثم اطلب منه اعتمادها من بنك الأسئلة قبل بناء الامتحان.
-- للأسئلة المعرفية (قرارات/كتب/طرق مذاكرة/مناهج): استدعِ search_knowledge أو book_guide أولاً — المعرفة المحلية دقيقة ومجانية.
+- لسؤال «ماذا تعرف عن منهج X»: استدعِ curriculum_outline أولاً (مخطط الدروس من قاعدتنا).
+- للأسئلة المعرفية الأخرى (قرارات/كتب/طرق مذاكرة): استدعِ search_knowledge أو book_guide — المعرفة المحلية دقيقة ومجانية.
 - إن لم تجد إجابة في المعرفة: قل «سأتعلم هذا الموضوع» بصدق — فسؤالك يُسجل تلقائياً ويُحصد من البوابات الرسمية في التحديث اليومي.
 - لحل مسألة: استدعِ solve_question (من البنك فقط — لا تحل من عندك أبداً).
 - لحل امتحان كامل للمراجعة: استدعِ solve_exam.
@@ -126,6 +127,15 @@ const DECLARATIONS = [
     },
   },
   {
+    name: "curriculum_outline",
+    description: "مخطط منهج مادة من قاعدة المناهج: الوحدات والدروس. استخدمها لسؤال «ماذا تعرف عن منهج X» قبل المعرفة العامة.",
+    parameters: {
+      type: "OBJECT",
+      properties: { subject: { type: "STRING", description: "المادة" } },
+      required: ["subject"],
+    },
+  },
+  {
     name: "solve_question",
     description: "حل مسألة: يبحث في البنك عن سؤال مشابه محلول ويعيد إجابته. إن لم يوجد يقول ذلك بصراحة ولا يخمن.",
     parameters: {
@@ -182,7 +192,7 @@ function findSubject(m: string): string | null {
  * المسار المباشر: أسئلة شائعة تُجاب من الأدوات فوراً بلا أي LLM (فوري + مجاني).
  * يرجع null عندما يحتاج الأمر استدلالاً (إنشاء/تأليف/صياغة حرة).
  */
-async function directAnswer(
+export async function directAnswer(
   admin: any, tid: string, message: string,
   onStep?: (s: { tool: string; ok: boolean }) => void
 ): Promise<{ text: string; steps: { tool: string; ok: boolean }[] } | null> {
@@ -201,8 +211,13 @@ async function directAnswer(
       return null;
     }
   };
-  // أسئلة الأنظمة والمناهج والوزارة → المعرفة المحلية مباشرة (تعمل بلا ذكاء)
-  if (/بكالوريا|ثانوية|تنسيق|وزارة|أزهر|منهج|نظام التعليم/.test(m)) {
+  // مخطط منهج مادة → قاعدة المناهج مباشرة (أدق إجابة عن "ماذا تعرف عن منهج X")
+  const outlineM = m.match(/منهج\s+([^\s؟?]+)/);
+  if (outlineM) {
+    return run("curriculum_outline", { subject: outlineM[1].slice(0, 40) });
+  }
+  // أسئلة الأنظمة والوزارة → المعرفة المحلية مباشرة (تعمل بلا ذكاء)
+  if (/بكالوريا|ثانوية|تنسيق|وزارة|أزهر|نظام التعليم/.test(m)) {
     return run("search_knowledge", { query: m.split(/\s+/).filter((w) => w.length > 3).slice(0, 4).join(" ") || m.slice(0, 60) });
   }
   // مساعدة الداشبورد أولاً: صيغة السؤال (فين/إزاي/كيف) تتفوق على الكلمات الموضوعية
@@ -497,6 +512,14 @@ function fallbackSummary(last: { tool: string; out: unknown } | null): string {
   }
   if (last?.tool === "app_help" && Array.isArray(o.answers)) {
     return o.answers.slice(0, 3).join("\n\n");
+  }
+  if (last?.tool === "curriculum_outline" && Array.isArray(o.units)) {
+    if (!o.units.length) return `لا يوجد مخطط لمادة «${o.subject}» في قاعدة المناهج — سأتعلمها في التحديث القادم.`;
+    return `منهج ${o.subject} (${o.lessons} درساً):\n` + o.units.slice(0, 8).map((u: any) => `• ${u.unit}: ${u.lessons.slice(0, 5).join("، ")}`).join("\n");
+  }
+  if (last?.tool === "curriculum_outline" && o.error) {
+    const got = (o as any).received ? ` (وصلني: «${String((o as any).received).slice(0, 40)}»)` : "";
+    return `لا يوجد مخطط لهذه المادة في قاعدة المناهج — سأتعلمها في التحديث القادم.${got}`;
   }
   return "تعذر الوصول لخدمة الذكاء حالياً (ازدحام) — حاول بعد قليل.";
 }

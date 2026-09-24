@@ -61,6 +61,18 @@ export async function POST(req: Request) {
         let text = "";
         let usedMastra = false;
         let via: "mastra" | "raw" = "raw";
+        // المسار الحتمي أولاً: إجابات مباشرة من القاعدة (بنك/منهج/حل/حضور) — فورية ولا تعتمد على حصة LLM
+        let fastDone = false;
+        try {
+          const { directAnswer } = await import("@/lib/agent");
+          const fast = await directAnswer(admin, tid, message);
+          if (fast && fast.text) {
+            text = fast.text;
+            steps.push(...fast.steps);
+            for (const s of fast.steps) send({ type: "step", ...s });
+            fastDone = true;
+          }
+        } catch {}
         // الاستقلال أولاً: نموذج مستضاف ذاتياً يغني عن Mastra وGemini معاً
         const selfHosted = !!process.env.AGENT_LLM_URL;
         // المسار الأول: Mastra (بث حي + ذاكرة) — يُتخطى عند وجود مستضاف ذاتي (الحلقة الخام تستخدمه مباشرة)
@@ -131,8 +143,8 @@ export async function POST(req: Request) {
             } catch {}
           }
         }
-        // المسار الاحتياطي: الحلقة الخام المختبرة
-        if (!usedMastra) {
+        // المسار الاحتياطي: الحلقة الخام المختبرة (يُتخطى عند نجاح المسار الحتمي)
+        if (!usedMastra && !fastDone) {
           const out = await runAgent(
             admin, tid, history,
             (trow as any)?.settings?.vision_key ?? null,
