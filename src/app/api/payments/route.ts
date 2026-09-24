@@ -28,12 +28,20 @@ export async function GET() {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
 
-  let collectedMonth = 0, collectedToday = 0;
+  let collectedMonth = 0, collectedToday = 0, todayCount = 0;
+  const byMethod: Record<string, { total: number; count: number }> = {};
   (payments ?? []).forEach((p: any) => {
     if (p.status !== "confirmed") return;
     const amt = Number(p.amount ?? 0);
     if (p.paid_at >= monthStart) collectedMonth += amt;
-    if (p.paid_at >= todayStart) collectedToday += amt;
+    if (p.paid_at >= todayStart) {
+      collectedToday += amt;
+      todayCount += 1;
+      const mk = String(p.method ?? "cash");
+      byMethod[mk] ??= { total: 0, count: 0 };
+      byMethod[mk].total += amt;
+      byMethod[mk].count += 1;
+    }
   });
 
   // المتوقع الشهري = مجموع اشتراكات التسجيلات النشطة
@@ -51,6 +59,7 @@ export async function GET() {
   return NextResponse.json({
     ok: true,
     totals: { collectedMonth, collectedToday, expected, outstanding },
+    close: { date: new Date().toISOString().slice(0, 10), total: collectedToday, count: todayCount, byMethod },
     payments: (payments ?? []).map((p: any) => ({
       id: p.id,
       student: names[p.student_id] ?? "—",
@@ -113,6 +122,15 @@ export async function POST(req: Request) {
   if (error || !data) {
     return NextResponse.json({ ok: false, error: error?.message ?? "insert_failed" }, { status: 500 });
   }
+
+  // سجل تدقيق (best-effort — جدول audit_log موجود)
+  try {
+    await ctx.admin.from("audit_log").insert({
+      tenant_id: ctx.tenantId, actor_id: ctx.userRow.id,
+      action: "payment:collect", entity_type: "payment", entity_id: (data as any).id,
+      details: { studentId, amount, method },
+    });
+  } catch {}
 
   // إيصال واتساب فوري (best-effort)
   try {

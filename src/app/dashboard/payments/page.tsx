@@ -4,12 +4,14 @@ import { useEffect, useState } from "react";
 
 type Payment = { id: string; student: string; amount: number; method: string; status: string; note: string | null; paid_at: string };
 type Totals = { collectedMonth: number; collectedToday: number; expected: number; outstanding: number };
+type Close = { date: string; total: number; count: number; byMethod: Record<string, { total: number; count: number }> };
 
 const METHODS: Record<string, string> = { cash: "كاش", wallet: "محفظة", instapay: "انستاباي", card: "بطاقة", fawry: "فوري" };
 
 export default function PaymentsPage() {
   const [payments, setPayments] = useState<Payment[] | null>(null);
   const [totals, setTotals] = useState<Totals | null>(null);
+  const [close, setClose] = useState<Close | null>(null);
   const [err, setErr] = useState("");
   const [students, setStudents] = useState<{ id: string; name: string }[]>([]);
   const [showCollect, setShowCollect] = useState(false);
@@ -24,6 +26,7 @@ export default function PaymentsPage() {
       if (!rp.ok || !jp?.ok) { setErr("تعذر تحميل الدفعات."); return; }
       setPayments(jp.payments);
       setTotals(jp.totals);
+      if (jp.close) setClose(jp.close);
       if (rs.ok && js?.ok) setStudents(js.students.map((s: any) => ({ id: s.id, name: s.name })));
       setErr("");
     } catch { setErr("تعذر الاتصال بالخادم."); }
@@ -107,6 +110,27 @@ export default function PaymentsPage() {
           </div>
         ))}
       </section>
+
+      {close && close.count > 0 && (
+        <section className="card space-y-3 border-primary/20 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-bold">تقفيل اليوم 🧾 <span className="text-xs font-normal text-slate-400">({close.count} دفعات)</span></h2>
+            <button onClick={() => window.print()} className="rounded-lg bg-slate-100 px-4 py-1.5 text-xs font-bold text-slate-600">طباعة التقرير 🖨️</button>
+          </div>
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {Object.entries(close.byMethod).map(([mk, v]) => (
+              <li key={mk} className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-2.5 text-small">
+                <span className="text-slate-500">{METHODS[mk] ?? mk} <span className="text-xs">×{v.count}</span></span>
+                <span className="font-extrabold text-primary">{fmt(v.total)}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="flex items-center justify-between rounded-xl bg-primary/5 px-4 py-3">
+            <span className="font-bold">إجمالي الخزنة اليوم</span>
+            <span className="text-xl font-extrabold text-primary">{fmt(close.total)}</span>
+          </div>
+        </section>
+      )}
 
       {pending.length > 0 && (
         <section className="card space-y-3 border-warning/30 p-5">

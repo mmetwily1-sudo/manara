@@ -40,6 +40,15 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     .eq("tenant_id", tid);
   if (error) return dbFail("payment-review", error);
 
+  // سجل تدقيق (best-effort)
+  try {
+    await admin.from("audit_log").insert({
+      tenant_id: tid, actor_id: res.ctx.userRow.id,
+      action: `payment:${action}`, entity_type: "payment", entity_id: params.id,
+      details: { amount: Number((pay as any).amount ?? 0) },
+    });
+  } catch {}
+
   if (action === "confirm") {
     try {
       const { notifyStudent } = await import("@/lib/notify");
