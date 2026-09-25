@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import ExamCodesManager from "@/components/ExamCodesManager";
+import SuspicionPanel from "@/components/SuspicionPanel";
 
 type ExamRow = {
   id: string; title: string; duration_minutes: number; total_marks: number;
@@ -482,6 +483,7 @@ export default function ExamsListPage() {
                 </div>
               </div>
               <ExamCodesManager examId={ex.id} required={!!ex.require_code} onToggleRequire={(v) => onRequireCode(ex.id, v)} />
+              <SuspicionPanel examId={ex.id} attempts={ex.attempts_count} />
               {audits[ex.id] && (
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed">
                   <div className="font-bold">نتيجة التدقيق ({audits[ex.id].total} أسئلة، تحقق لغوي: {audits[ex.id].llm.checked}

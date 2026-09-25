@@ -77,7 +77,10 @@ export default function PaymentsPage() {
           <h1 className="text-h1">التحصيل</h1>
           <p className="mt-1 text-small text-slate-500">دورة الشهر · صفر عمولة</p>
         </div>
-        <button onClick={() => setShowCollect((v) => !v)} className="btn-primary text-small">تسجيل دفعة</button>
+        <div className="flex gap-2">
+          <a href="/api/export?scope=payments" className="btn-secondary text-small">تصدير CSV ⬇️</a>
+          <button onClick={() => setShowCollect((v) => !v)} className="btn-primary text-small">تسجيل دفعة</button>
+        </div>
       </header>
 
       {err && <div className="card border-danger/20 bg-danger/5 p-4 text-small font-bold text-danger">{err}</div>}

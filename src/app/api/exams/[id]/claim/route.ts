@@ -102,6 +102,13 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     }
     return NextResponse.json({ ok: false, error: "taken" }, { status: 409 });
   }
+  // بصمة زمن البدء لقياس مدة الحل (تكشف السرعة المستحيلة) — تُضبط مرة واحدة
+  try {
+    await sb.from("exam_attempts").upsert({
+      tenant_id: (exam as any).tenant_id, exam_id: params.id, student_id: sid,
+      answers: {}, score: 0, started_at: now.toISOString(),
+    }, { onConflict: "exam_id,student_id", ignoreDuplicates: true });
+  } catch {}
   try {
     await sb.from("audit_log").insert({
       tenant_id: (exam as any).tenant_id, actor_id: sid,

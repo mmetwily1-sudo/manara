@@ -61,8 +61,15 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     .eq("tenant_id", exam.tenant_id)
     .order("position", { ascending: true });
 
-  // خلط الخيارات لكل طالب (عدالة بين الطلاب)
+  // خلط الخيارات + ترتيب الأسئلة لكل طالب (حتمي لكل طالب — ثابت عند التحديث)
   const seed = [...user.id].reduce((a, c) => a + c.charCodeAt(0), 0);
+  let h = seed >>> 0;
+  const rnd = () => {
+    h |= 0; h = (h + 0x6D2B79F5) | 0;
+    let t = Math.imul(h ^ (h >>> 15), 1 | h);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
   const questions = (eqs ?? []).map((row: any, i: number) => {
     const q = row.questions;
     let options: string[] | null = Array.isArray(q.options) ? [...q.options] : null;
@@ -72,6 +79,10 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     }
     return { id: q.id, body: q.body, options, qtype: q.qtype, marks: row.marks ?? q.marks, media_url: q.media_url ?? null };
   });
+  for (let i = questions.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    [questions[i], questions[j]] = [questions[j], questions[i]];
+  }
 
   return NextResponse.json({
     ok: true,

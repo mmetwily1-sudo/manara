@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { waTo } from "@/lib/wa";
 
 type Student = { id: string; name: string; phone: string | null; groups: { id: string; name: string }[] };
 type Group = { id: string; name: string };
@@ -73,6 +74,7 @@ export default function StudentsPage() {
           <button onClick={copyInvite} className="btn-secondary text-small">
             {copied ? "✓ تم النسخ" : "نسخ رابط التسجيل"}
           </button>
+          <a href="/api/export?scope=students" className="btn-secondary text-small">تصدير CSV ⬇️</a>
           <button onClick={() => setShowAdd((v) => !v)} className="btn-primary text-small">طالب جديد</button>
         </div>
       </header>
@@ -112,7 +114,7 @@ export default function StudentsPage() {
         ) : (
           <table className="w-full text-right text-small">
             <thead className="bg-slate-50 text-xs text-slate-500">
-              <tr>{["الطالب", "المجموعات", "الهاتف", "تقرير"].map((h) => (
+              <tr>{["الطالب", "المجموعات", "الهاتف", "تقرير", "تذكير"].map((h) => (
                 <th key={h} className="px-4 py-3 font-semibold">{h}</th>
               ))}</tr>
             </thead>
@@ -125,6 +127,14 @@ export default function StudentsPage() {
                   </td>
                   <td className="px-4 py-3 font-mono text-xs text-slate-400" dir="ltr">{s.phone ?? "—"}</td>
                   <td className="px-4 py-3"><a href={`/reports/parent/${s.id}`} className="text-xs font-bold text-primary hover:underline">تقرير 📄</a></td>
+                  <td className="px-4 py-3">
+                    {(() => {
+                      const link = waTo(s.phone, `السلام عليكم 👋 تذكير من سنترنا: برجاء متابعة المصروفات الشهرية الخاصة بالطالب ${s.name} — للاستفسار تواصل معنا.`);
+                      return link
+                        ? <a href={link} target="_blank" rel="noreferrer" className="text-xs font-bold text-success hover:underline">واتساب 💬</a>
+                        : <span className="text-xs text-slate-300">—</span>;
+                    })()}
+                  </td>
                 </tr>
               ))}
             </tbody>
