@@ -23,6 +23,7 @@ const navMore = [
   { href: "/dashboard/store", label: "المتجر", key: "08e" },
   { href: "/dashboard/certificates", label: "التقارير", key: "09" },
   { href: "/dashboard/digests", label: "تقارير الأهل", key: "09b", roles: ["teacher_admin", "supervisor"] },
+  { href: "/dashboard/referrals", label: "الإحالات والنمو", key: "09d", roles: ["teacher_admin"] },
   { href: "/dashboard/staff", label: "الفروع والطاقم", key: "09c", roles: ["teacher_admin"] },
   { href: "/dashboard/settings", label: "هويتي والإعدادات", key: "10", roles: ["teacher_admin"] },
 ];

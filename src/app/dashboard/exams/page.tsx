@@ -6,7 +6,7 @@ import SuspicionPanel from "@/components/SuspicionPanel";
 
 type ExamRow = {
   id: string; title: string; duration_minutes: number; total_marks: number;
-  is_published: boolean; require_code?: boolean; questions_count: number; attempts_count: number; pending_drafts?: number;
+  is_published: boolean; require_code?: boolean; is_archived?: boolean; questions_count: number; attempts_count: number; pending_drafts?: number;
 };
 type AuditReport = {
   total: number; fixed: string[];
@@ -180,6 +180,23 @@ export default function ExamsListPage() {
       setNotice({ kind: "err", text: "انتهت مهلة الاتصال — تحقق من الإنترنت وحاول مجدداً. لو تكرر، قلل عدد الأسئلة." });
     } finally {
       setGenerating(false);
+    }
+  }
+
+  const [showArchived, setShowArchived] = useState(false);
+
+  async function onArchive(id: string, v: boolean) {
+    if (v && !confirm("أرشفة هذا الامتحان؟ (يختفي من القائمة ويمكن استعادته)")) return;
+    try {
+      const { r, j } = await apiFetch(`/api/exams/${id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_archived: v }),
+      });
+      if (r.ok && j?.ok) {
+        setExams((prev) => (prev ?? []).map((e) => (e.id === id ? { ...e, is_archived: v } : e)));
+      } else setNotice({ kind: "err", text: "فشل الأرشفة." });
+    } catch {
+      setNotice({ kind: "err", text: "تعذر الاتصال بالخادم." });
     }
   }
 
@@ -425,8 +442,15 @@ export default function ExamsListPage() {
       ) : exams.length === 0 ? (
         <div className="card p-8 text-center text-slate-500">لا توجد امتحانات بعد — ولّد أول امتحان من الأعلى.</div>
       ) : (
+        <>
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-slate-400">{exams.filter((e) => !e.is_archived).length} نشطاً</span>
+          <button onClick={() => setShowArchived((v) => !v)} className="text-xs font-bold text-slate-500 underline">
+            {showArchived ? "إخفاء الأرشيف" : `عرض الأرشيف (${exams.filter((e) => e.is_archived).length})`}
+          </button>
+        </div>
         <ul className="space-y-3">
-          {exams.map((ex) => (
+          {exams.filter((ex) => showArchived || !ex.is_archived).map((ex) => (
             <li key={ex.id} className="card space-y-3 p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
@@ -442,6 +466,9 @@ export default function ExamsListPage() {
                     )}
                     {ex.require_code && (
                       <span className="rounded-full bg-primary-light px-2 py-0.5 text-[11px] font-bold text-primary">🔐 بالأكواد</span>
+                    )}
+                    {ex.is_archived && (
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500">📦 مؤرشف</span>
                     )}
                   </div>
                   <div className="mt-1 text-xs text-slate-500">
@@ -474,6 +501,10 @@ export default function ExamsListPage() {
                   <button onClick={() => onPurgeImages(ex.id)}
                     className="rounded-lg px-4 py-1.5 text-xs font-bold text-slate-500 transition hover:bg-slate-100">
                     حذف صور المسح
+                  </button>
+                  <button onClick={() => onArchive(ex.id, !ex.is_archived)}
+                    className="rounded-lg px-4 py-1.5 text-xs font-bold text-slate-500 transition hover:bg-slate-100">
+                    {ex.is_archived ? "استعادة" : "أرشفة"}
                   </button>
                   <button onClick={() => onDelete(ex.id, ex.title, ex.attempts_count)}
                     disabled={deletingId === ex.id}
@@ -508,6 +539,7 @@ export default function ExamsListPage() {
             </li>
           ))}
         </ul>
+        </>
       )}
     </div>
   );

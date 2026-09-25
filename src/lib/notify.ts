@@ -101,6 +101,7 @@ export async function notifyStudent(
   });
 
   // Web Push لأجهزة الطالب/ولي الأمر (best-effort — يصل حتى والتطبيق مقفول)
+  let pushSent = 0;
   try {
     const { sendPushToUser } = await import("./push");
     const titles: Record<NotifyEvent["kind"], string> = {
@@ -115,6 +116,7 @@ export async function notifyStudent(
       body: body.slice(0, 150),
       url: "/progress",
     });
+    pushSent = r.sent;
     if (r.sent > 0 || r.cleaned > 0) {
       await admin.from("notification_log").insert({
         tenant_id: tenantId, user_id: studentId, event: event.kind, channel: "webpush",
@@ -123,6 +125,17 @@ export async function notifyStudent(
       });
     }
   } catch {}
+
+  // SMS احتياطي: تنبيه حرج لم يصل push → طابور (يُعالج عبر /api/sms/process)
+  const CRITICAL: NotifyEvent["kind"][] = ["attendance_absent", "exam_graded"];
+  if (pushSent === 0 && CRITICAL.includes(event.kind) && target) {
+    try {
+      await admin.from("sms_queue").insert({
+        tenant_id: tenantId, user_id: studentId, phone: target,
+        body: body.slice(0, 300), event: event.kind,
+      });
+    } catch {}
+  }
 
   return { sent, reason: sent ? undefined : reason };
 }

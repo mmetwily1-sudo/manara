@@ -107,6 +107,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     patch.duration_minutes = Math.floor(body.duration_minutes);
   }
   if (typeof body.require_code === "boolean") patch.require_code = body.require_code;
+  if (typeof body.is_archived === "boolean") {
+    patch.is_archived = body.is_archived;
+    (patch as any).archived_at = body.is_archived ? new Date().toISOString() : null;
+  }
   if (!Object.keys(patch).length) return NextResponse.json({ ok: false, error: "nothing_to_update" }, { status: 400 });
 
   const { data: exam } = await admin.from("exams").select("id").eq("id", params.id).eq("tenant_id", res.ctx.tenantId).single();

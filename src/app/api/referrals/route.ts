@@ -41,7 +41,7 @@ export async function GET() {
   }
   const code = (mine as any).code as string;
 
-  const { data: rows } = await admin.from("referrals").select("status,reward_days,created_at,qualified_at,rewarded_at")
+  const { data: rows } = await admin.from("referrals").select("status,reward_days,created_at,qualified_at,rewarded_at,referee_tenant_id")
     .eq("referrer_tenant_id", tid).not("referee_tenant_id", "is", null).order("created_at", { ascending: false }).limit(100);
   const byStatus: Record<string, number> = {};
   let earnedDays = 0;
@@ -49,6 +49,12 @@ export async function GET() {
     byStatus[r.status] = (byStatus[r.status] ?? 0) + 1;
     if (r.status === "rewarded") earnedDays += Number(r.reward_days ?? 0);
   });
+  const refTids = Array.from(new Set((rows ?? []).map((r: any) => r.referee_tenant_id).filter(Boolean)));
+  let refNames: Record<string, string> = {};
+  if (refTids.length) {
+    const { data: ts } = await admin.from("tenants").select("id,name").in("id", refTids as string[]);
+    (ts ?? []).forEach((x: any) => { refNames[x.id] = x.name; });
+  }
   const base = (process.env.NEXT_PUBLIC_SITE_URL ?? "").replace(/\/$/, "") || null;
 
   return NextResponse.json({
@@ -59,6 +65,7 @@ export async function GET() {
     referrals: (rows ?? []).map((r: any) => ({
       status: r.status, reward_days: r.reward_days,
       created_at: r.created_at, qualified_at: r.qualified_at, rewarded_at: r.rewarded_at,
+      referee: r.referee_tenant_id ? (refNames[r.referee_tenant_id] ?? "—") : null,
     })),
   });
 }
