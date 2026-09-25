@@ -9,19 +9,21 @@ export async function GET() {
   if ("error" in res) return res.error;
   const { ctx } = res;
 
-  const { data: payments, error } = await ctx.admin
-    .from("payments")
-    .select("id,amount,method,status,note,paid_at,student_id,receipt_no")
-    .eq("tenant_id", ctx.tenantId)
-    .order("paid_at", { ascending: false })
-    .limit(100);
+  const [{ data: payments, error }, { data: students }, scope] = await Promise.all([
+    ctx.admin
+      .from("payments")
+      .select("id,amount,method,status,note,paid_at,student_id,receipt_no")
+      .eq("tenant_id", ctx.tenantId)
+      .order("paid_at", { ascending: false })
+      .limit(100),
+    ctx.admin
+      .from("users")
+      .select("id,full_name")
+      .eq("tenant_id", ctx.tenantId)
+      .eq("role", "student"),
+    staffScope(ctx.admin, ctx.tenantId, res.ctx.userRow.role, res.ctx.userRow.id),
+  ]);
   if (error) return dbFail("payments", error);
-
-  const { data: students } = await ctx.admin
-    .from("users")
-    .select("id,full_name")
-    .eq("tenant_id", ctx.tenantId)
-    .eq("role", "student");
   const names: Record<string, string> = {};
   (students ?? []).forEach((s: any) => { names[s.id] = s.full_name; });
 
@@ -57,7 +59,6 @@ export async function GET() {
   });
   const outstanding = Math.max(0, expected - collectedMonth);
 
-  const scope = await staffScope(ctx.admin, ctx.tenantId, res.ctx.userRow.role, res.ctx.userRow.id);
   const visible = scope.studentIds
     ? (payments ?? []).filter((p: any) => scope.studentIds!.includes(p.student_id))
     : (payments ?? []);

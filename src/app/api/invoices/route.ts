@@ -12,11 +12,19 @@ export async function GET(req: Request) {
   const admin = res.ctx.admin;
   const tid = res.ctx.tenantId;
 
-  const scope = await staffScope(admin, tid, res.ctx.userRow.role, res.ctx.userRow.id);
-  const { data: allInv } = await admin.from("invoices")
-    .select("id,student_id,group_id,period,amount,paid,status,receipt_no,paid_at")
-    .eq("tenant_id", tid)
-    .order("period", { ascending: false }).order("created_at", { ascending: false }).limit(500);
+  const monthStart = new Date();
+  monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+  const [scope, invRes, attRes] = await Promise.all([
+    staffScope(admin, tid, res.ctx.userRow.role, res.ctx.userRow.id),
+    admin.from("invoices")
+      .select("id,student_id,group_id,period,amount,paid,status,receipt_no,paid_at")
+      .eq("tenant_id", tid)
+      .order("period", { ascending: false }).order("created_at", { ascending: false }).limit(500),
+    admin.from("attendance").select("student_id")
+      .eq("tenant_id", tid).eq("status", "absent").gte("created_at", monthStart.toISOString()).limit(2000)
+      .then((r: any) => r).catch(() => ({ data: [] })),
+  ]);
+  const allInv = (invRes as any)?.data;
   const inv = scope.studentIds
     ? (allInv ?? []).filter((x: any) => scope.studentIds!.includes(x.student_id))
     : (allInv ?? []);
@@ -27,15 +35,9 @@ export async function GET(req: Request) {
     const { data: st } = await admin.from("users").select("id,full_name,phone").in("id", sids as string[]);
     (st ?? []).forEach((s: any) => { people[s.id] = { name: s.full_name, phone: s.phone ?? null }; });
   }
-  // الغياب هذا الشهر لكل طالب (لربط الالتزام بالسداد — توصية Grok)
-  const monthStart = new Date();
-  monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+  // الغياب هذا الشهر لكل طالب (جُلب بالتوازي أعلاه — توصية Grok)
   let absences: Record<string, number> = {};
-  try {
-    const { data: att } = await admin.from("attendance").select("student_id")
-      .eq("tenant_id", tid).eq("status", "absent").gte("created_at", monthStart.toISOString()).limit(2000);
-    (att ?? []).forEach((a: any) => { absences[a.student_id] = (absences[a.student_id] ?? 0) + 1; });
-  } catch {}
+  ((attRes as any)?.data ?? []).forEach((a: any) => { absences[a.student_id] = (absences[a.student_id] ?? 0) + 1; });
 
   const bal: Record<string, { name: string; phone: string | null; due: number; periods: string[]; abs: number }> = {};
   (inv ?? []).forEach((x: any) => {
