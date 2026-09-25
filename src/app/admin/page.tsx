@@ -48,6 +48,10 @@ export default async function AdminHome() {
           <div className="font-bold">تذاكر الدعم</div>
           <div className="mt-1 text-small text-slate-500">أول رد ≤ ساعتين — {stats.tickets} مفتوحة</div>
         </div>
+        <a href="/admin/feedback" className="card p-6 transition hover:border-primary/40">
+          <div className="font-bold">صوت المعلمين 💬</div>
+          <div className="mt-1 text-small text-slate-500">تقييمات واقتراحات وبلاغات السناتر</div>
+        </a>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { PushSubscribeButton } from "@/components/PushSubscribeButton";
 
 type Progress = {
   ok: boolean;
@@ -279,6 +280,10 @@ export default function ProgressPage() {
         <h1 className="text-h1">تقدمي الدراسي 🎯</h1>
         <p className="mt-1 text-small text-slate-500">أهلاً {data.student.name} — كل نتائجك وشهاداتك في مكان واحد</p>
       </header>
+
+      <section className="card p-4">
+        <PushSubscribeButton />
+      </section>
 
       <div className="grid grid-cols-3 gap-3">
         {[

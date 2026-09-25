@@ -100,5 +100,29 @@ export async function notifyStudent(
     sent_at: sentAt,
   });
 
+  // Web Push لأجهزة الطالب/ولي الأمر (best-effort — يصل حتى والتطبيق مقفول)
+  try {
+    const { sendPushToUser } = await import("./push");
+    const titles: Record<NotifyEvent["kind"], string> = {
+      attendance_absent: "تنبيه غياب 📋",
+      exam_graded: "نتيجة امتحان 📝",
+      payment_received: "تم استلام دفعة ✅",
+      homework_submitted: "واجب جديد 📝",
+      homework_graded: "تصحيح واجب 📝",
+    };
+    const r = await sendPushToUser(admin, tenantId, studentId, {
+      title: titles[event.kind],
+      body: body.slice(0, 150),
+      url: "/progress",
+    });
+    if (r.sent > 0 || r.cleaned > 0) {
+      await admin.from("notification_log").insert({
+        tenant_id: tenantId, user_id: studentId, event: event.kind, channel: "webpush",
+        payload: { sent: r.sent, cleaned: r.cleaned }, status: r.sent > 0 ? "sent" : "queued",
+        dedupe_key: dedupeKey + ":push", sent_at: r.sent > 0 ? new Date().toISOString() : null,
+      });
+    }
+  } catch {}
+
   return { sent, reason: sent ? undefined : reason };
 }

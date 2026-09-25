@@ -1,5 +1,6 @@
 import { PasskeyManager } from "@/components/PasskeyManager";
 import { NotifyToggle, PayNumbersForm, VisionKeyForm, ThemeForm, SlugForm } from "@/components/NotifyToggle";
+import { PushSubscribeButton } from "@/components/PushSubscribeButton";
 import { getTenantInfoDB } from "@/lib/data";
 
 export default async function SettingsPage() {
@@ -40,6 +41,16 @@ export default async function SettingsPage() {
 
       <section className="card space-y-4 p-6">
         <NotifyToggle />
+      </section>
+
+      <section className="card space-y-4 p-6">
+        <div>
+          <h2 className="font-bold">إشعارات الجهاز 🔔</h2>
+          <p className="mt-1 text-xs leading-relaxed text-slate-500">
+            تنبيهات الغياب والنتائج والمدفوعات على هذا الجهاز — حتى لو التطبيق مقفول.
+          </p>
+        </div>
+        <PushSubscribeButton />
       </section>
 
       <section className="card space-y-4 p-6">

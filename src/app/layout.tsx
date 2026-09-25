@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { FloatingWhatsApp } from "@/components/FloatingWhatsApp";
+import { PushBootstrap } from "@/components/PushBootstrap";
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://manara-mmetwily.vercel.app").replace(/\/$/, "");
 
@@ -71,6 +72,7 @@ export default function RootLayout({
       <body className="bg-bg font-sans text-slate-900 antialiased">
         {children}
         <FloatingWhatsApp />
+        <PushBootstrap />
       </body>
     </html>
   );
