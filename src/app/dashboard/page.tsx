@@ -3,6 +3,7 @@ import { getKpis, getGroups, getEarlyWarning, getFeed } from "@/lib/data";
 import ReferralCard from "@/components/ReferralCard";
 import ReferralPromo from "@/components/ReferralPromo";
 import NpsBanner from "@/components/NpsBanner";
+import OnboardingChecklist from "@/components/OnboardingChecklist";
 import FeedbackWidget from "@/components/FeedbackWidget";
 
 export default async function DashboardHome() {
@@ -40,6 +41,7 @@ export default async function DashboardHome() {
         ))}
       </section>
 
+      <OnboardingChecklist />
       <NpsBanner />
       <ReferralPromo />
       <ReferralCard />
