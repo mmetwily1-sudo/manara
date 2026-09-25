@@ -25,4 +25,11 @@ for (const tb of tables) {
 fs.writeFileSync(path.join(dir, "_manifest.json"), JSON.stringify(manifest, null, 1));
 const total = Object.values(manifest.tables).reduce((s, n) => s + (typeof n === "number" ? n : 0), 0);
 console.log("BACKUP-OK dir=backups/" + ts + " tables=" + tables.length + " rows=" + total);
+// مرآة خارج الجهاز (OneDrive) — توصية اللجنة ضد عطل الجهاز
+try {
+  const mirror = "C:\\Users\\LORD LAPTOP\\OneDrive\\manara-backups\\" + ts;
+  fs.mkdirSync(mirror, { recursive: true });
+  for (const f of fs.readdirSync(dir)) fs.copyFileSync(path.join(dir, f), path.join(mirror, f));
+  console.log("MIRROR-OK " + mirror);
+} catch (e) { console.log("MIRROR-SKIP " + e.message.slice(0, 80)); }
 await pool.end();

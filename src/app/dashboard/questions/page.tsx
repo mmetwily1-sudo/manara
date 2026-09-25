@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { TeacherDraftCard } from "@/components/TeacherDraftCard";
+import LessonLinker from "@/components/LessonLinker";
 
 type Q = { id: string; subject: string; lesson: string | null; difficulty: number; qtype: string; body: string; marks: number };
 
@@ -383,6 +384,8 @@ export default function QuestionsPage() {
           </ul>
         </section>
       )}
+
+      <LessonLinker onLinked={load} />
 
       {stats && (
         <div className="card flex flex-wrap gap-x-6 gap-y-1 p-3 text-xs text-slate-600">
