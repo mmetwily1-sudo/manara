@@ -26,6 +26,12 @@ export default function QuestionsPage() {
   const [scanBusy, setScanBusy] = useState(false);
   // مسوداتي
   const [drafts, setDrafts] = useState<any[] | null>(null);
+  // توليد من مذكرة
+  const [showGen, setShowGen] = useState(false);
+  const [genText, setGenText] = useState("");
+  const [genSubject, setGenSubject] = useState("");
+  const [genCount, setGenCount] = useState(5);
+  const [genBusy, setGenBusy] = useState(false);
 
   const [autoBusy, setAutoBusy] = useState(false);
 
@@ -156,6 +162,25 @@ export default function QuestionsPage() {
       } else setErr(j?.message ?? "فشل المسح: " + (j?.error ?? "خطأ غير معروف"));
     } catch { setErr("تعذر الاتصال بالخادم."); }
     finally { setScanBusy(false); }
+  }
+
+  async function onGenerateNotes(e: React.FormEvent) {
+    e.preventDefault();
+    if (genText.trim().length < 200) { setErr("الصق 200 حرف على الأقل من المذكرة."); return; }
+    setGenBusy(true); setErr(""); setOkMsg("");
+    try {
+      const r = await fetch("/api/questions/generate", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: genText, subject: genSubject, count: genCount }),
+      });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) {
+        setGenText(""); setShowGen(false);
+        setOkMsg(`تم توليد ${j.drafts} مسودات من مذكرتك 🤖 — راجعها واعتمدها أدناه (لا شيء يُنشر تلقائياً).`);
+        loadDrafts();
+      } else setErr(j?.message ?? "فشل التوليد: " + (j?.error ?? "خطأ غير معروف"));
+    } catch { setErr("تعذر الاتصال بالخادم."); }
+    finally { setGenBusy(false); }
   }
 
   async function onDraftAct(id: string, action: "approve" | "delete", edits?: any) {
@@ -348,6 +373,7 @@ export default function QuestionsPage() {
           <button onClick={() => setShowBulk((v) => !v)} className="btn-secondary text-small">لصق أسئلة نصية</button>
           <button onClick={downloadTemplate} className="btn-secondary text-small">تحميل القالب</button>
           <button onClick={() => setShowScan((v) => !v)} className="btn-secondary text-small">مسح ورقة 📷</button>
+          <button onClick={() => setShowGen((v) => !v)} className="btn-secondary text-small">ولّد من مذكرة 🤖</button>
           <button onClick={() => setShowAdd((v) => !v)} className="btn-primary text-small">سؤال جديد</button>
         </div>
       </header>
@@ -370,6 +396,27 @@ export default function QuestionsPage() {
               className="rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:border-primary" />
           </div>
           <button className="btn-primary" disabled={scanBusy}>{scanBusy ? "جاري المسح والمعالجة..." : "بدء المسح"}</button>
+        </form>
+      )}
+
+      {showGen && (
+        <form onSubmit={onGenerateNotes} className="card space-y-3 p-5">
+          <h3 className="font-bold">ولّد أسئلة من مذكرة 🤖</h3>
+          <p className="text-xs leading-relaxed text-slate-500">
+            الصق نص المذكرة — نستخرج منها أسئلة اختيار من متعدد كمسودات تراجعها وتعتمدها بنفسك.
+          </p>
+          <textarea value={genText} onChange={(e) => setGenText(e.target.value)} rows={6}
+            placeholder="الصق هنا نص المذكرة (200 حرف على الأقل)..."
+            className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-small outline-none focus:border-primary" />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <input value={genSubject} onChange={(e) => setGenSubject(e.target.value)} placeholder="المادة (مثال: فيزياء)"
+              className="rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:border-primary" />
+            <select value={genCount} onChange={(e) => setGenCount(Number(e.target.value))}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5">
+              {[3, 5, 8, 10].map((n) => <option key={n} value={n}>{n} أسئلة</option>)}
+            </select>
+          </div>
+          <button className="btn-primary" disabled={genBusy}>{genBusy ? "جاري التوليد... (قد يستغرق دقيقة)" : "ولّد المسودات"}</button>
         </form>
       )}
 

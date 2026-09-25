@@ -204,6 +204,76 @@ export async function generateDrafts(
   return { drafts: rows.length, with_answers: withAns, subject, note: "بانتظار مراجعتك واعتمادها من بنك الأسئلة" };
 }
 
+/** توليد أسئلة من نص مذكرة: استخراج → مسودات للمراجعة (لا نشر تلقائي أبداً) */
+export async function generateFromNotes(
+  admin: any, tid: string, args: { text: string; subject?: string; count?: number; lesson_code?: string }, ctx?: ToolCtx
+): Promise<unknown> {
+  const text = String(args.text ?? "").trim().slice(0, 8000);
+  if (text.length < 200) return { error: "too_short", message: "الصق 200 حرف على الأقل من المذكرة" };
+  const subject = coreSubject(String(args.subject ?? "").slice(0, 40)) || "عام";
+  const count = Math.min(10, Math.max(1, Math.floor(Number(args.count ?? 5)) || 5));
+  const lessonCode = String(args.lesson_code ?? "").slice(0, 40) || null;
+  const keys = ctx?.keys ?? [];
+  if (!keys.length) return { error: "no_key" };
+
+  const prompt =
+    `You are an expert Egyptian curriculum teacher. From the following study-note text (Arabic), ` +
+    `author ${count} original Arabic multiple-choice questions for subject "${subject}". ` +
+    `Base EVERY question strictly on the note text (no outside facts). ` +
+    `TEXT:\n"""\n${text.slice(0, 6000)}\n"""\n` +
+    `Rules: EXACTLY 4 options each, exactly one correct, varied difficulty, no duplicates. ` +
+    `Return ONLY a JSON array, no markdown: [{"q": "...", "options": ["..","..","..",".."], "answer": "exact correct option text"}]`;
+
+  let items: any[] = [];
+  let lastErr = "";
+  for (const key of keys) {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 90000);
+      const r = await fetch(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=" + key,
+        {
+          method: "POST", headers: { "Content-Type": "application/json" }, signal: ctrl.signal,
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.7, maxOutputTokens: 4000 },
+          }),
+        }
+      ).finally(() => clearTimeout(timer));
+      const j = await r.json().catch(() => null);
+      const out: string = j?.candidates?.[0]?.content?.parts?.map((p: any) => p.text ?? "").join("") ?? "";
+      if (r.ok && out) {
+        const clean = out.replace(/```json|```/g, "").trim();
+        const arr = JSON.parse(clean.slice(clean.indexOf("["), clean.lastIndexOf("]") + 1));
+        if (Array.isArray(arr) && arr.length) { items = arr; break; }
+      }
+      lastErr = String((j as any)?.error?.message ?? r.status).slice(0, 60);
+      if (r.status !== 429) break;
+    } catch { lastErr = "network"; break; }
+  }
+  if (!items.length) return { error: "gen_failed", message: lastErr || "تعذر التوليد — تحقق من مفتاح الرؤية" };
+
+  const { normOption } = await import("@/lib/vision");
+  const rows: Record<string, unknown>[] = [];
+  for (const it of items.slice(0, count)) {
+    const body = String(it?.q ?? "").trim().slice(0, 2000);
+    const opts = Array.isArray(it?.options) ? it.options.map((o: any) => String(o ?? "").trim()).filter(Boolean).slice(0, 4) : [];
+    if (body.length < 5 || opts.length !== 4) continue;
+    const ans = String(it?.answer ?? "").trim();
+    const match = ans ? (opts.find((o: string) => o === ans || normOption(o) === normOption(ans)) ?? null) : null;
+    rows.push({
+      tenant_id: tid, subject, qtype: "mcq", body, options: opts,
+      correct_answer: match, difficulty: 3, visibility: "private", status: "draft",
+      source: "teacher", source_detail: JSON.stringify({ ai_from_notes: true }),
+      lesson_code: lessonCode, marks: 1,
+    });
+  }
+  if (!rows.length) return { error: "gen_failed", message: "ناتج غير صالح" };
+  const { error } = await admin.from("questions").insert(rows);
+  if (error) return { error: "db" };
+  return { drafts: rows.length, subject, note: "راجعها واعتمدها من مسوداتك — لا شيء يُنشر تلقائياً" };
+}
+
 /** بحث قاعدة المعرفة المحلية — يعمل بلا أي AI خارجي (SQL مباشر) */
 export async function searchKnowledge(
   admin: any, _tid: string, args: { query: string; kind?: string }
@@ -425,6 +495,7 @@ export const TOOL_IMPLS: Record<string, (admin: any, tid: string, args: Record<s
   student_progress: (a, t, x) => studentProgress(a, t, x as { name: string }),
   review_exam: (a, t, x) => reviewExam(a, t, x as { exam_id?: string }),
   generate_drafts: (a, t, x, c) => generateDrafts(a, t, x as { subject: string; count?: number }, c),
+  generate_from_notes: (a, t, x, c) => generateFromNotes(a, t, x as { text: string; subject?: string; count?: number; lesson_code?: string }, c),
   solve_question: (a, t, x) => solveQuestion(a, t, x as { question: string }),
   solve_exam: (a, t, x) => solveExam(a, t, x as { exam_id?: string }),
   app_help: (a, t, x) => appHelp(a, t, x as { topic: string }),
