@@ -4,6 +4,7 @@ import ReferralCard from "@/components/ReferralCard";
 import ReferralPromo from "@/components/ReferralPromo";
 import NpsBanner from "@/components/NpsBanner";
 import OnboardingChecklist from "@/components/OnboardingChecklist";
+import TrialBanner from "@/components/TrialBanner";
 import FeedbackWidget from "@/components/FeedbackWidget";
 
 export default async function DashboardHome() {
@@ -41,6 +42,7 @@ export default async function DashboardHome() {
         ))}
       </section>
 
+      <TrialBanner />
       <OnboardingChecklist />
       <NpsBanner />
       <ReferralPromo />

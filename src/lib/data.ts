@@ -87,6 +87,21 @@ export async function getFeed() {
   return [];
 }
 
+/** عدّاد التجربة: أيام متبقية + حالة (active/expiring/expired/paid) */
+export function withTrial(t: { name: string; slug: string; plan: string; primary_color: string; trial_ends_at?: string | null; settings?: any }) {
+  const paidUntil = t.settings?.plan_paid_until as string | undefined;
+  if (t.plan !== "trial" && paidUntil) {
+    const d = Math.ceil((new Date(paidUntil).getTime() - Date.now()) / 864e5);
+    return { name: t.name, slug: t.slug, plan: t.plan, color: t.primary_color, trialDaysLeft: d, trialState: "paid" as const };
+  }
+  if (!t.trial_ends_at) return { name: t.name, slug: t.slug, plan: t.plan, color: t.primary_color, trialDaysLeft: null as number | null, trialState: "unknown" as const };
+  const d = Math.ceil((new Date(t.trial_ends_at).getTime() - Date.now()) / 864e5);
+  return {
+    name: t.name, slug: t.slug, plan: t.plan, color: t.primary_color, trialDaysLeft: d,
+    trialState: (d <= 0 ? "expired" : d <= 3 ? "expiring" : "active") as "expired" | "expiring" | "active",
+  };
+}
+
 export async function getTenantInfoDB() {
   const sb = supaServer();
   // حاول أولاً عبر جلسة المستخدم (الأدق)
@@ -97,8 +112,8 @@ export async function getTenantInfoDB() {
       if (uid) {
         const { data: u } = await sb.from("users").select("tenant_id").eq("auth_user_id", uid).single();
         if (u?.tenant_id) {
-          const { data: t } = await sb.from("tenants").select("name,slug,plan,primary_color").eq("id", u.tenant_id).single();
-          if (t) return { name: t.name, slug: t.slug, plan: t.plan, color: t.primary_color };
+          const { data: t } = await sb.from("tenants").select("name,slug,plan,primary_color,trial_ends_at,settings").eq("id", u.tenant_id).single();
+          if (t) return withTrial(t as any);
         }
       }
     } catch {}
@@ -118,13 +133,13 @@ export async function getTenantInfoDB() {
       const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
       if (url && key) {
         const admin = createClient(url, key, { auth: { persistSession: false } });
-        const { data: t } = await admin.from("tenants").select("name,slug,plan,primary_color").eq("slug", slug).single();
-        if (t) return { name: t.name, slug: t.slug, plan: t.plan, color: t.primary_color };
+        const { data: t } = await admin.from("tenants").select("name,slug,plan,primary_color,trial_ends_at,settings").eq("slug", slug).single();
+        if (t) return withTrial(t as any);
       }
     }
   } catch {}
   // أخيراً: demo فقط لو Supabase غير مُعد
-  if (!sb) return demo.getTenantInfo();
+  if (!sb) return { ...demo.getTenantInfo(), trialDaysLeft: null as number | null, trialState: "unknown" as const };
   // حساب جديد بدون بيانات بعد — أظهر حالة فارغة بدلاً من demo
-  return { name: "سنترك الجديد", slug: "demo", plan: "trial", color: "#1A73E8" };
+  return { name: "سنترك الجديد", slug: "demo", plan: "trial", color: "#1A73E8", trialDaysLeft: null as number | null, trialState: "unknown" as const };
 }

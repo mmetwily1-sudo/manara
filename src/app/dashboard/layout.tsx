@@ -54,7 +54,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <span className="flex h-9 w-9 items-center justify-center rounded-lg font-extrabold text-white" style={{ backgroundColor: t.color }}>ن</span>
             <div>
               <div className="text-small font-bold leading-tight">{t.name}</div>
-              <div className="text-xs text-slate-400">باقة تجريبية · 14 يوم</div>
+              <div className="text-xs text-slate-400">
+                {(t as any).trialState === "paid" ? "باقة مدفوعة ✅"
+                  : (t as any).trialState === "expired" ? "انتهت التجربة ⚠️"
+                  : (t as any).trialState === "expiring" ? `تنتهي خلال ${(t as any).trialDaysLeft} أيام ⏳`
+                  : (t as any).trialState === "active" ? `تجربة · متبقٍ ${(t as any).trialDaysLeft} يوم`
+                  : "باقة تجريبية"}
+              </div>
             </div>
           </div>
           <nav className="flex-1 space-y-1 overflow-y-auto p-4">
