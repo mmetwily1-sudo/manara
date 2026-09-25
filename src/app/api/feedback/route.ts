@@ -33,5 +33,14 @@ export async function POST(req: Request) {
     tenant_id: res.ctx.tenantId, user_id: res.ctx.userRow.id, kind, score, text, page,
   });
   if (error) return dbFail("feedback", error);
+  // حملة NPS: سجّل تاريخ السؤال (مرة كل 90 يوماً)
+  if (kind === "nps") {
+    try {
+      const { data: t } = await admin.from("tenants").select("settings").eq("id", res.ctx.tenantId).single();
+      await admin.from("tenants").update({
+        settings: { ...(((t as any)?.settings ?? {}) as object), nps_last_asked: new Date().toISOString() },
+      }).eq("id", res.ctx.tenantId);
+    } catch {}
+  }
   return NextResponse.json({ ok: true });
 }

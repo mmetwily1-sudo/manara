@@ -4,6 +4,27 @@ import { createClient } from "@supabase/supabase-js";
 const HOLD_DAYS = 14; // فترة الحماية من الاسترداد/الإلغاء قبل منح المكافأة
 const MONTH_CAP = 5;
 const YEAR_CAP = 20;
+// عرض الافتتاح: مضاعفة المؤقتة — تُضبط عبر البيئة (افتراضي: 14 يوماً حتى 2026-10-31)
+const LAUNCH_DAYS = Number(process.env.REFERRAL_LAUNCH_DAYS ?? 14);
+const LAUNCH_UNTIL = process.env.REFERRAL_LAUNCH_UNTIL ?? "2026-10-31";
+const REFEREE_DAYS = Number(process.env.REFEREE_REWARD_DAYS ?? 7); // مكافأة المُحال (طرف ثانٍ)
+
+/** مدّد اشتراك سنتر بعدد أيام (paid_until وإلا trial) — يرجع التاريخ الجديد */
+async function extendSub(admin: any, tenantId: string, days: number): Promise<string | null> {
+  const { data: t } = await admin.from("tenants").select("settings,trial_ends_at").eq("id", tenantId).single();
+  if (!t) return null;
+  const cur = (t as any)?.settings?.plan_paid_until ?? (t as any)?.trial_ends_at ?? null;
+  const base = Math.max(Date.now(), cur ? new Date(cur).getTime() : 0);
+  const extended = new Date(base + days * 24 * 60 * 60 * 1000).toISOString();
+  if ((t as any)?.settings?.plan_paid_until) {
+    await admin.from("tenants").update({
+      settings: { ...(((t as any)?.settings ?? {}) as object), plan_paid_until: extended },
+    }).eq("id", tenantId);
+  } else {
+    await admin.from("tenants").update({ trial_ends_at: extended }).eq("id", tenantId);
+  }
+  return extended;
+}
 
 /**
  * POST /api/referrals/settle — تسوية الإحالات الناضجة (cron يومي، مؤمّن بـ CRON_SECRET).
@@ -78,27 +99,25 @@ async function settle(req: Request) {
         .eq("referrer_tenant_id", r.referrer_tenant_id).eq("status", "rewarded").gte("rewarded_at", y365);
       if ((c30 ?? 0) >= MONTH_CAP || (c365 ?? 0) >= YEAR_CAP) { out.skipped++; continue; }
 
-      // المنح: مدّد plan_paid_until (أو trial_ends_at) من max(الآن، الحالي)
-      const { data: owner } = await admin.from("tenants")
-        .select("settings,trial_ends_at").eq("id", r.referrer_tenant_id).single();
-      if (!owner) { out.skipped++; continue; }
-      const cur = (owner as any)?.settings?.plan_paid_until ?? (owner as any)?.trial_ends_at ?? null;
-      const base = Math.max(Date.now(), cur ? new Date(cur).getTime() : 0);
-      const extended = new Date(base + Number(r.reward_days || 7) * 24 * 60 * 60 * 1000).toISOString();
-      const settings = { ...(((owner as any)?.settings ?? {}) as object) };
-      if ((owner as any)?.settings?.plan_paid_until) (settings as any).plan_paid_until = extended;
-      else {
-        await admin.from("tenants").update({ trial_ends_at: extended }).eq("id", r.referrer_tenant_id);
+      // المنح: المُحيل (مع عرض الافتتاح المضاعف) + المُحال (طرف ثانٍ لمرة واحدة)
+      const launchOn = new Date().toISOString().slice(0, 10) <= LAUNCH_UNTIL;
+      const referrerDays = launchOn ? LAUNCH_DAYS : Number(r.reward_days || 7);
+      const ext1 = await extendSub(admin, r.referrer_tenant_id, referrerDays);
+      if (!ext1) { out.skipped++; continue; }
+      let refereeExt: string | null = null;
+      if (r.referee_tenant_id) {
+        const { count: prevRef } = await admin.from("referrals").select("id", { count: "exact", head: true })
+          .eq("referee_tenant_id", r.referee_tenant_id).eq("status", "rewarded");
+        if (!prevRef) refereeExt = await extendSub(admin, r.referee_tenant_id, REFEREE_DAYS);
       }
-      if ((owner as any)?.settings?.plan_paid_until) {
-        await admin.from("tenants").update({ settings }).eq("id", r.referrer_tenant_id);
-      }
-      await admin.from("referrals").update({ status: "rewarded", rewarded_at: new Date().toISOString() }).eq("id", r.id);
+      await admin.from("referrals").update({
+        status: "rewarded", rewarded_at: new Date().toISOString(), reward_days: referrerDays,
+      }).eq("id", r.id);
       try {
         await admin.from("audit_log").insert({
           tenant_id: r.referrer_tenant_id, actor_id: null,
           action: "referral:reward", entity_type: "referral", entity_id: r.id,
-          details: { days: r.reward_days, referee: r.referee_tenant_id },
+          details: { days: referrerDays, referee: r.referee_tenant_id, referee_extended: !!refereeExt, launch: launchOn },
         });
       } catch {}
       out.rewarded++;

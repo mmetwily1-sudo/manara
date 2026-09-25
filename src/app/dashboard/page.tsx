@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { getKpis, getGroups, getEarlyWarning, getFeed } from "@/lib/data";
 import ReferralCard from "@/components/ReferralCard";
+import ReferralPromo from "@/components/ReferralPromo";
+import NpsBanner from "@/components/NpsBanner";
 import FeedbackWidget from "@/components/FeedbackWidget";
 
 export default async function DashboardHome() {
@@ -38,6 +40,8 @@ export default async function DashboardHome() {
         ))}
       </section>
 
+      <NpsBanner />
+      <ReferralPromo />
       <ReferralCard />
       <FeedbackWidget />
 

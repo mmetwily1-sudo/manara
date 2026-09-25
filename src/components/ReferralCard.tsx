@@ -38,7 +38,7 @@ export default function ReferralCard() {
   }
 
   return (
-    <section className="card space-y-3 border-primary/20 bg-gradient-to-l from-primary-light/40 to-transparent p-5">
+    <section id="referral" className="card scroll-mt-24 space-y-3 border-primary/20 bg-gradient-to-l from-primary-light/40 to-transparent p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-bold">رشّح زميلاً واكسب 🎁</h2>
         <div className="flex gap-4 text-xs">
