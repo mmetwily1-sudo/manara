@@ -27,6 +27,14 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const sbUser = supaUser();
   const { data: { user } } = sbUser ? await sbUser.auth.getUser() : { data: { user: null } } as any;
   if (!user) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
+
+  // ضد تخمين الأكواد: 60 محاولة/ساعة لكل IP
+  try {
+    const { isRateLimited } = await import("@/lib/rate-limit");
+    if (isRateLimited(req, "exam-claim", 60, 60 * 60 * 1000)) {
+      return NextResponse.json({ ok: false, error: "too_many_attempts", message: "محاولات كثيرة — انتظر ساعة." }, { status: 429 });
+    }
+  } catch {}
   const sb = admin();
 
   const body = await req.json().catch(() => ({} as any));
