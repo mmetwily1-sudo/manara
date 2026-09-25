@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import WinbackPanel from "@/components/WinbackPanel";
 
 export default async function AdminTenantsPage() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -14,6 +15,7 @@ export default async function AdminTenantsPage() {
   return (
     <div className="space-y-4">
       <h1 className="text-h1">السناتر</h1>
+      <WinbackPanel />
       <div className="card overflow-hidden">
         <table className="w-full text-right text-small">
           <thead className="bg-slate-900 text-xs text-slate-300">
