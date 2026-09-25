@@ -269,6 +269,7 @@ export default function ProgressPage() {
         <div className="text-h1">📊</div>
         <p className="font-bold">{err}</p>
         <a href="/login" className="btn-primary inline-block">تسجيل الدخول</a>
+        <div><a href="/parent" className="mt-2 inline-block text-small font-bold text-primary underline">ولي أمر؟ ادخل برقم موبايل الطالب ←</a></div>
       </div>
     );
   }

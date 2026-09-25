@@ -143,5 +143,37 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     });
   } catch {}
 
+  // تنبيه فوري للمدرس عند إشارات قوية (v2 — إرشادي لا حظر)
+  try {
+    const { data: tm } = await sb.from("exam_attempts").select("started_at").eq("id", att.id).single();
+    const durMin = (tm as any)?.started_at
+      ? (Date.now() - new Date((tm as any).started_at).getTime()) / 60000 : null;
+    const allotted = Math.max(1, Number((exam as any).duration_minutes ?? 30));
+    const fastPerfect = durMin !== null && durMin < allotted * 0.1 && total > 0 && score / total >= 0.9;
+    const manyTabs = Number(tabSwitches ?? 0) > 5;
+    if (fastPerfect || manyTabs) {
+      const { data: stu } = await sb.from("users").select("full_name").eq("id", urow.id).single();
+      const why = [
+        fastPerfect ? `حل سريع (${durMin!.toFixed(1)} د من ${allotted}) بدرجة ${score}/${total}` : "",
+        manyTabs ? `${tabSwitches} تبديل تبويب` : "",
+      ].filter(Boolean).join(" + ");
+      await sb.from("audit_log").insert({
+        tenant_id: exam.tenant_id, actor_id: urow.id,
+        action: "exam:suspicion_instant", entity_type: "exam", entity_id: params.id,
+        details: { student: (stu as any)?.full_name ?? "", why },
+      });
+      const { data: teachers } = await sb.from("users").select("id")
+        .eq("tenant_id", exam.tenant_id).in("role", ["teacher_admin", "supervisor"]).limit(10);
+      const { sendPushToUser } = await import("@/lib/push");
+      for (const tch of (teachers ?? []) as any[]) {
+        await sendPushToUser(sb, exam.tenant_id, tch.id, {
+          title: "🕵️ مؤشر اشتباه فوري",
+          body: `${(stu as any)?.full_name ?? "طالب"} — ${exam.title}: ${why}`,
+          url: "/dashboard/exams",
+        });
+      }
+    }
+  } catch {}
+
   return NextResponse.json({ ok: true, score, total, certSerial });
 }

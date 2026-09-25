@@ -66,9 +66,13 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       }
     }
 
-    // timing: الأسرع (تحت P25) + درجة ≥90%
+    // timing: الأسرع (تحت P25) + درجة ≥90% + ملخص توزيع الأزمنة (v2)
     const durs = info.map((i) => i.durMin).filter((d): d is number => d !== null && d > 0.2).sort((a, b) => a - b);
     const p25 = durs.length >= 4 ? durs[Math.floor(durs.length * 0.25)] : null;
+    const median = durs.length ? durs[Math.floor(durs.length / 2)] : null;
+    const timing = durs.length
+      ? { n: durs.length, min: Math.round(durs[0] * 10) / 10, p25: p25 !== null ? Math.round(p25 * 10) / 10 : null, median: median !== null ? Math.round(median * 10) / 10 : null, max: Math.round(durs[durs.length - 1] * 10) / 10 }
+      : null;
 
     const durMinExam = Number((exam as any).duration_minutes ?? 30);
     const flags: any[] = [];
@@ -99,7 +103,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       (st ?? []).forEach((s: any) => { names[s.id] = s.full_name; });
     }
     return NextResponse.json({
-      ok: true, attempts: rows.length,
+      ok: true, attempts: rows.length, timing,
       flags: flags.map((f) => ({ ...f, student: names[f.student_id] ?? "—" })),
       disclaimer: "مؤشرات إحصائية تستحق المراجعة — لا تثبت الغش وحدها.",
     });

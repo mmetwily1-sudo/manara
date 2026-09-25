@@ -8,6 +8,7 @@ type Flag = { student_id: string; student: string; score: number; level: string;
 export default function SuspicionPanel({ examId, attempts }: { examId: string; attempts: number }) {
   const [open, setOpen] = useState(false);
   const [flags, setFlags] = useState<Flag[] | null>(null);
+  const [timing, setTiming] = useState<{ n: number; min: number; p25: number | null; median: number | null; max: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
@@ -16,7 +17,7 @@ export default function SuspicionPanel({ examId, attempts }: { examId: string; a
     try {
       const r = await fetch(`/api/exams/${examId}/suspicion`);
       const j = await r.json().catch(() => null);
-      if (r.ok && j?.ok) setFlags(j.flags);
+      if (r.ok && j?.ok) { setFlags(j.flags); if (j.timing) setTiming(j.timing); }
       else setErr("تعذر التحليل.");
     } catch { setErr("تعذر الاتصال."); }
     finally { setBusy(false); }
@@ -34,6 +35,11 @@ export default function SuspicionPanel({ examId, attempts }: { examId: string; a
         <div className="mt-3">
           {busy && <div className="text-xs text-slate-400">جاري التحليل...</div>}
           {err && <div className="text-xs font-bold text-danger">{err}</div>}
+          {timing && (
+            <div className="mb-2 rounded-xl bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
+              ⏱️ مدد الحل ({timing.n} محاولات): أسرع {timing.min} د · الوسيط {timing.median ?? "—"} د · الأبطأ {timing.max} د
+            </div>
+          )}
           {flags !== null && flags.length === 0 && (
             <div className="text-xs font-bold text-success">لا توجد أنماط غير معتادة — كل المحاولات طبيعية ✅</div>
           )}

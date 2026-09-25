@@ -115,6 +115,13 @@ export default function PricingPage() {
           </div>
         </div>
 
+        <div className="card mx-auto mt-10 max-w-3xl bg-gradient-to-l from-primary-light/50 to-transparent p-6 text-center">
+          <div className="text-3xl">🎁</div>
+          <h2 className="mt-1 font-bold">عندك زميل معلم؟ اكسبا معاً 14 يوماً</h2>
+          <p className="mx-auto mt-1 max-w-md text-small text-slate-600">كل إحالة مؤهلة = أيام مجانية لك وله — بلا حد أدنى وبلا عمولة.</p>
+          <Link href="/referral" className="btn-primary mt-3 inline-block">اعرف عن برنامج الإحالة ←</Link>
+        </div>
+
         <div className="mx-auto mt-10 max-w-3xl text-center">
           <h2 className="text-h2 mb-4">أسئلة عن الدفع</h2>
           <div className="space-y-3 text-right">
