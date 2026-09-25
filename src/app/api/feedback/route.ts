@@ -33,6 +33,16 @@ export async function POST(req: Request) {
     tenant_id: res.ctx.tenantId, user_id: res.ctx.userRow.id, kind, score, text, page,
   });
   if (error) return dbFail("feedback", error);
+  // NPS منخفض (≤6): تذكرة متابعة تلقائية — الملاحظة تتحول لإجراء (قرار اللجنة)
+  if (kind === "nps" && score !== null && score <= 6) {
+    try {
+      await admin.from("support_tickets").insert({
+        tenant_id: res.ctx.tenantId, opened_by: res.ctx.userRow.id, category: "nps_followup",
+        subject: `متابعة NPS منخفض (${score}/10)`, body: text || "بدون تفاصيل — تواصل مع المعلم.",
+        priority: "high", status: "open",
+      });
+    } catch {}
+  }
   // حملة NPS: سجّل تاريخ السؤال (مرة كل 90 يوماً)
   if (kind === "nps") {
     try {

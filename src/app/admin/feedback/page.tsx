@@ -9,6 +9,7 @@ export default async function AdminFeedback() {
   let avg: number | null = null;
   let counts: Record<string, number> = {};
   let rows: any[] = [];
+  let openFollowups: number | null = null;
 
   if (url && key) {
     const admin = createClient(url, key, { auth: { persistSession: false } });
@@ -19,12 +20,20 @@ export default async function AdminFeedback() {
     const { data: latest } = await admin.from("feedback")
       .select("kind,score,text,page,created_at,tenants(name)")
       .order("created_at", { ascending: false }).limit(50);
+    const { count: ofc } = await admin.from("support_tickets").select("id", { count: "exact", head: true })
+      .eq("category", "nps_followup").eq("status", "open");
+    openFollowups = ofc;
     rows = latest ?? [];
   }
 
   return (
     <div className="space-y-6">
       <h1 className="text-h1">صوت المعلمين 💬</h1>
+      {(openFollowups ?? 0) > 0 && (
+        <div className="card border-danger/30 bg-danger/5 p-4 text-small font-bold text-danger">
+          🚨 {openFollowups} متابعة NPS منخفض مفتوحة — تواصل شخصياً خلال 24 ساعة قبل أن يغادر المعلم.
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
         <div className="card p-5">
           <div className="text-h1 font-extrabold">{avg ?? "—"}</div>
