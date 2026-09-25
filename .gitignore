@@ -40,3 +40,7 @@ next-env.d.ts
 .vscode/*
 !.vscode/extensions.json
 .idea/
+
+# local logical backups (never commit data)
+/backups/
+
