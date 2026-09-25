@@ -23,7 +23,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   if (!exam) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
 
   const { data: codes } = await admin.from("exam_codes")
-    .select("id,student_id,code_hint,status,issued_at,started_at,expires_at,submitted_at")
+    .select("id,student_id,code_hint,status,device_fp,ip,issued_at,started_at,expires_at,submitted_at")
     .eq("exam_id", params.id).eq("tenant_id", tid).order("issued_at", { ascending: false }).limit(500);
   const sids = Array.from(new Set((codes ?? []).map((c: any) => c.student_id).filter(Boolean)));
   let names: Record<string, string> = {};

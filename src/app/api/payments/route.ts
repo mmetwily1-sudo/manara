@@ -10,7 +10,7 @@ export async function GET() {
 
   const { data: payments, error } = await ctx.admin
     .from("payments")
-    .select("id,amount,method,status,note,paid_at,student_id")
+    .select("id,amount,method,status,note,paid_at,student_id,receipt_no")
     .eq("tenant_id", ctx.tenantId)
     .order("paid_at", { ascending: false })
     .limit(100);
@@ -67,6 +67,7 @@ export async function GET() {
       method: p.method,
       status: p.status,
       note: p.note,
+      receipt_no: p.receipt_no ?? null,
       paid_at: p.paid_at,
     })),
   });
@@ -108,6 +109,19 @@ export async function POST(req: Request) {
     .limit(1)
     .single();
 
+  // رقم إيصال متسلسل لكل سنتر (تفاؤلي: قراءة + تحديث مشروط — التكرار مستحيل عملياً بسرعة التحصيل اليدوي)
+  let receiptNo: number | null = null;
+  try {
+    await ctx.admin.from("tenant_counters").insert({ tenant_id: ctx.tenantId, receipt_seq: 0 });
+  } catch {}
+  try {
+    const { data: cur } = await ctx.admin.from("tenant_counters").select("receipt_seq").eq("tenant_id", ctx.tenantId).single();
+    const next = Number((cur as any)?.receipt_seq ?? 0) + 1;
+    const { data: upd } = await ctx.admin.from("tenant_counters").update({ receipt_seq: next })
+      .eq("tenant_id", ctx.tenantId).eq("receipt_seq", Number((cur as any)?.receipt_seq ?? 0)).select("receipt_seq").single();
+    receiptNo = Number((upd as any)?.receipt_seq ?? next);
+  } catch {}
+
   const { data, error } = await ctx.admin.from("payments").insert({
     tenant_id: ctx.tenantId,
     student_id: studentId,
@@ -117,11 +131,37 @@ export async function POST(req: Request) {
     status: "confirmed",
     confirmed_by: ctx.userRow.id,
     note,
+    receipt_no: receiptNo,
   }).select("id").single();
 
   if (error || !data) {
     return NextResponse.json({ ok: false, error: error?.message ?? "insert_failed" }, { status: 500 });
   }
+
+  // ترحيل المبلغ تلقائياً على أقدم فواتير الطالب غير المسددة (FIFO)
+  try {
+    let rest = amount;
+    const { data: open } = await ctx.admin.from("invoices").select("id,amount,paid")
+      .eq("tenant_id", ctx.tenantId).eq("student_id", studentId).neq("status", "paid")
+      .order("period", { ascending: true }).limit(20);
+    for (const iv of (open ?? []) as any[]) {
+      if (rest <= 0) break;
+      const owe = Number(iv.amount ?? 0) - Number(iv.paid ?? 0);
+      if (owe <= 0) continue;
+      const take = Math.min(owe, rest);
+      rest -= take;
+      const nPaid = Number(iv.paid ?? 0) + take;
+      await ctx.admin.from("invoices").update({
+        paid: nPaid,
+        status: nPaid >= Number(iv.amount ?? 0) ? "paid" : "partial",
+        paid_at: nPaid >= Number(iv.amount ?? 0) ? new Date().toISOString() : null,
+        receipt_no: receiptNo,
+      }).eq("id", iv.id);
+      if (!rest) {
+        await ctx.admin.from("payments").update({ invoice_id: iv.id }).eq("id", (data as any).id);
+      }
+    }
+  } catch {}
 
   // سجل تدقيق (best-effort — جدول audit_log موجود)
   try {
@@ -144,5 +184,5 @@ export async function POST(req: Request) {
     });
   } catch {}
 
-  return NextResponse.json({ ok: true, id: data.id });
+  return NextResponse.json({ ok: true, id: (data as any).id, receipt_no: receiptNo });
 }

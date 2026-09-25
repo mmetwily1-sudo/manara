@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { waTo } from "@/lib/wa";
 
-type Payment = { id: string; student: string; amount: number; method: string; status: string; note: string | null; paid_at: string };
+type Payment = { id: string; student: string; amount: number; method: string; status: string; note: string | null; paid_at: string; receipt_no: number | null };
+type Overdue = { student_id: string; name: string; phone: string | null; due: number; periods: string[]; abs: number };
 type Totals = { collectedMonth: number; collectedToday: number; expected: number; outstanding: number };
 type Close = { date: string; total: number; count: number; byMethod: Record<string, { total: number; count: number }> };
 
@@ -12,6 +14,8 @@ export default function PaymentsPage() {
   const [payments, setPayments] = useState<Payment[] | null>(null);
   const [totals, setTotals] = useState<Totals | null>(null);
   const [close, setClose] = useState<Close | null>(null);
+  const [overdues, setOverdues] = useState<Overdue[] | null>(null);
+  const [issuing, setIssuing] = useState(false);
   const [err, setErr] = useState("");
   const [students, setStudents] = useState<{ id: string; name: string }[]>([]);
   const [showCollect, setShowCollect] = useState(false);
@@ -20,13 +24,15 @@ export default function PaymentsPage() {
 
   async function load() {
     try {
-      const [rp, rs] = await Promise.all([fetch("/api/payments"), fetch("/api/students")]);
+      const [rp, rs, ri] = await Promise.all([fetch("/api/payments"), fetch("/api/students"), fetch("/api/invoices")]);
       const jp = await rp.json().catch(() => null);
       const js = await rs.json().catch(() => null);
+      const ji = await ri.json().catch(() => null);
       if (!rp.ok || !jp?.ok) { setErr("تعذر تحميل الدفعات."); return; }
       setPayments(jp.payments);
       setTotals(jp.totals);
       if (jp.close) setClose(jp.close);
+      if (ri.ok && ji?.ok) setOverdues(ji.overdues);
       if (rs.ok && js?.ok) setStudents(js.students.map((s: any) => ({ id: s.id, name: s.name })));
       setErr("");
     } catch { setErr("تعذر الاتصال بالخادم."); }
@@ -49,6 +55,21 @@ export default function PaymentsPage() {
 
   const pending = (payments ?? []).filter((p) => p.status === "pending");
   const history = (payments ?? []).filter((p) => p.status !== "pending");
+
+  async function onIssue() {
+    if (!confirm("إصدار فواتير الشهر الحالي لكل التسجيلات النشطة؟")) return;
+    setIssuing(true); setErr("");
+    try {
+      const r = await fetch("/api/invoices", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "issue" }),
+      });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) load();
+      else setErr("فشل الإصدار.");
+    } catch { setErr("تعذر الاتصال."); }
+    finally { setIssuing(false); }
+  }
 
   async function onCollect(e: React.FormEvent) {
     e.preventDefault();
@@ -77,8 +98,11 @@ export default function PaymentsPage() {
           <h1 className="text-h1">التحصيل</h1>
           <p className="mt-1 text-small text-slate-500">دورة الشهر · صفر عمولة</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <a href="/api/export?scope=payments" className="btn-secondary text-small">تصدير CSV ⬇️</a>
+          <button onClick={onIssue} disabled={issuing} className="btn-secondary text-small disabled:opacity-50">
+            {issuing ? "جاري الإصدار..." : "إصدار فواتير الشهر 🧾"}
+          </button>
           <button onClick={() => setShowCollect((v) => !v)} className="btn-primary text-small">تسجيل دفعة</button>
         </div>
       </header>
@@ -135,6 +159,28 @@ export default function PaymentsPage() {
         </section>
       )}
 
+      {overdues !== null && overdues.length > 0 && (
+        <section className="card space-y-3 border-danger/25 p-5">
+          <h2 className="font-bold text-danger">متأخرات مستحقة ({overdues.length}) 📋</h2>
+          <ul className="space-y-2">
+            {overdues.map((o) => {
+              const link = waTo(o.phone, `السلام عليكم 👋 تذكير من سنترنا: على الطالب ${o.name} مبلغ مستحق ${o.due.toLocaleString("ar-EG")} جنيه عن ${o.periods.join("، ")} — برجاء السداد في أقرب وقت.`);
+              return (
+                <li key={o.student_id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-danger/5 px-4 py-3 text-small">
+                  <div>
+                    <span className="font-bold">{o.name}</span>
+                    <span className="mx-2 font-extrabold text-danger">{fmt(o.due)}</span>
+                    <span className="text-xs text-slate-500">{o.periods.join("، ")}</span>
+                    {o.abs > 0 && <span className="mx-2 rounded-full bg-warning/15 px-2 py-0.5 text-[11px] font-bold text-warning">غياب الشهر: {o.abs}</span>}
+                  </div>
+                  {link && <a href={link} target="_blank" rel="noreferrer" className="rounded-lg bg-success px-4 py-1.5 text-xs font-bold text-white">تذكير واتساب 💬</a>}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
       {pending.length > 0 && (
         <section className="card space-y-3 border-warning/30 p-5">
           <h2 className="font-bold">مطالبات بانتظار المراجعة ({pending.length}) ⏳</h2>
@@ -165,7 +211,7 @@ export default function PaymentsPage() {
         ) : (
           <table className="w-full text-right text-small">
             <thead className="bg-slate-50 text-xs text-slate-500">
-              <tr>{["الطالب", "المبلغ", "الطريقة", "ملاحظة", "الوقت"].map((h) => <th key={h} className="px-4 py-3 font-semibold">{h}</th>)}</tr>
+              <tr>{["الطالب", "المبلغ", "الطريقة", "إيصال", "ملاحظة", "الوقت"].map((h) => <th key={h} className="px-4 py-3 font-semibold">{h}</th>)}</tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {history.map((p) => (
@@ -173,6 +219,7 @@ export default function PaymentsPage() {
                   <td className="px-4 py-3 font-bold">{p.student}</td>
                   <td className="px-4 py-3 font-bold text-success">{fmt(p.amount)}</td>
                   <td className="px-4 py-3 text-slate-500">{METHODS[p.method] ?? p.method}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-slate-400" dir="ltr">{p.receipt_no != null ? `#${p.receipt_no}` : "—"}</td>
                   <td className="px-4 py-3 text-slate-400">{p.note ?? "—"}</td>
                   <td className="px-4 py-3 text-xs text-slate-400">{new Date(p.paid_at).toLocaleDateString("ar-EG", { day: "numeric", month: "short" })}</td>
                 </tr>

@@ -4,7 +4,8 @@ import { useState } from "react";
 
 type CodeRow = {
   id: string; student_id: string | null; student: string; code_hint: string;
-  status: string; issued_at: string; started_at: string | null; expires_at: string | null; submitted_at: string | null;
+  status: string; device_fp: string | null; ip: string | null;
+  issued_at: string; started_at: string | null; expires_at: string | null; submitted_at: string | null;
 };
 
 const STATUS: Record<string, [string, string]> = {
@@ -105,10 +106,15 @@ export default function ExamCodesManager({ examId, required, onToggleRequire }: 
                 const [label, tone] = STATUS[c.status] ?? [c.status, "bg-slate-100"];
                 return (
                   <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white px-3 py-2">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="font-bold">{c.student}</span>
                       <span className="font-mono text-slate-400" dir="ltr">{c.code_hint}</span>
                       <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${tone}`}>{label}</span>
+                      {(c.status === "started" || c.status === "submitted") && (c.device_fp || c.ip) && (
+                        <span className="font-mono text-[10px] text-slate-400" dir="ltr" title="بصمة الجهاز وعنوان الشبكة — لمراجعة الجلسات">
+                          {c.device_fp ?? ""} {c.ip ? `· ${c.ip}` : ""}
+                        </span>
+                      )}
                     </div>
                     {(c.status === "issued" || c.status === "started") && (
                       <button onClick={() => revoke(c.id)} className="font-bold text-danger">سحب</button>
