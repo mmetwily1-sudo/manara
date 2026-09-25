@@ -16,6 +16,7 @@ export default function PaymentsPage() {
   const [close, setClose] = useState<Close | null>(null);
   const [overdues, setOverdues] = useState<Overdue[] | null>(null);
   const [issuing, setIssuing] = useState(false);
+  const [reminding, setReminding] = useState(false);
   const [err, setErr] = useState("");
   const [students, setStudents] = useState<{ id: string; name: string }[]>([]);
   const [showCollect, setShowCollect] = useState(false);
@@ -38,6 +39,18 @@ export default function PaymentsPage() {
     } catch { setErr("تعذر الاتصال بالخادم."); }
   }
   useEffect(() => { load(); }, []);
+
+  async function onRemindAll() {
+    if (!confirm("إرسال تذكير تلقائي لكل متأخر مستحق (push + واتساب إن كان مربوطاً)؟")) return;
+    setReminding(true); setErr("");
+    try {
+      const r = await fetch("/api/invoices/remind", { method: "POST" });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) load();
+      else setErr("فشل التذكير.");
+    } catch { setErr("تعذر الاتصال."); }
+    finally { setReminding(false); }
+  }
 
   async function onReview(id: string, action: "confirm" | "reject") {
     if (!confirm(action === "confirm" ? "تأكيد استلام هذه الدفعة؟" : "رفض هذه المطالبة؟")) return;
@@ -102,6 +115,9 @@ export default function PaymentsPage() {
           <a href="/api/export?scope=payments" className="btn-secondary text-small">تصدير CSV ⬇️</a>
           <button onClick={onIssue} disabled={issuing} className="btn-secondary text-small disabled:opacity-50">
             {issuing ? "جاري الإصدار..." : "إصدار فواتير الشهر 🧾"}
+          </button>
+          <button onClick={onRemindAll} disabled={reminding} className="btn-secondary text-small disabled:opacity-50">
+            {reminding ? "جاري..." : "تذكير كل المتأخرين 🔔"}
           </button>
           <button onClick={() => setShowCollect((v) => !v)} className="btn-primary text-small">تسجيل دفعة</button>
         </div>

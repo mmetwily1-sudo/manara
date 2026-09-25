@@ -11,6 +11,7 @@ export type NotifyEvent =
   | { kind: "attendance_absent"; studentName: string; centerName: string; sessionLabel: string }
   | { kind: "exam_graded"; studentName: string; examTitle: string; score: number; total: number; certSerial: string | null }
   | { kind: "payment_received"; studentName: string; amount: number; centerName: string }
+  | { kind: "payment_reminder"; studentName: string; amount: number; centerName: string; periods: string }
   | { kind: "homework_submitted"; studentName: string; hwTitle: string }
   | { kind: "homework_graded"; studentName: string; hwTitle: string; score: number; total: number };
 
@@ -24,6 +25,8 @@ function renderBody(e: NotifyEvent): string {
     }
     case "payment_received":
       return `تم استلام دفعة ✅\nالطالب: ${e.studentName}\nالمبلغ: ${e.amount} جنيه\nشكراً لكم — ${e.centerName}`;
+    case "payment_reminder":
+      return `تذكير ودي بالمصروفات 🔔\nالطالب: ${e.studentName}\nالمستحق: ${e.amount} جنيه (${e.periods})\n${e.centerName} — للسداد تواصل مع الإدارة.`;
     case "homework_submitted":
       return `واجب جديد بانتظار التصحيح 📝\nالطالب: ${e.studentName}\nالواجب: «${e.hwTitle}»`;
     case "homework_graded": {
@@ -108,6 +111,7 @@ export async function notifyStudent(
       attendance_absent: "تنبيه غياب 📋",
       exam_graded: "نتيجة امتحان 📝",
       payment_received: "تم استلام دفعة ✅",
+      payment_reminder: "تذكير بالمصروفات 🔔",
       homework_submitted: "واجب جديد 📝",
       homework_graded: "تصحيح واجب 📝",
     };

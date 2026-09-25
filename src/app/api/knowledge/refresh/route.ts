@@ -69,6 +69,16 @@ function classify(title: string): string {
   return "curriculum_note";
 }
 
+export async function GET(req: Request) {
+  // cron فيرسل GET حصراً — يقبل cron فقط
+  const cronSecret = process.env.CRON_SECRET ?? "";
+  const auth = req.headers.get("authorization") ?? "";
+  if (!cronSecret || auth !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  }
+  return doRefresh(req, null);
+}
+
 export async function POST(req: Request) {
   // cron الرسمي (Vercel) أو معلم
   const cronSecret = process.env.CRON_SECRET ?? "";
@@ -85,7 +95,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "rate_limited" }, { status: 429 });
     }
   }
+  return doRefresh(req, tid);
+}
 
+async function doRefresh(req: Request, tid: string | null) {
+  void req; void tid;
   const { createClient } = await import("@supabase/supabase-js");
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
     auth: { persistSession: false },
