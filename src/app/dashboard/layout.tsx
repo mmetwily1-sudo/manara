@@ -22,7 +22,9 @@ const navMore = [
   { href: "/dashboard/announcements", label: "الإعلانات", key: "08d" },
   { href: "/dashboard/store", label: "المتجر", key: "08e" },
   { href: "/dashboard/certificates", label: "التقارير", key: "09" },
-  { href: "/dashboard/settings", label: "هويتي والإعدادات", key: "10" },
+  { href: "/dashboard/digests", label: "تقارير الأهل", key: "09b", roles: ["teacher_admin", "supervisor"] },
+  { href: "/dashboard/staff", label: "الفروع والطاقم", key: "09c", roles: ["teacher_admin"] },
+  { href: "/dashboard/settings", label: "هويتي والإعدادات", key: "10", roles: ["teacher_admin"] },
 ];
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -55,7 +57,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             </div>
           </div>
           <nav className="flex-1 space-y-1 overflow-y-auto p-4">
-            {[...nav, ...navMore].map((item) => (
+            {[...nav, ...navMore].filter((item: any) => !item.roles || !viewerRole || item.roles.includes(viewerRole) || viewerRole === "teacher_admin").map((item) => (
               <Link key={item.label} href={item.href}
                 className="group flex items-center justify-between rounded-lg px-3 py-2.5 text-small font-semibold text-slate-600 transition hover:bg-primary-light/50 hover:text-primary">
                 <span>{item.label}</span>

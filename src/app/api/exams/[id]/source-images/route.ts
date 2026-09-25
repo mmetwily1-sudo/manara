@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { R } from "@/lib/permissions";
 
 /**
  * DELETE /api/exams/[id]/source-images — حذف صور المسح الأصلية لامتحان.
@@ -6,7 +7,7 @@ import { NextResponse } from "next/server";
  */
 export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
   const { requireTeacher, adminClient } = await import("@/lib/server-auth");
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(R.content);
   if ("error" in res) return res.error;
   const admin = adminClient();
   const tid = res.ctx.tenantId;

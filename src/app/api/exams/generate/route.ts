@@ -1,4 +1,5 @@
 ﻿import { NextResponse } from "next/server";
+import { R } from "@/lib/permissions";
 import { isMissingTable } from "@/lib/server-auth";
 
 /**
@@ -36,7 +37,7 @@ function apportion(total: number, weights: number[]): number[] {
 
 export async function POST(req: Request) {
   const { requireTeacher } = await import("@/lib/server-auth");
-  const ares = await requireTeacher(["teacher_admin"]);
+  const ares = await requireTeacher(R.content);
   if ("error" in ares) return ares.error;
   const { isRateLimited } = await import("@/lib/rate-limit");
   if (isRateLimited(req, "generate", 30, 60 * 60 * 1000, ares.ctx.tenantId)) {

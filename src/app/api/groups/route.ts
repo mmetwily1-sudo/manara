@@ -1,16 +1,18 @@
 import { NextResponse } from "next/server";
 import { dbFail } from "@/lib/api-error";
 import { requireTeacher } from "@/lib/server-auth";
+import { R, staffScope } from "@/lib/permissions";
 
-/** GET /api/groups — مجموعات السنتر مع عدد الطلاب */
+/** GET /api/groups — مجموعات السنتر مع عدد الطلاب (طاقم الفرع يرى فرعه) */
 export async function GET() {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(R.groupsRead);
   if ("error" in res) return res.error;
   const { ctx } = res;
 
+  const scope = await staffScope(ctx.admin, ctx.tenantId, res.ctx.userRow.role, res.ctx.userRow.id);
   const { data: groups, error } = await ctx.admin
     .from("groups")
-    .select("id,name,grade_level,subject,monthly_fee,schedule,created_at")
+    .select("id,name,grade_level,subject,monthly_fee,schedule,branch_id,created_at")
     .eq("tenant_id", ctx.tenantId)
     .order("created_at", { ascending: true });
   if (error) return dbFail("groups", error);
@@ -23,9 +25,10 @@ export async function GET() {
   const counts: Record<string, number> = {};
   (enrolls ?? []).forEach((e: any) => { counts[e.group_id] = (counts[e.group_id] ?? 0) + 1; });
 
+  const visible = scope.groupIds ? (groups ?? []).filter((g: any) => scope.groupIds!.includes(g.id)) : (groups ?? []);
   return NextResponse.json({
     ok: true,
-    groups: (groups ?? []).map((g: any) => ({ ...g, students_count: counts[g.id] ?? 0 })),
+    groups: visible.map((g: any) => ({ ...g, students_count: counts[g.id] ?? 0 })),
   });
 }
 

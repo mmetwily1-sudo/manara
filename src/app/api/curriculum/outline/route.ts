@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { R } from "@/lib/permissions";
 import { requireTeacher, isMissingTable } from "@/lib/server-auth";
 
 /**
@@ -6,7 +7,7 @@ import { requireTeacher, isMissingTable } from "@/lib/server-auth";
  * مفردات مادة: وحدات ← دروس (بالأوزان) + الكتب الخارجية + عدد أسئلة البنك لكل درس
  */
 export async function GET(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(R.content);
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const sp = new URL(req.url).searchParams;

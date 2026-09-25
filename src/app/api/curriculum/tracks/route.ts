@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
+import { R } from "@/lib/permissions";
 import { dbFail } from "@/lib/api-error";
 import { requireTeacher, isMissingTable } from "@/lib/server-auth";
 
 /** GET /api/curriculum/tracks — المسارات الدراسية النشطة (عام/أزهر) */
 export async function GET() {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(R.content);
   if ("error" in res) return res.error;
   const { data, error } = await res.ctx.admin
     .from("curriculum_tracks")

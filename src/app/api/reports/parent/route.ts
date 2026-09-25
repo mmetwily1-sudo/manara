@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
+import { R } from "@/lib/permissions";
 import { requireTeacher } from "@/lib/server-auth";
 
 /** GET /api/reports/parent?studentId= — بيانات تقرير ولي الأمر الشهري (آخر 30 يوم) */
 export async function GET(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(R.content);
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const tid = res.ctx.tenantId;

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { R } from "@/lib/permissions";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
@@ -14,7 +15,7 @@ function supaUser() {
 /** GET /api/questions/stats — عدد أسئلة البنك لكل مستوى صعوبة */
 export async function GET() {
   const { requireTeacher } = await import("@/lib/server-auth");
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(R.content);
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const urow = { tenant_id: res.ctx.tenantId };

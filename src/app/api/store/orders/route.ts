@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { R } from "@/lib/permissions";
 import { dbFail } from "@/lib/api-error";
 import { isMissingTable } from "@/lib/server-auth";
 
@@ -8,7 +9,7 @@ import { isMissingTable } from "@/lib/server-auth";
  */
 export async function GET() {
   const { requireTeacher, adminClient } = await import("@/lib/server-auth");
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(R.content);
   if ("error" in res) return res.error;
   const admin = adminClient();
   try {
@@ -34,7 +35,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const { requireTeacher, adminClient } = await import("@/lib/server-auth");
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(R.content);
   if ("error" in res) return res.error;
   const admin = adminClient();
   const body = await req.json().catch(() => ({} as any));

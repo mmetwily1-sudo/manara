@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { R } from "@/lib/permissions";
 import { getSessionUser, adminClient } from "@/lib/server-auth";
 import { dbFail } from "@/lib/api-error";
 
@@ -9,7 +10,7 @@ import { dbFail } from "@/lib/api-error";
  */
 async function ctx() {
   const { requireTeacher } = await import("@/lib/server-auth");
-  return requireTeacher(["teacher_admin"]);
+  return requireTeacher(R.content);
 }
 
 export async function GET() {

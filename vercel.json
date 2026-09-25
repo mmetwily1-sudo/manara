@@ -8,6 +8,10 @@
     {
       "path": "/api/referrals/settle",
       "schedule": "30 6 * * *"
+    },
+    {
+      "path": "/api/digests/run",
+      "schedule": "0 7 * * 6"
     }
   ]
 }

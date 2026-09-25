@@ -1,19 +1,25 @@
 import { NextResponse } from "next/server";
 import { dbFail } from "@/lib/api-error";
 import { requireTeacher } from "@/lib/server-auth";
+import { R, staffScope } from "@/lib/permissions";
 
 const curPeriod = () => new Date().toISOString().slice(0, 7);
 
-/** GET /api/invoices — الفواتير + كشف المتأخرات (بالغياب) */
+/** GET /api/invoices — الفواتير + كشف المتأخرات (طاقم الفرع لطلاب فرعه) */
 export async function GET(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(R.billingRead);
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const tid = res.ctx.tenantId;
 
-  const { data: inv } = await admin.from("invoices")
+  const scope = await staffScope(admin, tid, res.ctx.userRow.role, res.ctx.userRow.id);
+  const { data: allInv } = await admin.from("invoices")
     .select("id,student_id,group_id,period,amount,paid,status,receipt_no,paid_at")
-    .eq("tenant_id", tid).order("period", { ascending: false }).order("created_at", { ascending: false }).limit(500);
+    .eq("tenant_id", tid)
+    .order("period", { ascending: false }).order("created_at", { ascending: false }).limit(500);
+  const inv = scope.studentIds
+    ? (allInv ?? []).filter((x: any) => scope.studentIds!.includes(x.student_id))
+    : (allInv ?? []);
 
   const sids = Array.from(new Set((inv ?? []).map((x: any) => x.student_id).filter(Boolean)));
   let people: Record<string, { name: string; phone: string | null }> = {};
@@ -51,9 +57,9 @@ export async function GET(req: Request) {
   });
 }
 
-/** POST /api/invoices {action:"issue", period?} — إصدار فواتير شهر من التسجيلات النشطة */
+/** POST /api/invoices {action:"issue", period?} — إصدار فواتير شهر (مالك + محاسب) */
 export async function POST(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(R.billingWrite);
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const tid = res.ctx.tenantId;

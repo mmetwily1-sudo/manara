@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { dbFail } from "@/lib/api-error";
 import { requireTeacher } from "@/lib/server-auth";
+import { R } from "@/lib/permissions";
 
 /**
  * POST /api/payments/[id]/review — المعلم يقبل/يرفض مطالبة دفع.
@@ -8,7 +9,7 @@ import { requireTeacher } from "@/lib/server-auth";
  * القبول يرسل إيصال واتساب تلقائياً (نفس قناة الدفع المباشر).
  */
 export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(R.billingWrite);
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const tid = res.ctx.tenantId;

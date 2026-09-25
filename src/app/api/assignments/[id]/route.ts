@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
+import { R } from "@/lib/permissions";
 import { dbFail } from "@/lib/api-error";
 
 /** GET /api/assignments/[id] — تفاصيل الواجب + التسليمات (معلم). DELETE — حذف الواجب وتسليماته. */
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const { requireTeacher, adminClient } = await import("@/lib/server-auth");
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(R.content);
   if ("error" in res) return res.error;
   const admin = adminClient();
   const tid = res.ctx.tenantId;
@@ -37,7 +38,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 
 export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
   const { requireTeacher, adminClient } = await import("@/lib/server-auth");
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(R.content);
   if ("error" in res) return res.error;
   const admin = adminClient();
   const { error } = await admin.from("assignments").delete().eq("id", params.id).eq("tenant_id", res.ctx.tenantId);

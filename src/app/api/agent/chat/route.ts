@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { dbFail } from "@/lib/api-error";
 import { isMissingTable } from "@/lib/server-auth";
 import { runAgent, followUps, type AgentHistory } from "@/lib/agent";
+import { R } from "@/lib/permissions";
 
 /**
  * POST /api/agent/chat { thread_id?, message } — دور محادثة مع الوكيل.
@@ -9,7 +10,7 @@ import { runAgent, followUps, type AgentHistory } from "@/lib/agent";
  */
 export async function POST(req: Request) {
   const { requireTeacher, adminClient } = await import("@/lib/server-auth");
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(R.content);
   if ("error" in res) return res.error;
   const admin = adminClient();
   const tid = res.ctx.tenantId;

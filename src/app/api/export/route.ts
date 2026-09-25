@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireTeacher } from "@/lib/server-auth";
+import { R } from "@/lib/permissions";
 
 const BOM = "﻿";
 function csv(rows: (string | number | null)[][]): string {
@@ -15,7 +16,7 @@ function csv(rows: (string | number | null)[][]): string {
  * يجعل ادعاء «بياناتك بتتصدر في أي وقت» حقيقياً.
  */
 export async function GET(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(R.billingRead);
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const tid = res.ctx.tenantId;

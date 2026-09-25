@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { dbFail } from "@/lib/api-error";
 import { requireTeacher } from "@/lib/server-auth";
+import { R, staffScope } from "@/lib/permissions";
 
-/** GET /api/payments — سجل الدفعات + ملخص الشهر */
+/** GET /api/payments — سجل الدفعات + ملخص الشهر (طاقم الفرع لطلاب فرعه) */
 export async function GET() {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(R.billingRead);
   if ("error" in res) return res.error;
   const { ctx } = res;
 
@@ -56,11 +57,15 @@ export async function GET() {
   });
   const outstanding = Math.max(0, expected - collectedMonth);
 
+  const scope = await staffScope(ctx.admin, ctx.tenantId, res.ctx.userRow.role, res.ctx.userRow.id);
+  const visible = scope.studentIds
+    ? (payments ?? []).filter((p: any) => scope.studentIds!.includes(p.student_id))
+    : (payments ?? []);
   return NextResponse.json({
     ok: true,
     totals: { collectedMonth, collectedToday, expected, outstanding },
     close: { date: new Date().toISOString().slice(0, 10), total: collectedToday, count: todayCount, byMethod },
-    payments: (payments ?? []).map((p: any) => ({
+    payments: visible.map((p: any) => ({
       id: p.id,
       student: names[p.student_id] ?? "—",
       amount: Number(p.amount),
@@ -73,9 +78,9 @@ export async function GET() {
   });
 }
 
-/** POST /api/payments — تسجيل دفعة جديدة */
+/** POST /api/payments — تسجيل دفعة جديدة (مالك + محاسب) */
 export async function POST(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(R.billingWrite);
   if ("error" in res) return res.error;
   const { ctx } = res;
 

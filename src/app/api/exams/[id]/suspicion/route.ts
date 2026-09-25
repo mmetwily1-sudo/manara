@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { R } from "@/lib/permissions";
 import { dbFail } from "@/lib/api-error";
 import { requireTeacher } from "@/lib/server-auth";
 
@@ -8,7 +9,7 @@ import { requireTeacher } from "@/lib/server-auth";
  * تبديل تبويب مرتفع (+20) · تطابق إجابات كلي ≥90% (+20). العتبات: ≥70 مرتفع، 40-69 مراجعة.
  */
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(R.content);
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const tid = res.ctx.tenantId;

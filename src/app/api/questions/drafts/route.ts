@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { R } from "@/lib/permissions";
 import { dbFail } from "@/lib/api-error";
 
 function pageUrl(tenantId: string, ref: string, page: number): string | null {
@@ -27,7 +28,7 @@ function metaOf(row: any): { ref: string | null; page: number | null; exam_id: s
 /** GET /api/questions/drafts — مسودات المعلم الخاصة (مع صورها) */
 export async function GET() {
   const { requireTeacher, adminClient } = await import("@/lib/server-auth");
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(R.content);
   if ("error" in res) return res.error;
   const admin = adminClient();
   const tid = res.ctx.tenantId;
@@ -71,7 +72,7 @@ export async function GET() {
  */
 export async function POST(req: Request) {
   const { requireTeacher, adminClient } = await import("@/lib/server-auth");
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(R.content);
   if ("error" in res) return res.error;
   const admin = adminClient();
   const tid = res.ctx.tenantId;

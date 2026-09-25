@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { dbFail } from "@/lib/api-error";
 import { requireTeacher } from "@/lib/server-auth";
 import { coreSubject } from "@/mastra/tool-impls";
+import { R } from "@/lib/permissions";
 
 const normWords = (s: string): string[] =>
   String(s ?? "")
@@ -16,7 +17,7 @@ const normWords = (s: string): string[] =>
  * {action:"apply", links:[{qid, code}]} → تحديث lesson_code + audit
  */
 export async function POST(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(R.content);
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const tid = res.ctx.tenantId;

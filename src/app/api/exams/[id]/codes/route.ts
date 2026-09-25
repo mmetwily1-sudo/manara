@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { R } from "@/lib/permissions";
 import { createHash, randomBytes } from "crypto";
 import { dbFail } from "@/lib/api-error";
 import { requireTeacher } from "@/lib/server-auth";
@@ -14,7 +15,7 @@ const hash = (c: string) => createHash("sha256").update("examcode:" + c).digest(
 
 /** GET — قائمة أكواد الامتحان (معلم فقط) */
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(R.content);
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const tid = res.ctx.tenantId;
@@ -39,7 +40,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 
 /** POST — توليد أكواد {student_ids?: string[], count?: number} — يعيد الأكواد الصريحة مرة واحدة فقط */
 export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(R.content);
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const tid = res.ctx.tenantId;
@@ -110,7 +111,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
 /** DELETE — سحب كود {code_id} */
 export async function DELETE(req: Request, { params }: { params: { id: string } }) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(R.content);
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const tid = res.ctx.tenantId;

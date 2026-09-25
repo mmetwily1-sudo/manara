@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { R } from "@/lib/permissions";
 
 /**
  * POST /api/exams/[id]/audit — تدقيق آلي لأسئلة الامتحان قبل النشر.
@@ -13,7 +14,7 @@ type Warn = { n: number; question_id: string; body: string; issues: string[]; su
 
 export async function POST(_req: Request, { params }: { params: { id: string } }) {
   const { requireTeacher } = await import("@/lib/server-auth");
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(R.content);
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const tid = res.ctx.tenantId;

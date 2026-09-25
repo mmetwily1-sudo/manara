@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { requireTeacher } from "@/lib/server-auth";
+import { R, staffScope } from "@/lib/permissions";
 
-/** POST /api/sessions — إنشاء أو جلب جلسة اليوم لمجموعة */
+/** POST /api/sessions — إنشاء أو جلب جلسة اليوم لمجموعة (طاقم الفرع لمجموعات فرعه) */
 export async function POST(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(R.attendance);
   if ("error" in res) return res.error;
   const { ctx } = res;
 
@@ -18,6 +19,10 @@ export async function POST(req: Request) {
     .eq("tenant_id", ctx.tenantId)
     .single();
   if (!g) return NextResponse.json({ ok: false, error: "bad_group" }, { status: 400 });
+  const scope = await staffScope(ctx.admin, ctx.tenantId, res.ctx.userRow.role, res.ctx.userRow.id);
+  if (scope.groupIds && !scope.groupIds.includes(groupId)) {
+    return NextResponse.json({ ok: false, error: "wrong_branch" }, { status: 403 });
+  }
 
   const today = new Date().toISOString().slice(0, 10);
   const { data: existing } = await ctx.admin

@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { dbFail } from "@/lib/api-error";
 import { requireTeacher } from "@/lib/server-auth";
+import { R } from "@/lib/permissions";
 
 /** POST /api/feedback {kind: nps|idea|bug|praise, score?, text?, page?} — صوت المعلم */
 export async function POST(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(R.feedback);
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
 

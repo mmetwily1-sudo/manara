@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { dbFail } from "@/lib/api-error";
 import { requireTeacher } from "@/lib/server-auth";
+import { R, staffScope } from "@/lib/permissions";
 
-/** GET /api/students?groupId= — طلاب السنتر مع مجموعاتهم */
+/** GET /api/students?groupId= — طلاب السنتر مع مجموعاتهم (طاقم الفرع يرى طلاب فرعه) */
 export async function GET(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(R.studentsRead);
   if ("error" in res) return res.error;
   const { ctx } = res;
 
@@ -36,6 +37,8 @@ export async function GET(req: Request) {
     id: s.id, name: s.full_name, phone: s.phone, groups: byStudent[s.id] ?? [],
   }));
   if (groupId) list = list.filter((s: any) => s.groups.length > 0);
+  const scope = await staffScope(ctx.admin, ctx.tenantId, res.ctx.userRow.role, res.ctx.userRow.id);
+  if (scope.studentIds) list = list.filter((s: any) => scope.studentIds!.includes(s.id));
 
   return NextResponse.json({ ok: true, students: list });
 }

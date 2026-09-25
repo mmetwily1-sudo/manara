@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
+import { R } from "@/lib/permissions";
 import { dbFail } from "@/lib/api-error";
 
 /** POST /api/assignments/[id]/grade { student_id, score, feedback_text? } — تصحيح تسليم (معلم). */
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const { requireTeacher, adminClient } = await import("@/lib/server-auth");
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(R.content);
   if ("error" in res) return res.error;
   const admin = adminClient();
   const tid = res.ctx.tenantId;

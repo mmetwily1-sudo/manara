@@ -3,6 +3,7 @@ import { dbFail } from "@/lib/api-error";
 import { createClient } from "@supabase/supabase-js";
 import { cookies, headers } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
+import { R } from "@/lib/permissions";
 
 const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -54,9 +55,20 @@ export async function POST(req: Request) {
 
   const { data: urow } = await admin.from("users").select("id,tenant_id,role").eq("auth_user_id", auth.data.user.id).single();
   if (!urow?.tenant_id) return NextResponse.json({ ok: false, error: "no_tenant" }, { status: 403 });
+  // التحضير للطاقم فقط — الطالب لا يسجل حضور نفسه أو غيره
+  if (!R.attendance.includes((urow as any).role)) {
+    return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  }
 
   const { data: sess } = await admin.from("sessions").select("id,tenant_id,group_id").eq("id", sessionId).single();
   if (!sess || sess.tenant_id !== urow.tenant_id) return NextResponse.json({ ok: false, error: "bad_session" }, { status: 403 });
+  try {
+    const { staffScope } = await import("@/lib/permissions");
+    const scope = await staffScope(admin, urow.tenant_id, (urow as any).role, (urow as any).id);
+    if (scope.groupIds && !scope.groupIds.includes((sess as any).group_id)) {
+      return NextResponse.json({ ok: false, error: "wrong_branch" }, { status: 403 });
+    }
+  } catch {}
 
   // الطالب يجب أن ينتمي لنفس السنتر (منع تلويث سجلات سناتر أخرى)
   const { data: student } = await admin.from("users").select("id").eq("id", studentId).eq("tenant_id", urow.tenant_id).single();

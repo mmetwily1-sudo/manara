@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { R } from "@/lib/permissions";
 import { dbFail } from "@/lib/api-error";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
@@ -94,7 +95,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 /** PATCH /api/exams/[id] — تعديل العنوان/المدة/النشر (معلم فقط، سنتره فقط) */
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   const { requireTeacher } = await import("@/lib/server-auth");
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(R.content);
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
 
@@ -118,7 +119,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 /** DELETE /api/exams/[id] — حذف الامتحان وروابطه ومحاولاته وشهاداتها (معلم فقط) */
 export async function DELETE(req: Request, { params }: { params: { id: string } }) {
   const { requireTeacher } = await import("@/lib/server-auth");
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(R.content);
   if ("error" in res) return res.error;
   const sb = res.ctx.admin;
   const urow = { tenant_id: res.ctx.tenantId };

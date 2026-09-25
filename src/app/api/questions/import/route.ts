@@ -1,4 +1,5 @@
 ﻿import { NextResponse } from "next/server";
+import { R } from "@/lib/permissions";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
@@ -56,7 +57,7 @@ function parseBulkText(text: string): any[] {
 
 export async function POST(req: Request) {
   const { requireTeacher } = await import("@/lib/server-auth");
-  const tres = await requireTeacher(["teacher_admin"]);
+  const tres = await requireTeacher(R.content);
   if ("error" in tres) return tres.error;
   const tctx = tres.ctx;
   const { isRateLimited } = await import("@/lib/rate-limit");
