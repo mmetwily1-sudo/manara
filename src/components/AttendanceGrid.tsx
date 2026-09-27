@@ -227,6 +227,9 @@ export function AttendanceGrid({ students, sessionId }: { students: Student[]; s
         اضغط على الطالب = يتحول غايب · يُحفظ في قاعدة البيانات فوراً
         {syncing && " · جاري المزامنة..."}
         {queueLen > 0 && !syncing && ` · ${queueLen} تسجيل مستنيين المزامنة`}
+        {queueLen > 0 && !syncing && (
+          <button onClick={() => flushQueue()} className="mx-2 font-bold text-primary underline">مزامنة الآن 🔄</button>
+        )}
       </p>
     </div>
   );

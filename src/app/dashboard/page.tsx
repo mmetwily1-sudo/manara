@@ -8,6 +8,7 @@ import TrialBanner from "@/components/TrialBanner";
 import FeedbackWidget from "@/components/FeedbackWidget";
 import HealthScore from "@/components/HealthScore";
 import InstallPwa from "@/components/InstallPwa";
+import DarkToggle from "@/components/DarkToggle";
 
 export default async function DashboardHome() {
   const [kpis, groups, warnings, feed] = await Promise.all([getKpis(), getGroups(), getEarlyWarning(), getFeed()]);
@@ -21,6 +22,7 @@ export default async function DashboardHome() {
           <p className="mt-1 text-small text-slate-500">{todayStr} — {groups.length} {groups.length === 1 ? "جلسة" : "جلسات"} النهاردة</p>
         </div>
         <div className="flex gap-2">
+          <DarkToggle />
           <InstallPwa />
           <Link href="/dashboard/attendance" className="btn-primary text-small">ابدأ التحضير</Link>
         </div>

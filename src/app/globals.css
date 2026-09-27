@@ -59,6 +59,19 @@
   .rise-4 { animation-delay: 0.3s; }
 }
 
+/* الوضع الداكن — أسطح ونصوص (v1) */
+html.dark { color-scheme: dark; }
+html.dark body { background: #0f172a; color: #e2e8f0; }
+html.dark .card { background: #1e293b; border-color: #334155; }
+html.dark .btn-secondary { background: #1e293b; border-color: #334155; color: #e2e8f0; }
+html.dark input, html.dark select, html.dark textarea { background: #0f172a; border-color: #334155; color: #e2e8f0; }
+html.dark .bg-white { background-color: #1e293b !important; }
+html.dark .bg-slate-50 { background-color: #0f172a !important; }
+html.dark .text-slate-500, html.dark .text-slate-600 { color: #94a3b8 !important; }
+html.dark .text-slate-400 { color: #64748b !important; }
+html.dark .border-slate-200, html.dark .border-slate-100 { border-color: #334155 !important; }
+html.dark .divide-slate-100 > * + * { border-color: #334155 !important; }
+
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .rise { animation: none; opacity: 1; transform: none; }

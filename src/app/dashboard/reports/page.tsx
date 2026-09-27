@@ -55,7 +55,10 @@ export default function ReportsPage() {
           <h1 className="text-h1">تقارير الربحية 💰</h1>
           <p className="mt-1 text-small text-slate-500">آخر 30 يوماً — إجمالي المحصّل <b className="text-success">{fmt(data.total)}</b></p>
         </div>
-        <button onClick={() => window.print()} className="btn-secondary text-small">طباعة 🖨️</button>
+        <div className="flex gap-2">
+          <a href="/api/backup/export" className="btn-secondary text-small">نسخة احتياطية ⬇️</a>
+          <button onClick={() => window.print()} className="btn-secondary text-small">طباعة 🖨️</button>
+        </div>
       </header>
 
       {fc && (
