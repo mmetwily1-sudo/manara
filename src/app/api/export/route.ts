@@ -12,7 +12,7 @@ function csv(rows: (string | number | null)[][]): string {
 }
 
 /**
- * GET /api/export?scope=students|payments — تصدير بيانات السنتر CSV (Excel جاهز).
+ * GET /api/export?scope=students|payments|invoices|grades[&exam_id=] — تصدير بيانات السنتر CSV (Excel جاهز).
  * يجعل ادعاء «بياناتك بتتصدر في أي وقت» حقيقياً.
  */
 export async function GET(req: Request) {
@@ -49,6 +49,50 @@ export async function GET(req: Request) {
     ]);
     return new NextResponse(body, {
       headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": "attachment; filename=payments.csv" },
+    });
+  }
+
+  if (scope === "invoices") {
+    const { data: inv } = await admin.from("invoices").select("period,amount,paid,status,receipt_no,student_id")
+      .eq("tenant_id", tid).order("period", { ascending: false }).limit(2000);
+    const sids = Array.from(new Set((inv ?? []).map((x: any) => x.student_id).filter(Boolean)));
+    let names: Record<string, string> = {};
+    if (sids.length) {
+      const { data: st } = await admin.from("users").select("id,full_name").in("id", sids as string[]);
+      (st ?? []).forEach((s: any) => { names[s.id] = s.full_name; });
+    }
+    const body = csv([
+      ["الطالب", "الفترة", "المبلغ", "المدفوع", "المتبقي", "الحالة", "إيصال"],
+      ...((inv ?? []).map((x: any) => [names[x.student_id] ?? "", x.period, x.amount, x.paid ?? 0, Number(x.amount ?? 0) - Number(x.paid ?? 0), x.status, x.receipt_no ?? ""])),
+    ]);
+    return new NextResponse(body, {
+      headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": "attachment; filename=invoices.csv" },
+    });
+  }
+
+  if (scope === "grades") {
+    const examId = new URL(req.url).searchParams.get("exam_id");
+    let q = admin.from("exam_attempts").select("exam_id,student_id,score,submitted_at").eq("tenant_id", tid).order("submitted_at", { ascending: false }).limit(2000);
+    if (examId) q = q.eq("exam_id", examId);
+    const { data: atts } = await q;
+    const sids = Array.from(new Set((atts ?? []).map((a: any) => a.student_id).filter(Boolean)));
+    const eids = Array.from(new Set((atts ?? []).map((a: any) => a.exam_id).filter(Boolean)));
+    let names: Record<string, string> = {};
+    let exams: Record<string, string> = {};
+    if (sids.length) {
+      const { data: st } = await admin.from("users").select("id,full_name").in("id", sids as string[]);
+      (st ?? []).forEach((s: any) => { names[s.id] = s.full_name; });
+    }
+    if (eids.length) {
+      const { data: ex } = await admin.from("exams").select("id,title").in("id", eids as string[]);
+      (ex ?? []).forEach((e: any) => { exams[e.id] = e.title; });
+    }
+    const body = csv([
+      ["الامتحان", "الطالب", "الدرجة", "التاريخ"],
+      ...((atts ?? []).map((a: any) => [exams[a.exam_id] ?? "", names[a.student_id] ?? "", a.score ?? 0, String(a.submitted_at ?? "").slice(0, 10)])),
+    ]);
+    return new NextResponse(body, {
+      headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": "attachment; filename=grades.csv" },
     });
   }
 

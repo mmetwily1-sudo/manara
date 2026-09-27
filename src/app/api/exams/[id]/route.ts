@@ -120,45 +120,6 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   return NextResponse.json({ ok: true, updated: patch });
 }
 
-/** POST /api/exams/[id]/duplicate {title?} — نسخ امتحان بأسئلته (مسودة، بلا محاولات) */
-export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const { requireTeacher } = await import("@/lib/server-auth");
-  const { R } = await import("@/lib/permissions");
-  const res = await requireTeacher(R.content);
-  if ("error" in res) return res.error;
-  const sb = res.ctx.admin;
-  const tid = res.ctx.tenantId;
-
-  const { data: src } = await sb.from("exams")
-    .select("title,duration_minutes,total_marks,require_code")
-    .eq("id", params.id).eq("tenant_id", tid).single();
-  if (!src) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
-  const body = await req.json().catch(() => ({} as any));
-  const title = String(body?.title ?? "").trim().slice(0, 120) || `${(src as any).title} (نسخة)`;
-
-  const { data: neo, error: e1 } = await sb.from("exams").insert({
-    tenant_id: tid, title, duration_minutes: (src as any).duration_minutes ?? 30,
-    total_marks: (src as any).total_marks ?? null, is_published: false,
-    require_code: !!(src as any).require_code,
-  }).select("id").single();
-  if (e1 || !neo) return dbFail("exam-duplicate", e1);
-  const { data: links } = await sb.from("exam_questions")
-    .select("question_id,position,marks").eq("exam_id", params.id).eq("tenant_id", tid);
-  if (links?.length) {
-    await sb.from("exam_questions").insert(
-      (links as any[]).map((l) => ({ tenant_id: tid, exam_id: (neo as any).id, question_id: l.question_id, position: l.position, marks: l.marks }))
-    );
-  }
-  try {
-    await sb.from("audit_log").insert({
-      tenant_id: tid, actor_id: res.ctx.userRow.id,
-      action: "exam:duplicate", entity_type: "exam", entity_id: (neo as any).id,
-      details: { from: params.id, questions: links?.length ?? 0 },
-    });
-  } catch {}
-  return NextResponse.json({ ok: true, id: (neo as any).id, questions: links?.length ?? 0 });
-}
-
 /** DELETE /api/exams/[id] — حذف الامتحان وروابطه ومحاولاته وشهاداتها (معلم فقط) */
 export async function DELETE(req: Request, { params }: { params: { id: string } }) {
   const { requireTeacher } = await import("@/lib/server-auth");
