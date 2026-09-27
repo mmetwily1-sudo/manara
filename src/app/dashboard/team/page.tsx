@@ -56,6 +56,29 @@ function DeviceSection() {
   );
 }
 
+/** مدرسون يحتاجون دعماً (مالك فقط) */
+function SupportFlags() {
+  const [flags, setFlags] = useState<{ teacher: string; reason: string }[] | null>(null);
+  useEffect(() => {
+    fetch("/api/team/support-flags").then(async (r) => {
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) setFlags(j.flags);
+    }).catch(() => {});
+  }, []);
+  if (!flags || flags.length === 0) return null;
+  return (
+    <section className="card space-y-2 border-warning/25 p-5">
+      <h2 className="font-bold text-warning">يحتاجون دعماً 🆘</h2>
+      {flags.map((f, i) => (
+        <div key={i} className="rounded-xl bg-warning/5 px-4 py-2.5 text-small">
+          <span className="font-bold">{f.teacher}</span>
+          <span className="mx-2 text-slate-500">{f.reason}</span>
+        </div>
+      ))}
+    </section>
+  );
+}
+
 /** فريق العمل: مهام + تقييم أداء + إجازات + أجهزة */
 export default function TeamPage() {
   const [tasks, setTasks] = useState<Task[] | null>(null);
@@ -191,6 +214,7 @@ export default function TeamPage() {
       )}
 
       <DeviceSection />
+      <SupportFlags />
 
       <section className="card space-y-3 p-5">
         <h2 className="font-bold">المهام 📝</h2>

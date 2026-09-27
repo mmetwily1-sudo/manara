@@ -17,6 +17,8 @@ export default function ReportsPage() {
     deltas: { vsPrev: { collected: number; registered: number }; vsYoy: { collected: number; registered: number } };
     cohorts: { month: string; registered: number; active: number }[];
   } | null>(null);
+  const [narr, setNarr] = useState<string[] | null>(null);
+  const [hints, setHints] = useState<{ group: string; hint: string; tone: string }[]>([]);
   const [err, setErr] = useState("");
 
   useEffect(() => {
@@ -32,6 +34,14 @@ export default function ReportsPage() {
     fetch("/api/analytics/compare").then(async (r) => {
       const j = await r.json().catch(() => null);
       if (r.ok && j?.ok) setCmp(j);
+    }).catch(() => {});
+    fetch("/api/reports/narrative").then(async (r) => {
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) setNarr(j.paras);
+    }).catch(() => {});
+    fetch("/api/analytics/pricing-hints").then(async (r) => {
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) setHints(j.hints);
     }).catch(() => {});
   }, []);
 
@@ -65,6 +75,25 @@ export default function ReportsPage() {
             <div className="mt-1 text-2xl font-extrabold text-warning">{fc.churn.inactive14d}<span className="text-xs font-normal text-slate-400"> / {fc.churn.total} طالب بلا حضور 14 يوماً</span></div>
             <div className="mt-1 text-xs text-slate-500">تابعهم من الإنذار المبكر باللوحة الرئيسية قبل أن يتسربوا.</div>
           </div>
+        </section>
+      )}
+
+      {narr && (
+        <section className="card space-y-2 border-primary/20 p-5">
+          <h2 className="font-bold">تقرير الشهر بلغة بشرية ✍️</h2>
+          {narr.map((p, i) => <p key={i} className="text-small leading-relaxed text-slate-600">• {p}</p>)}
+        </section>
+      )}
+
+      {hints.length > 0 && (
+        <section className="card space-y-2 p-5">
+          <h2 className="font-bold">اقتراحات تسعير 💡 <span className="text-xs font-normal text-slate-400">من بيانات التحصيل — قرارك أولاً</span></h2>
+          {hints.map((h, i) => (
+            <div key={i} className="rounded-xl bg-slate-50 px-4 py-2.5 text-small">
+              <span className="font-bold">{h.group}</span>
+              <span className="mx-2">{h.tone === "up" ? "📈" : "📉"} {h.hint}</span>
+            </div>
+          ))}
         </section>
       )}
 
