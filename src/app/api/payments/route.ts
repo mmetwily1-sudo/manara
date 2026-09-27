@@ -178,17 +178,25 @@ export async function POST(req: Request) {
     });
   } catch {}
 
-  // إيصال واتساب فوري (best-effort)
+  // إيصال واتساب فوري برقم الإيصال (best-effort) + روابط مشاركة
+  let waReceipt: string | null = null;
   try {
     const { notifyStudent } = await import("@/lib/notify");
-    const { data: trow } = await ctx.admin.from("tenants").select("name").eq("id", ctx.tenantId).single();
+    const { waTo } = await import("@/lib/wa");
+    const [{ data: trow }, { data: srow }] = await Promise.all([
+      ctx.admin.from("tenants").select("name").eq("id", ctx.tenantId).single(),
+      ctx.admin.from("users").select("full_name,phone").eq("id", studentId).single(),
+    ]);
     await notifyStudent(ctx.admin, {
       tenantId: ctx.tenantId,
       studentId,
-      event: { kind: "payment_received", studentName: "", amount, centerName: (trow as any)?.name ?? "" },
+      event: { kind: "payment_received", studentName: "", amount, centerName: (trow as any)?.name ?? "", receiptNo },
       dedupeKey: `payment:${(data as any).id}`,
     });
+    const center = (trow as any)?.name ?? "";
+    waReceipt = waTo((srow as any)?.phone ?? null,
+      `إيصال استلام 🧾\nالطالب: ${(srow as any)?.full_name ?? ""}\nالمبلغ: ${amount} جنيه${receiptNo ? `\nإيصال رقم: #${receiptNo}` : ""}\n${center}`);
   } catch {}
 
-  return NextResponse.json({ ok: true, id: (data as any).id, receipt_no: receiptNo });
+  return NextResponse.json({ ok: true, id: (data as any).id, receipt_no: receiptNo, wa_receipt: waReceipt, receipt_url: `/i/${(data as any).id}` });
 }

@@ -10,7 +10,7 @@ import { normalizePhone, sendWhatsAppText, isWhatsAppLive } from "./whatsapp";
 export type NotifyEvent =
   | { kind: "attendance_absent"; studentName: string; centerName: string; sessionLabel: string }
   | { kind: "exam_graded"; studentName: string; examTitle: string; score: number; total: number; certSerial: string | null }
-  | { kind: "payment_received"; studentName: string; amount: number; centerName: string }
+  | { kind: "payment_received"; studentName: string; amount: number; centerName: string; receiptNo?: number | null }
   | { kind: "payment_reminder"; studentName: string; amount: number; centerName: string; periods: string }
   | { kind: "homework_submitted"; studentName: string; hwTitle: string }
   | { kind: "homework_graded"; studentName: string; hwTitle: string; score: number; total: number };
@@ -24,7 +24,7 @@ function renderBody(e: NotifyEvent): string {
       return `نتيجة امتحان 📝\n${e.studentName} حصل على ${e.score}/${e.total} (${pct}%) في «${e.examTitle}»${e.certSerial ? `\n🎓 شهادة إتمام: ${e.certSerial}` : ""}`;
     }
     case "payment_received":
-      return `تم استلام دفعة ✅\nالطالب: ${e.studentName}\nالمبلغ: ${e.amount} جنيه\nشكراً لكم — ${e.centerName}`;
+      return `تم استلام دفعة ✅\nالطالب: ${e.studentName}\nالمبلغ: ${e.amount} جنيه${e.receiptNo ? `\nإيصال رقم: #${e.receiptNo}` : ""}\nشكراً لكم — ${e.centerName}`;
     case "payment_reminder":
       return `تذكير ودي بالمصروفات 🔔\nالطالب: ${e.studentName}\nالمستحق: ${e.amount} جنيه (${e.periods})\n${e.centerName} — للسداد تواصل مع الإدارة.`;
     case "homework_submitted":
@@ -63,7 +63,27 @@ export async function notifyStudent(
   const phone = (student?.phone ?? "") as string;
   const enabled = (tenant?.settings as any)?.notify_whatsapp !== false;
 
-  const body = renderBody({
+  // تجاوز قالب السنتر المخصص (قوالب الجولة 21) — {placeholders}
+  const TPL_KEY: Record<NotifyEvent["kind"], string> = {
+    attendance_absent: "absence_alert", exam_graded: "exam_grade",
+    payment_received: "payment_receipt", payment_reminder: "installment_reminder",
+    homework_submitted: "session_reminder", homework_graded: "exam_grade",
+  };
+  let body: string | null = null;
+  try {
+    const { data: tpl } = await admin.from("message_templates").select("body")
+      .eq("tenant_id", tenantId).eq("key", TPL_KEY[event.kind]).eq("is_active", true).limit(1).single();
+    const tb = (tpl as any)?.body as string | undefined;
+    if (tb) {
+      const ev = event as any;
+      body = tb.replace("{student}", ev.studentName || student?.full_name || "الطالب")
+        .replace("{amount}", String(ev.amount ?? "")).replace("{receipt}", ev.receiptNo != null ? `#${ev.receiptNo}` : "")
+        .replace("{center}", ev.centerName || "").replace("{exam}", ev.examTitle || ev.hwTitle || "")
+        .replace("{score}", String(ev.score ?? "")).replace("{total}", String(ev.total ?? ""))
+        .replace("{date}", new Date().toLocaleDateString("ar-EG")).replace("{periods}", ev.periods || "");
+    }
+  } catch {}
+  if (!body) body = renderBody({
     ...event,
     studentName: (event as any).studentName || student?.full_name || "الطالب",
   } as NotifyEvent);

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { waTo } from "@/lib/wa";
 
 type Payment = { id: string; student: string; amount: number; method: string; status: string; note: string | null; paid_at: string; receipt_no: number | null };
-type Overdue = { student_id: string; name: string; phone: string | null; due: number; periods: string[]; abs: number };
+type Overdue = { student_id: string; name: string; phone: string | null; due: number; periods: string[]; abs: number; score?: number; risk?: string; daysOverdue?: number };
 type Totals = { collectedMonth: number; collectedToday: number; expected: number; outstanding: number };
 type Close = { date: string; total: number; count: number; byMethod: Record<string, { total: number; count: number }> };
 
@@ -22,6 +22,7 @@ export default function PaymentsPage() {
   const [showCollect, setShowCollect] = useState(false);
   const [form, setForm] = useState({ studentId: "", amount: "", method: "cash", note: "" });
   const [busy, setBusy] = useState(false);
+  const [receiptShare, setReceiptShare] = useState<{ no: number | null; wa: string | null; url: string } | null>(null);
 
   async function load() {
     try {
@@ -96,6 +97,7 @@ export default function PaymentsPage() {
       if (r.ok && j?.ok) {
         setForm({ studentId: "", amount: "", method: "cash", note: "" });
         setShowCollect(false);
+        setReceiptShare({ no: j.receipt_no ?? null, wa: j.wa_receipt ?? null, url: j.receipt_url ?? "" });
         load();
       } else setErr("فشل التسجيل: " + (j?.error ?? "خطأ غير معروف"));
     } catch { setErr("تعذر الاتصال بالخادم."); }
@@ -124,6 +126,17 @@ export default function PaymentsPage() {
       </header>
 
       {err && <div className="card border-danger/20 bg-danger/5 p-4 text-small font-bold text-danger">{err}</div>}
+
+      {receiptShare && (
+        <section className="card space-y-2 border-success/30 bg-success/5 p-5">
+          <div className="font-bold text-success">✅ تم التسجيل {receiptShare.no != null && <span>— إيصال #{receiptShare.no}</span>}</div>
+          <div className="flex flex-wrap gap-2">
+            {receiptShare.url && <a href={receiptShare.url} target="_blank" rel="noreferrer" className="btn-secondary !px-4 !py-2 text-xs">عرض الإيصال 🧾</a>}
+            {receiptShare.wa && <a href={receiptShare.wa} target="_blank" rel="noreferrer" className="rounded-xl bg-success px-4 py-2 text-xs font-bold text-white">إرسال الإيصال واتساب 💬</a>}
+            <button onClick={() => setReceiptShare(null)} className="px-3 py-2 text-xs text-slate-400">إغلاق</button>
+          </div>
+        </section>
+      )}
 
       {showCollect && (
         <form onSubmit={onCollect} className="card grid gap-3 p-5 sm:grid-cols-2">
@@ -179,14 +192,16 @@ export default function PaymentsPage() {
         <section className="card space-y-3 border-danger/25 p-5">
           <h2 className="font-bold text-danger">متأخرات مستحقة ({overdues.length}) 📋</h2>
           <ul className="space-y-2">
-            {overdues.map((o) => {
+            {overdues.map((o, i) => {
               const link = waTo(o.phone, `السلام عليكم 👋 تذكير من سنترنا: على الطالب ${o.name} مبلغ مستحق ${o.due.toLocaleString("ar-EG")} جنيه عن ${o.periods.join("، ")} — برجاء السداد في أقرب وقت.`);
               return (
                 <li key={o.student_id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-danger/5 px-4 py-3 text-small">
                   <div>
+                    {i < 3 && <span className="ml-2 rounded-full bg-danger px-2 py-0.5 text-[11px] font-bold text-white">⚠️ أولوية {i + 1}</span>}
                     <span className="font-bold">{o.name}</span>
                     <span className="mx-2 font-extrabold text-danger">{fmt(o.due)}</span>
                     <span className="text-xs text-slate-500">{o.periods.join("، ")}</span>
+                    {(o.daysOverdue ?? 0) > 0 && <span className="mx-2 text-[11px] text-slate-400">متأخر {o.daysOverdue} يوم</span>}
                     {o.abs > 0 && <span className="mx-2 rounded-full bg-warning/15 px-2 py-0.5 text-[11px] font-bold text-warning">غياب الشهر: {o.abs}</span>}
                   </div>
                   {link && <a href={link} target="_blank" rel="noreferrer" className="rounded-lg bg-success px-4 py-1.5 text-xs font-bold text-white">تذكير واتساب 💬</a>}

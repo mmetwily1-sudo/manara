@@ -39,18 +39,25 @@ export async function GET(req: Request) {
   let absences: Record<string, number> = {};
   ((attRes as any)?.data ?? []).forEach((a: any) => { absences[a.student_id] = (absences[a.student_id] ?? 0) + 1; });
 
-  const bal: Record<string, { name: string; phone: string | null; due: number; periods: string[]; abs: number }> = {};
+  const bal: Record<string, { name: string; phone: string | null; due: number; periods: string[]; abs: number; oldest: string }> = {};
   (inv ?? []).forEach((x: any) => {
     if (x.status === "paid") return;
     const rest = Number(x.amount ?? 0) - Number(x.paid ?? 0);
     if (rest <= 0) return;
-    const b = bal[x.student_id] ??= { name: people[x.student_id]?.name ?? "—", phone: people[x.student_id]?.phone ?? null, due: 0, periods: [], abs: 0 };
+    const b = bal[x.student_id] ??= { name: people[x.student_id]?.name ?? "—", phone: people[x.student_id]?.phone ?? null, due: 0, periods: [], abs: 0, oldest: x.period };
     b.due += rest;
     if (!b.periods.includes(x.period)) b.periods.push(x.period);
+    if (String(x.period) < b.oldest) b.oldest = x.period;
   });
   Object.keys(bal).forEach((sid) => { bal[sid].abs = absences[sid] ?? 0; });
-  const overdues = Object.entries(bal).map(([sid, b]) => ({ student_id: sid, ...b }))
-    .sort((a, b) => b.due - a.due).slice(0, 100);
+  const now = Date.now();
+  const overdues = Object.entries(bal).map(([sid, b]) => {
+    const oldestMs = new Date(`${b.oldest}-01T00:00:00Z`).getTime();
+    const daysOverdue = Number.isFinite(oldestMs) ? Math.max(0, Math.floor((now - oldestMs) / 864e5)) : 0;
+    // درجة ذكية: المبلغ + قِدم أقدم فترة + الغياب (الأعلى = أولوية التحصيل)
+    const score = Math.round(b.due + daysOverdue * 10 + b.abs * 100);
+    return { student_id: sid, ...b, daysOverdue, score, risk: score >= 5000 ? "high" : score >= 2000 ? "mid" : "low" };
+  }).sort((a, b) => b.score - a.score).slice(0, 100);
 
   return NextResponse.json({
     ok: true,

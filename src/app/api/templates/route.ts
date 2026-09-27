@@ -11,6 +11,7 @@ const DEFAULT_TEMPLATES = [
   { key: "welcome_student", channel: "whatsapp", title: "ترحيب بطالب", body: "أهلاً {student} في {center} 🎉 مجموعتك: {group} — أول حصة {date}" },
   { key: "session_reminder", channel: "whatsapp", title: "تذكير حصة", body: "تذكير: حصة {group} غداً {time} — {center}" },
   { key: "overdue_collect", channel: "whatsapp", title: "تحصيل متأخر", body: "تنبيه: متأخرات {amount} جنيه على حساب {student} — برجاء السداد — {center}" },
+  { key: "payment_receipt", channel: "whatsapp", title: "إيصال دفع", body: "تم استلام دفعة ✅\nالطالب: {student}\nالمبلغ: {amount} جنيه\nإيصال رقم: {receipt}\nشكراً لكم — {center}" },
 ];
 
 /** GET /api/templates — القوالب الافتراضية + تجاوزات السنتر (مالك فقط) */
