@@ -134,6 +134,49 @@ function MyPlanSection() {
   );
 }
 
+/** قيّم حصص اليوم (1-5) — مرة واحدة لكل حصة خلال 48 ساعة */
+function RateTodaySection() {
+  const [list, setList] = useState<{ id: string; topic: string | null; group: string }[]>([]);
+  const [done, setDone] = useState(false);
+
+  async function load() {
+    try {
+      const r = await fetch("/api/sessions/rate", { cache: "no-store" });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) setList(j.sessions ?? []);
+    } catch {}
+  }
+  useEffect(() => { load(); }, []);
+
+  async function rate(id: string, score: number) {
+    try {
+      const r = await fetch("/api/sessions/rate", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: id, score }),
+      });
+      if (r.ok) { setDone(true); load(); setTimeout(() => setDone(false), 3000); }
+    } catch {}
+  }
+
+  if (!list.length) return null;
+  return (
+    <section className="card space-y-2 p-5">
+      <h2 className="font-bold">قيّم حصص اليوم ⭐</h2>
+      {done && <div className="text-xs font-bold text-success">شكراً — رأيك وصل لمعلمك ✅</div>}
+      {list.map((s) => (
+        <div key={s.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 px-4 py-2.5">
+          <span className="text-small font-bold">{s.group}{s.topic ? ` · ${s.topic}` : ""}</span>
+          <div className="flex gap-1" dir="ltr">
+            {[1, 2, 3, 4, 5].map((n) => (
+              <button key={n} onClick={() => rate(s.id, n)} className="h-8 w-8 rounded-lg bg-white text-small shadow-sm transition hover:bg-warning hover:text-white">★</button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </section>
+  );
+}
+
 function GamificationSection() {
   const [g, setG] = useState<Game | null>(null);
   useEffect(() => {
@@ -346,6 +389,7 @@ export default function ProgressPage() {
       )}
 
       <HomeworkSection />
+      <RateTodaySection />
       <MyPlanSection />
       <GamificationSection />
       <AnnouncementsFeed />

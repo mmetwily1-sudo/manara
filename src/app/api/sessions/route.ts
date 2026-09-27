@@ -27,6 +27,12 @@ export async function POST(req: Request) {
   const isMakeup = (body as any)?.kind === "makeup";
   const date = isMakeup && /^\d{4}-\d{2}-\d{2}$/.test(String((body as any)?.session_date ?? ""))
     ? String((body as any).session_date) : new Date().toISOString().slice(0, 10);
+  // إجازة رسمية: منع جلسة عادية (التعويضية مسموحة)
+  if (!isMakeup) {
+    const { data: hol } = await ctx.admin.from("holidays").select("id,title")
+      .eq("tenant_id", ctx.tenantId).eq("holiday_date", date).limit(1).single();
+    if (hol) return NextResponse.json({ ok: false, error: "holiday", title: (hol as any).title ?? "" }, { status: 409 });
+  }
   const { data: existing } = await ctx.admin
     .from("sessions")
     .select("id,topic,status")

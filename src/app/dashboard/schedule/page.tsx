@@ -13,6 +13,34 @@ export default function SchedulePage() {
   const [mk, setMk] = useState({ groupId: "", date: "", topic: "" });
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [holidays, setHolidays] = useState<{ id: string; holiday_date: string; title: string }[]>([]);
+  const [hol, setHol] = useState({ date: "", title: "" });
+
+  async function loadHolidays() {
+    try {
+      const r = await fetch("/api/holidays");
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) setHolidays(j.holidays);
+    } catch {}
+  }
+
+  async function addHoliday(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      const r = await fetch("/api/holidays", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ holiday_date: hol.date, title: hol.title }),
+      });
+      if (r.ok) { setHol({ date: "", title: "" }); loadHolidays(); }
+    } catch {}
+  }
+
+  async function delHoliday(id: string) {
+    try {
+      const r = await fetch(`/api/holidays?id=${id}`, { method: "DELETE" });
+      if (r.ok) loadHolidays();
+    } catch {}
+  }
 
   async function load() {
     try {
@@ -26,7 +54,7 @@ export default function SchedulePage() {
       if (r.ok && j?.ok) setGroups((j.groups ?? []).map((g: any) => ({ id: g.id, name: g.name })));
     } catch {}
   }
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); loadHolidays(); }, []);
 
   async function makeup(e: React.FormEvent) {
     e.preventDefault();
@@ -74,6 +102,24 @@ export default function SchedulePage() {
             </div>
           </div>
         ))}
+      </section>
+
+      <section className="card space-y-3 p-5">
+        <h2 className="font-bold">الإجازات الرسمية 🏖️ <span className="text-xs font-normal text-slate-400">تمنع إنشاء حصص عادية تلقائياً</span></h2>
+        <form onSubmit={addHoliday} className="flex flex-wrap gap-2">
+          <input value={hol.date} onChange={(e) => setHol({ ...hol, date: e.target.value })} required type="date" className="rounded-xl border border-slate-200 px-3 py-2 text-small" />
+          <input value={hol.title} onChange={(e) => setHol({ ...hol, title: e.target.value })} maxLength={120} placeholder="المناسبة (اختياري)" className="flex-1 rounded-xl border border-slate-200 px-4 py-2 text-small" />
+          <button className="btn-secondary !px-4 !py-2 text-small">إضافة إجازة</button>
+        </form>
+        <div className="flex flex-wrap gap-2">
+          {holidays.map((h) => (
+            <span key={h.id} className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold">
+              <span dir="ltr">{h.holiday_date}</span> {h.title && `· ${h.title}`}
+              <button onClick={() => delHoliday(h.id)} className="mx-1 text-danger">✕</button>
+            </span>
+          ))}
+          {holidays.length === 0 && <span className="text-xs text-slate-400">لا إجازات مسجلة.</span>}
+        </div>
       </section>
 
       <section className="card space-y-3 p-5">

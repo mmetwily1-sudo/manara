@@ -4,6 +4,46 @@ import { useEffect, useState } from "react";
 import { AttendanceGrid } from "@/components/AttendanceGrid";
 import SessionQr from "@/components/SessionQr";
 
+/** تعيين بديل للحصة (مالك + مشرف) */
+function SwapBlock({ sessionId }: { sessionId: string | null }) {
+  const [staff, setStaff] = useState<{ id: string; full_name: string }[]>([]);
+  const [sub, setSub] = useState("");
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => {
+    fetch("/api/staff/names").then(async (r) => {
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) setStaff(j.staff);
+    }).catch(() => {});
+  }, []);
+
+  async function swap() {
+    if (!sessionId || !sub) return;
+    try {
+      const r = await fetch("/api/sessions/swap", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId, substitute_id: sub }),
+      });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) setMsg(`البديل: ${j.substitute} ✅`);
+      else setMsg("تعذر التعيين.");
+    } catch { setMsg("تعذر الاتصال."); }
+  }
+
+  if (!staff.length) return null;
+  return (
+    <section className="card flex flex-wrap items-center gap-2 p-4">
+      <span className="text-small font-bold">تبديل الحصة 🔀</span>
+      <select value={sub} onChange={(e) => setSub(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-small">
+        <option value="">البديل…</option>
+        {staff.map((s) => <option key={s.id} value={s.id}>{s.full_name}</option>)}
+      </select>
+      <button onClick={swap} disabled={!sub} className="btn-secondary !px-3 !py-1.5 text-xs disabled:opacity-50">تعيين</button>
+      {msg && <span className="text-xs font-bold text-primary">{msg}</span>}
+    </section>
+  );
+}
+
 /** أعذار الغياب: تسجيل + اعتماد (المعذور يُستثنى من التصعيد) */
 function ExcusesBlock({ students }: { students: { id: string; name: string }[] }) {
   const [list, setList] = useState<{ id: string; student_id: string; reason: string; status: string; users: { full_name: string } | null }[]>([]);
@@ -180,6 +220,7 @@ export default function AttendancePage() {
       ) : (
         <>
           <SessionQr sessionId={sessionId} />
+          <SwapBlock sessionId={sessionId} />
           <AttendanceGrid students={students} sessionId={sessionId} />
           <ExcusesBlock students={students} />
           <MonthlyRates />
