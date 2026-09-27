@@ -4,6 +4,102 @@ import { useEffect, useState } from "react";
 import { AttendanceGrid } from "@/components/AttendanceGrid";
 import SessionQr from "@/components/SessionQr";
 
+/** أعذار الغياب: تسجيل + اعتماد (المعذور يُستثنى من التصعيد) */
+function ExcusesBlock({ students }: { students: { id: string; name: string }[] }) {
+  const [list, setList] = useState<{ id: string; student_id: string; reason: string; status: string; users: { full_name: string } | null }[]>([]);
+  const [sid, setSid] = useState("");
+  const [reason, setReason] = useState("");
+
+  async function load() {
+    try {
+      const r = await fetch("/api/excuses");
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) setList(j.excuses);
+    } catch {}
+  }
+  useEffect(() => { load(); }, []);
+
+  async function create(e: React.FormEvent) {
+    e.preventDefault();
+    if (!sid) return;
+    try {
+      const r = await fetch("/api/excuses", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ student_id: sid, reason }),
+      });
+      if (r.ok) { setSid(""); setReason(""); load(); }
+    } catch {}
+  }
+
+  async function decide(id: string, status: string) {
+    try {
+      const r = await fetch("/api/excuses", {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, status }),
+      });
+      if (r.ok) load();
+    } catch {}
+  }
+
+  const pending = list.filter((x) => x.status === "pending");
+  return (
+    <section className="card space-y-3 p-5">
+      <h2 className="font-bold">أعذار الغياب 📝 <span className="text-xs font-normal text-slate-400">({pending.length} بانتظار — المعتمد يُستثنى من تصعيد الغياب)</span></h2>
+      <form onSubmit={create} className="flex flex-wrap gap-2">
+        <select value={sid} onChange={(e) => setSid(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-small">
+          <option value="">الطالب…</option>
+          {students.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
+        <input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={300} placeholder="سبب العذر (اختياري)"
+          className="flex-1 rounded-xl border border-slate-200 px-4 py-2 text-small" />
+        <button className="btn-secondary !px-4 !py-2 text-xs">تسجيل عذر</button>
+      </form>
+      {pending.slice(0, 10).map((x) => (
+        <div key={x.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 px-4 py-2.5 text-small">
+          <span><b>{x.users?.full_name ?? ""}</b> <span className="text-xs text-slate-400">· {x.reason || "بلا سبب"}</span></span>
+          <div className="flex gap-2">
+            <button onClick={() => decide(x.id, "approved")} className="rounded-lg bg-success/10 px-3 py-1 text-xs font-bold text-success">اعتماد ✓</button>
+            <button onClick={() => decide(x.id, "rejected")} className="rounded-lg bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500">رفض</button>
+          </div>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+/** نسب الحضور الشهرية — تنبيه تحت 75% */
+function MonthlyRates() {
+  const [rates, setRates] = useState<Record<string, { present: number; absent: number; rate: number | null }>>({});
+  const [names, setNames] = useState<Record<string, string>>({});
+  useEffect(() => {
+    (async () => {
+      try {
+        const [rm, rs] = await Promise.all([fetch("/api/attendance/monthly"), fetch("/api/students")]);
+        const jm = await rm.json().catch(() => null);
+        const js = await rs.json().catch(() => null);
+        if (rm.ok && jm?.ok) setRates(jm.rates);
+        if (rs.ok && js?.ok) {
+          const m: Record<string, string> = {};
+          (js.students ?? []).forEach((s: any) => { m[s.id] = s.name; });
+          setNames(m);
+        }
+      } catch {}
+    })();
+  }, []);
+  const low = Object.entries(rates).filter(([, v]) => v.rate !== null && (v.rate as number) < 75);
+  if (!low.length) return null;
+  return (
+    <section className="card space-y-2 border-warning/25 p-5">
+      <h2 className="font-bold text-warning">حضور شهري تحت 75% ({low.length}) ⚠️</h2>
+      {low.slice(0, 15).map(([sid, v]) => (
+        <div key={sid} className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-2 text-small">
+          <span className="font-bold">{names[sid] ?? "—"}</span>
+          <span className="font-extrabold text-warning">{v.rate}% <span className="font-normal text-slate-400">({v.present} حضور / {v.absent} غياب)</span></span>
+        </div>
+      ))}
+    </section>
+  );
+}
+
 type Group = { id: string; name: string; grade: string | null; subject: string | null };
 type Student = { id: string; name: string; groupId: string; parentPhone: string | null; status: "present" | "absent" | "pending" };
 
@@ -85,6 +181,8 @@ export default function AttendancePage() {
         <>
           <SessionQr sessionId={sessionId} />
           <AttendanceGrid students={students} sessionId={sessionId} />
+          <ExcusesBlock students={students} />
+          <MonthlyRates />
         </>
       )}
     </div>

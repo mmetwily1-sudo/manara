@@ -119,13 +119,16 @@ export async function POST(req: Request) {
         event: { kind: "attendance_absent", studentName: "", centerName, sessionLabel: label },
         dedupeKey: `attendance:${sessionId}:${studentId}`,
       });
-      // إنذار الغياب المبكر: 3 غيابات متتالية → تصعيد بملاحظة حمراء (مرة لكل سلسلة)
+      // إنذار الغياب المبكر: 3 غيابات متتالية غير معذورة → تصعيد (مرة لكل سلسلة)
       try {
-        const { data: last3 } = await admin.from("attendance")
-          .select("status,sessions!inner(session_date)")
+        const { data: last6 } = await admin.from("attendance")
+          .select("status,session_id,sessions!inner(session_date)")
           .eq("tenant_id", urow.tenant_id).eq("student_id", studentId)
-          .order("session_date", { foreignTable: "sessions", ascending: false }).limit(3);
-        const rows = (last3 ?? []) as any[];
+          .order("session_date", { foreignTable: "sessions", ascending: false }).limit(6);
+        const { data: exc } = await admin.from("absence_excuses").select("session_id")
+          .eq("tenant_id", urow.tenant_id).eq("student_id", studentId).eq("status", "approved").limit(100);
+        const excSet = new Set(((exc ?? []) as any[]).map((e) => e.session_id).filter(Boolean));
+        const rows = ((last6 ?? []) as any[]).filter((a) => !excSet.has(a.session_id)).slice(0, 3);
         if (rows.length >= 3 && rows.every((a) => a.status === "absent")) {
           await notifyStudent(admin, {
             tenantId: urow.tenant_id,
