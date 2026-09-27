@@ -62,6 +62,27 @@ export default function ExamsListPage() {
     } catch { setNotice({ kind: "err", text: "تعذر الاتصال بالخادم." }); }
   }
 
+  const [analysis, setAnalysis] = useState<{ title: string; attempts: number; hardest: { body: string; tried: number; rate: number | null }[]; failed: { student_id: string; name: string; phone: string | null; score: number; total: number }[] } | null>(null);
+
+  async function onVariants(id: string) {
+    if (!confirm("إنشاء نموذجين متوازيين A/B من هذا الامتحان كمسودتين؟")) return;
+    try {
+      const { r, j } = await apiFetch(`/api/exams/${id}/variants`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ count: 2 }),
+      });
+      if (r.ok && j?.ok) { setNotice({ kind: "ok", text: `تم إنشاء ${j.count} نماذج متوازية كمسودات.` }); loadAll(); }
+      else setNotice({ kind: "err", text: j?.error === "too_few_questions" ? "أسئلة غير كافية لنموذجين." : "فشل الإنشاء." });
+    } catch { setNotice({ kind: "err", text: "تعذر الاتصال بالخادم." }); }
+  }
+
+  async function onAnalysis(id: string, title: string) {
+    try {
+      const { r, j } = await apiFetch(`/api/exams/${id}/analysis`);
+      if (r.ok && j?.ok) setAnalysis({ title, attempts: j.attempts, hardest: j.hardest, failed: j.failed });
+      else setNotice({ kind: "err", text: "تعذر التحليل." });
+    } catch { setNotice({ kind: "err", text: "تعذر الاتصال بالخادم." }); }
+  }
+
   async function onUseTemplate() {
     if (!tplId) return;
     setTplBusy(true);
@@ -518,6 +539,35 @@ export default function ExamsListPage() {
         </div>
       )}
 
+      {analysis && (
+        <div className="card space-y-3 border-primary/20 p-5">
+          <div className="flex items-center justify-between">
+            <h2 className="font-bold">تحليل «{analysis.title}» 📊 <span className="text-xs font-normal text-slate-400">({analysis.attempts} محاولة)</span></h2>
+            <button onClick={() => setAnalysis(null)} className="text-xs text-slate-400">إغلاق ✕</button>
+          </div>
+          <div>
+            <div className="mb-1 text-xs font-bold text-slate-500">أصعب الأسئلة (أقل نسبة صواب):</div>
+            {analysis.hardest.length === 0 ? <div className="text-xs text-slate-400">لا محاولات بعد.</div> :
+              analysis.hardest.map((h, i) => (
+                <div key={i} className="text-xs text-slate-600">• {h.body || "(بلا نص)"} — <b className="text-danger">{h.rate !== null ? `${h.rate}%` : "—"}</b> <span className="text-slate-400">({h.tried})</span></div>
+              ))}
+          </div>
+          <div>
+            <div className="mb-1 text-xs font-bold text-slate-500">راسبون &lt;50% ({analysis.failed.length}) — إعادة مستحقة 🔁:</div>
+            {analysis.failed.length === 0 ? <div className="text-xs font-bold text-success">لا راسبين 🎉</div> :
+              analysis.failed.slice(0, 20).map((f) => {
+                const link = f.phone ? `https://wa.me/${String(f.phone).replace(/[^\d]/g, "")}?text=${encodeURIComponent(`تنبيه من سنترنا: ${f.name} حصل على ${f.score}/${f.total} — يستحق فرصة إعادة، تواصل معنا لتحديد الموعد 🔁`)}` : null;
+                return (
+                  <div key={f.student_id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-1.5 text-xs">
+                    <span><b>{f.name}</b> — {f.score}/{f.total}</span>
+                    {link && <a href={link} target="_blank" rel="noreferrer" className="rounded-lg bg-success px-3 py-1 font-bold text-white">دعوة إعادة 💬</a>}
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+      )}
+
       {exams === null ? (
         <div className="card p-8 text-center text-slate-400">جاري تحميل الامتحانات...</div>
       ) : exams.length === 0 ? (
@@ -579,6 +629,14 @@ export default function ExamsListPage() {
                   <button onClick={() => onSaveTemplate(ex.id, ex.title)}
                     className="rounded-lg px-4 py-1.5 text-xs font-bold text-slate-500 transition hover:bg-slate-100">
                     حفظ كقالب 📑
+                  </button>
+                  <button onClick={() => onVariants(ex.id)}
+                    className="rounded-lg px-4 py-1.5 text-xs font-bold text-slate-500 transition hover:bg-slate-100">
+                    نماذج A/B ⚖️
+                  </button>
+                  <button onClick={() => onAnalysis(ex.id, ex.title)}
+                    className="rounded-lg px-4 py-1.5 text-xs font-bold text-slate-500 transition hover:bg-slate-100">
+                    تحليل وراسبون 📊
                   </button>
                   <button onClick={() => copyLink(ex.id)} className="btn-secondary !px-4 !py-1.5 text-xs">
                     {copiedId === ex.id ? "✓ تم النسخ" : "نسخ رابط الطلاب"}
