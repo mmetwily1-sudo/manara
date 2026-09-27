@@ -622,6 +622,7 @@ export default function ExamsListPage() {
                     </button>
                   )}
                   <a href={`/exam/${ex.id}`} className="btn-secondary !px-4 !py-1.5 text-xs">معاينة وحل</a>
+                  <a href={`/dashboard/exams/${ex.id}/print`} target="_blank" rel="noreferrer" className="btn-secondary !px-4 !py-1.5 text-xs">طباعة 🖨️</a>
                   <button onClick={() => onDuplicate(ex.id)}
                     className="rounded-lg bg-primary-light px-4 py-1.5 text-xs font-bold text-primary transition hover:bg-primary hover:text-white">
                     نسخ 📋

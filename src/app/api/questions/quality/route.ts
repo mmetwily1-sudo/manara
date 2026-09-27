@@ -26,5 +26,7 @@ export async function GET() {
     if (q.status === "draft") probs.push("مسودة غير معتمدة");
     if (probs.length && issues.length < 50) issues.push({ id: q.id, body: String(q.body ?? "").slice(0, 80), problem: probs.join(" + ") });
   }
-  return NextResponse.json({ ok: true, total: rows.length, unused, broken: issues.length, issues, byDifficulty: byDiff });
+  const ranked = [...rows].sort((a, b) => Number(b.usage_count ?? 0) - Number(a.usage_count ?? 0));
+  const top = ranked.slice(0, 3).map((q) => ({ body: String(q.body ?? "").slice(0, 60), used: Number(q.usage_count ?? 0) }));
+  return NextResponse.json({ ok: true, total: rows.length, unused, broken: issues.length, issues, byDifficulty: byDiff, top });
 }

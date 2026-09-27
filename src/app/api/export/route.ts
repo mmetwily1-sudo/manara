@@ -96,5 +96,19 @@ export async function GET(req: Request) {
     });
   }
 
+  if (scope === "answerkey") {
+    const examId = new URL(req.url).searchParams.get("exam_id");
+    if (!examId) return NextResponse.json({ ok: false, error: "exam_required" }, { status: 400 });
+    const { data: links } = await admin.from("exam_questions").select("position,marks,questions(body,correct_answer)")
+      .eq("tenant_id", tid).eq("exam_id", examId).order("position", { ascending: true }).limit(200);
+    const body = csv([
+      ["م", "السؤال", "الدرجة", "الإجابة النموذجية"],
+      ...((links ?? []).map((l: any, i: number) => [i + 1, String(l.questions?.body ?? "").slice(0, 200), l.marks ?? 0, l.questions?.correct_answer ?? ""])),
+    ]);
+    return new NextResponse(body, {
+      headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": "attachment; filename=answerkey.csv" },
+    });
+  }
+
   return NextResponse.json({ ok: false, error: "bad_scope" }, { status: 400 });
 }

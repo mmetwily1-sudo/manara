@@ -14,7 +14,7 @@ export default function QuestionsPage() {
   const [showBulk, setShowBulk] = useState(false);
   const [bulkText, setBulkText] = useState("");
   const [stats, setStats] = useState<{ total: number; byLevel: Record<number, number> } | null>(null);
-  const [quality, setQuality] = useState<{ total: number; unused: number; broken: number; issues: { id: string; body: string; problem: string }[] } | null>(null);
+  const [quality, setQuality] = useState<{ total: number; unused: number; broken: number; issues: { id: string; body: string; problem: string }[]; top: { body: string; used: number }[] } | null>(null);
 
   async function loadQuality() {
     try {
@@ -464,6 +464,9 @@ export default function QuestionsPage() {
           {quality.issues.slice(0, 5).map((q) => (
             <div key={q.id} className="text-xs text-slate-500">• <span className="font-bold text-danger">{q.problem}</span> — {q.body || "(بلا نص)"}</div>
           ))}
+          {(quality.top ?? []).length > 0 && (
+            <div className="text-xs text-slate-500">🏆 الأكثر استخداماً: {(quality.top ?? []).map((t) => `${t.body.slice(0, 30)} (${t.used}×)`).join(" · ")}</div>
+          )}
         </div>
       )}
 
