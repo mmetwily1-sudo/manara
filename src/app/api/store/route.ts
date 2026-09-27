@@ -19,7 +19,7 @@ export async function GET() {
   const tid = (urow as any).tenant_id;
   const isTeacher = (urow as any).role === "teacher_admin";
   try {
-    let q = admin.from("products").select("id,title,description,price,is_active,stock_qty,low_stock_at,created_at")
+    let q = admin.from("products").select("id,title,description,price,is_active,stock_qty,low_stock_at,subject,lesson,created_at")
       .eq("tenant_id", tid).order("created_at", { ascending: false }).limit(100);
     if (!isTeacher) q = q.eq("is_active", true);
     const { data: prods, error } = await q;
@@ -79,6 +79,8 @@ export async function POST(req: Request) {
       tenant_id: tid, title,
       description: String(form.get("description") ?? "").trim().slice(0, 2000) || null,
       price, file_path: filePath, is_active: true,
+      subject: String(form.get("subject") ?? "").trim().slice(0, 80),
+      lesson: String(form.get("lesson") ?? "").trim().slice(0, 120),
     }).select("id").single();
     if (error) throw error;
     return NextResponse.json({ ok: true, id: (data as any).id });

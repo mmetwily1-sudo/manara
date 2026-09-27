@@ -2,14 +2,18 @@
 
 import { useEffect, useState } from "react";
 
-type Product = { id: string; title: string; description: string | null; price: number; is_active: boolean; stock_qty?: number; low_stock_at?: number };
+type Product = { id: string; title: string; description: string | null; price: number; is_active: boolean; stock_qty?: number; low_stock_at?: number; subject?: string; lesson?: string };
 type PosLine = { product_id: string; qty: number };
 type Order = { id: string; status: string; created_at: string; student_name: string; products: { title: string; price: number } };
 
 export default function StorePage() {
   const [prods, setProds] = useState<Product[] | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
-  const [form, setForm] = useState({ title: "", description: "", price: "" });
+  const [form, setForm] = useState({ title: "", description: "", price: "", subject: "", lesson: "" });
+  const [subjFilter, setSubjFilter] = useState("");
+
+  const subjects = (prods ?? []).map((p) => p.subject ?? "").filter((s, i, a) => s && a.indexOf(s) === i);
+  const shownProds = subjFilter ? (prods ?? []).filter((p) => p.subject === subjFilter) : prods;
   const [file, setFile] = useState<FileList | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
@@ -38,12 +42,14 @@ export default function StorePage() {
       fd.set("title", form.title);
       fd.set("description", form.description);
       fd.set("price", form.price || "0");
+      fd.set("subject", form.subject);
+      fd.set("lesson", form.lesson);
       if (file?.[0]) fd.set("file", file[0]);
       const r = await fetch("/api/store", { method: "POST", body: fd });
       const j = await r.json().catch(() => null);
       if (r.ok && j?.ok) {
         setMsg("تم نشر المنتج ✅");
-        setForm({ title: "", description: "", price: "" }); setFile(null);
+        setForm({ title: "", description: "", price: "", subject: "", lesson: "" }); setFile(null);
         load();
       } else setMsg(j?.message ?? "فشل: " + (j?.error ?? ""));
     } catch { setMsg("تعذر الاتصال."); }
@@ -123,6 +129,10 @@ export default function StorePage() {
           {file?.length ? `📎 ${file[0].name.slice(0, 30)}` : "ملف المنتج (PDF/صور)"}
           <input type="file" accept=".pdf,image/*" className="hidden" onChange={(e) => setFile(e.target.files)} />
         </label>
+        <input value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} maxLength={80}
+          placeholder="المادة (مثال: فيزياء)" className="rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:border-primary" />
+        <input value={form.lesson} onChange={(e) => setForm({ ...form, lesson: e.target.value })} maxLength={120}
+          placeholder="الدرس (مثال: الحركة الموجية)" className="rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:border-primary" />
         <input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
           placeholder="وصف مختصر (اختياري)" className="rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:border-primary sm:col-span-2" />
         <button className="btn-primary sm:col-span-2" disabled={busy}>{busy ? "جاري النشر..." : "نشر المنتج"}</button>
@@ -130,17 +140,26 @@ export default function StorePage() {
 
       {prods && prods.length > 0 && (
         <section className="card space-y-2 p-5">
-          <h2 className="font-bold">منتجاتي ومخزونها ({prods.length})</h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-bold">منتجاتي ومخزونها ({prods.length})</h2>
+            {subjects.length > 0 && (
+              <select value={subjFilter} onChange={(e) => setSubjFilter(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs">
+                <option value="">كل المواد 📚</option>
+                {subjects.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            )}
+          </div>
           {prods.some((p) => (p.stock_qty ?? -1) >= 0 && (p.stock_qty ?? 0) <= (p.low_stock_at ?? 5)) && (
             <div className="rounded-xl bg-danger/5 p-3 text-xs font-bold text-danger">
               ⚠️ مخزون منخفض: {prods.filter((p) => (p.stock_qty ?? -1) >= 0 && (p.stock_qty ?? 0) <= (p.low_stock_at ?? 5)).map((p) => p.title).join("، ")}
             </div>
           )}
           <ul className="space-y-2">
-            {prods.map((p) => (
+            {(shownProds ?? []).map((p) => (
               <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 px-4 py-2.5 text-small">
                 <div>
                   <span className="font-bold">{p.title}</span>
+                  {(p.subject || p.lesson) && <span className="mx-2 rounded-full bg-primary-light px-2 py-0.5 text-[11px] font-bold text-primary">{[p.subject, p.lesson].filter(Boolean).join(" · ")}</span>}
                   <span className="mx-2 text-slate-500">{Number(p.price) <= 0 ? "مجاني" : `${p.price} جنيه`}</span>
                   <span className={`text-xs font-bold ${(p.stock_qty ?? -1) < 0 ? "text-slate-400" : (p.stock_qty ?? 0) <= (p.low_stock_at ?? 5) ? "text-danger" : "text-success"}`}>
                     {(p.stock_qty ?? -1) < 0 ? "مخزون ∞" : `مخزون: ${p.stock_qty}`}
