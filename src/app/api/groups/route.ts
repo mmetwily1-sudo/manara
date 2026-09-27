@@ -12,7 +12,7 @@ export async function GET() {
   const scope = await staffScope(ctx.admin, ctx.tenantId, res.ctx.userRow.role, res.ctx.userRow.id);
   const { data: groups, error } = await ctx.admin
     .from("groups")
-    .select("id,name,grade_level,subject,monthly_fee,schedule,branch_id,created_at")
+    .select("id,name,grade_level,subject,monthly_fee,schedule,branch_id,capacity,created_at")
     .eq("tenant_id", ctx.tenantId)
     .order("created_at", { ascending: true });
   if (error) return dbFail("groups", error);
@@ -52,10 +52,26 @@ export async function POST(req: Request) {
     subject: (body?.subject ?? "").trim() || null,
     monthly_fee: Number(body?.monthly_fee ?? 0) || 0,
     schedule: Array.isArray(body?.schedule) ? body.schedule : [],
+    capacity: Math.max(0, Number(body?.capacity ?? 0) || 0),
   }).select("id,name").single();
 
   if (error) return dbFail("groups", error);
   return NextResponse.json({ ok: true, group: data });
+}
+
+/** PATCH /api/groups {id, capacity} — ضبط سعة المجموعة (مالك) */
+export async function PATCH(req: Request) {
+  const res = await requireTeacher(["teacher_admin"]);
+  if ("error" in res) return res.error;
+  const body = await req.json().catch(() => ({} as any));
+  const cap = Number(body?.capacity);
+  if (!body?.id || !Number.isInteger(cap) || cap < 0 || cap > 1000) {
+    return NextResponse.json({ ok: false, error: "bad_capacity" }, { status: 400 });
+  }
+  const { error } = await res.ctx.admin.from("groups").update({ capacity: cap })
+    .eq("id", body.id).eq("tenant_id", res.ctx.tenantId);
+  if (error) return NextResponse.json({ ok: false, error: "db" }, { status: 500 });
+  return NextResponse.json({ ok: true, capacity: cap });
 }
 
 /** DELETE /api/groups?id= — حذف مجموعة (يحذف تسجيلاتها تبعياً) */

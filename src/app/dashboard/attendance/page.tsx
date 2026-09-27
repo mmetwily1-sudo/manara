@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AttendanceGrid } from "@/components/AttendanceGrid";
+import SessionQr from "@/components/SessionQr";
 
 type Group = { id: string; name: string; grade: string | null; subject: string | null };
 type Student = { id: string; name: string; groupId: string; parentPhone: string | null; status: "present" | "absent" | "pending" };
@@ -81,7 +82,10 @@ export default function AttendancePage() {
           <p className="mt-1 text-xs text-slate-400">أضف طلاباً من صفحة الطلاب أولاً.</p>
         </div>
       ) : (
-        <AttendanceGrid students={students} sessionId={sessionId} />
+        <>
+          <SessionQr sessionId={sessionId} />
+          <AttendanceGrid students={students} sessionId={sessionId} />
+        </>
       )}
     </div>
   );

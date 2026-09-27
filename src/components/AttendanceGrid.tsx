@@ -99,17 +99,21 @@ export function AttendanceGrid({ students, sessionId }: { students: Student[]; s
     });
   }
 
-  function markAllPresent() {
+  function markAll(status: Exclude<StudentStatus, "pending">) {
     const all: Record<string, StudentStatus> = {};
-    students.forEach((s) => { all[s.id] = "present"; });
+    students.forEach((s) => { all[s.id] = status; });
     setStatuses(all);
     const sid = sessionRef.current;
     if (!sid) return;
     const others = loadQueue().filter((i) => i.sessionId !== sid);
-    const batch: QueueItem[] = students.map((s) => ({ sessionId: sid, studentId: s.id, status: "present" as const }));
+    const batch: QueueItem[] = students.map((s) => ({ sessionId: sid, studentId: s.id, status }));
     saveQueue([...others, ...batch]);
     setQueueLen(loadQueue().length);
     flushQueue(batch);
+  }
+
+  function markAllPresent() {
+    markAll("present");
   }
 
   function submitCode(e: React.FormEvent) {
@@ -165,6 +169,9 @@ export function AttendanceGrid({ students, sessionId }: { students: Student[]; s
         <div className="flex flex-wrap items-center gap-3">
           <button className="btn-primary !px-5 !py-2 text-small" onClick={markAllPresent}>
             تحضير الكل ✓
+          </button>
+          <button className="btn-secondary !px-5 !py-2 text-small" onClick={() => { if (confirm("تسجيل الكل غائب؟")) markAll("absent"); }}>
+            تغييب الكل
           </button>
           <button className="btn-secondary !px-5 !py-2 text-small" onClick={() => setCodeMode((v) => !v)}>
             {codeMode ? "إغلاق" : "تحضير بكود"}

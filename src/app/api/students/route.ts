@@ -74,6 +74,10 @@ export async function POST(req: Request) {
   if (groupId) {
     const { data: g } = await ctx.admin.from("groups").select("id").eq("id", groupId).eq("tenant_id", ctx.tenantId).single();
     if (!g) return NextResponse.json({ ok: false, error: "bad_group" }, { status: 400 });
+    const { isGroupFull } = await import("@/lib/capacity");
+    if (await isGroupFull(ctx.admin, ctx.tenantId, groupId)) {
+      return NextResponse.json({ ok: false, error: "group_full" }, { status: 409 });
+    }
   }
 
   const { data: row, error } = await ctx.admin.from("users").insert({

@@ -30,7 +30,11 @@ export async function POST(req: Request) {
       let groupId: string | null = null;
       if (r?.group_id) {
         const { data: g } = await sb.from("groups").select("id").eq("id", r.group_id).eq("tenant_id", tid).single();
-        if (g) groupId = (g as any).id;
+        if (g) {
+          const { isGroupFull } = await import("@/lib/capacity");
+          if (await isGroupFull(sb, tid, (g as any).id)) { skipped++; continue; }
+          groupId = (g as any).id;
+        }
       }
       const { data: row, error } = await sb.from("users").insert({
         tenant_id: tid, auth_user_id: null, role: "student", full_name: name, phone,

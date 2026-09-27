@@ -10,6 +10,7 @@ type Group = {
   monthly_fee: number;
   schedule: any[];
   students_count: number;
+  capacity: number;
 };
 
 const WEEKDAYS = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
@@ -18,7 +19,21 @@ export default function GroupsPage() {
   const [groups, setGroups] = useState<Group[] | null>(null);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState({ name: "", grade: "", subject: "", fee: "" });
+  const [form, setForm] = useState({ name: "", grade: "", subject: "", fee: "", capacity: "" });
+  const [capEdit, setCapEdit] = useState<Record<string, string>>({});
+
+  async function saveCap(id: string) {
+    const v = capEdit[id];
+    if (v === undefined) return;
+    try {
+      const r = await fetch("/api/groups", {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, capacity: Number(v) }),
+      });
+      if (r.ok) load();
+      else setErr("فشل حفظ السعة.");
+    } catch { setErr("تعذر الاتصال."); }
+  }
   const [sched, setSched] = useState({ weekday: "6", start: "16:00", end: "18:00" });
 
   async function load() {
@@ -37,14 +52,15 @@ export default function GroupsPage() {
     try {
       const r = await fetch("/api/groups", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: form.name, grade_level: form.grade, subject: form.subject,
-          monthly_fee: Number(form.fee) || 0,
-          schedule: [{ weekday: Number(sched.weekday), start: sched.start, end: sched.end }],
-        }),
+          body: JSON.stringify({
+            name: form.name, grade_level: form.grade, subject: form.subject,
+            monthly_fee: Number(form.fee) || 0,
+            capacity: Math.max(0, Number(form.capacity) || 0),
+            schedule: [{ weekday: Number(sched.weekday), start: sched.start, end: sched.end }],
+          }),
       });
       const j = await r.json();
-      if (r.ok && j.ok) { setForm({ name: "", grade: "", subject: "", fee: "" }); load(); }
+      if (r.ok && j.ok) { setForm({ name: "", grade: "", subject: "", fee: "", capacity: "" }); load(); }
       else setErr("فشل الإنشاء: " + (j.error ?? "خطأ غير معروف"));
     } catch { setErr("تعذر الاتصال بالخادم."); }
     finally { setBusy(false); }
@@ -73,6 +89,7 @@ export default function GroupsPage() {
           <input value={form.grade} onChange={(e) => setForm({ ...form, grade: e.target.value })} placeholder="الصف (مثال: ٣ ثانوي)" className="rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:border-primary" />
           <input value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} placeholder="المادة (مثال: فيزياء)" className="rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:border-primary" />
           <input value={form.fee} onChange={(e) => setForm({ ...form, fee: e.target.value })} placeholder="الاشتراك الشهري (جنيه)" inputMode="decimal" className="rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:border-primary" />
+          <input value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} placeholder="السعة القصوى (0 = بلا حد)" inputMode="numeric" className="rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:border-primary" />
           <div className="flex items-center gap-2 text-small">
             <select value={sched.weekday} onChange={(e) => setSched({ ...sched, weekday: e.target.value })} className="rounded-lg border border-slate-200 px-3 py-2">
               {WEEKDAYS.map((d, i) => <option key={i} value={i}>{d}</option>)}
@@ -98,7 +115,15 @@ export default function GroupsPage() {
                 <div className="mt-0.5 text-xs text-slate-500">
                   {[g.grade_level, g.subject].filter(Boolean).join(" · ")}
                   {g.monthly_fee ? ` · ${g.monthly_fee} ج/شهر` : ""}
-                  {` · ${g.students_count} طالب`}
+                  {` · ${g.students_count}${g.capacity > 0 ? `/${g.capacity}` : ""} طالب`}
+                  {g.capacity > 0 && g.students_count >= g.capacity && (
+                    <span className="mx-1 rounded-full bg-danger/10 px-2 py-0.5 font-bold text-danger">مكتملة 🔴</span>
+                  )}
+                </div>
+                <div className="mt-1 flex items-center gap-1 text-xs">
+                  <input value={capEdit[g.id] ?? ""} onChange={(e) => setCapEdit({ ...capEdit, [g.id]: e.target.value })}
+                    placeholder={`السعة (${g.capacity || "∞"})`} inputMode="numeric" className="w-24 rounded-lg border border-slate-200 px-2 py-1 text-center" />
+                  <button onClick={() => saveCap(g.id)} className="rounded-lg bg-slate-100 px-2 py-1 font-bold text-slate-500">حفظ</button>
                 </div>
                 {(g.schedule ?? []).length > 0 && (
                   <div className="mt-1 text-xs text-primary">
