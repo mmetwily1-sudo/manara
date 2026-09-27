@@ -6,6 +6,7 @@ import NpsBanner from "@/components/NpsBanner";
 import OnboardingChecklist from "@/components/OnboardingChecklist";
 import TrialBanner from "@/components/TrialBanner";
 import FeedbackWidget from "@/components/FeedbackWidget";
+import HealthScore from "@/components/HealthScore";
 
 export default async function DashboardHome() {
   const [kpis, groups, warnings, feed] = await Promise.all([getKpis(), getGroups(), getEarlyWarning(), getFeed()]);
@@ -43,6 +44,7 @@ export default async function DashboardHome() {
       </section>
 
       <TrialBanner />
+      <HealthScore />
       <OnboardingChecklist />
       <NpsBanner />
       <ReferralPromo />

@@ -74,11 +74,48 @@ export async function getKpis() {
   } catch { return { presentToday: 0, absentToday: 0, collectedMonth: 0, outstanding: 0, lateStudents: 0 }; }
 }
 
+/** إنذار تسرب حقيقي: غياب 14 يوماً / غياب متكرر / مديونية قديمة (بلا وهميات — فراغ = لا إنذار) */
 export async function getEarlyWarning() {
   const sb = supaServer();
   if (!sb) return demo.getEarlyWarning();
-  // حساب جديد: لا إنذارات وهمية
-  return [];
+  try {
+    const { data: students } = await sb.from("users").select("id,full_name").eq("role", "student").limit(300);
+    if (!students?.length) return [];
+    const ids = (students as any[]).map((s) => s.id);
+    const cutoff = new Date(Date.now() - 14 * 864e5).toISOString();
+    const [{ data: att }, { data: inv }] = await Promise.all([
+      sb.from("attendance").select("student_id,status,created_at").in("student_id", ids).gte("created_at", cutoff).limit(3000),
+      sb.from("invoices").select("student_id,amount,paid,period").in("student_id", ids).neq("status", "paid").limit(1000),
+    ]);
+    const lastSeen: Record<string, string> = {};
+    const abs: Record<string, number> = {};
+    ((att ?? []) as any[]).forEach((a) => {
+      if (!lastSeen[a.student_id] || a.created_at > lastSeen[a.student_id]) lastSeen[a.student_id] = a.created_at;
+      if (a.status === "absent") abs[a.student_id] = (abs[a.student_id] ?? 0) + 1;
+    });
+    const due: Record<string, { sum: number; oldest: string }> = {};
+    ((inv ?? []) as any[]).forEach((x) => {
+      const rest = Number(x.amount ?? 0) - Number(x.paid ?? 0);
+      if (rest <= 0) return;
+      const d = due[x.student_id] ??= { sum: 0, oldest: x.period };
+      d.sum += rest;
+      if (String(x.period) < d.oldest) d.oldest = x.period;
+    });
+    const out: { id: string; name: string; detail: string; reason: string }[] = [];
+    for (const s of students as any[]) {
+      const reasons: string[] = [];
+      if (!lastSeen[s.id]) reasons.push("لا حضور منذ 14 يوماً 🔴");
+      else if ((abs[s.id] ?? 0) >= 3) reasons.push(`غياب متكرر (${abs[s.id]} مرات) 🟡`);
+      const dd = due[s.id];
+      if (dd && dd.sum > 0) {
+        const ageD = Math.floor((Date.now() - new Date(`${dd.oldest}-01T00:00:00Z`).getTime()) / 864e5);
+        if (ageD > 45) reasons.push(`مديونية قديمة ${dd.sum.toLocaleString("ar-EG")} ج 🟡`);
+      }
+      if (reasons.length) out.push({ id: s.id, name: s.full_name, detail: reasons.join(" · "), reason: reasons.length > 1 ? "خطر مركّب" : "يحتاج متابعة" });
+      if (out.length >= 8) break;
+    }
+    return out;
+  } catch { return []; }
 }
 
 export async function getFeed() {
