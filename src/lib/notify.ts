@@ -61,7 +61,19 @@ export async function notifyStudent(
     admin.from("tenants").select("settings").eq("id", tenantId).single(),
   ]);
   const phone = (student?.phone ?? "") as string;
-  const enabled = (tenant?.settings as any)?.notify_whatsapp !== false;
+  const settings = (tenant?.settings as any) ?? {};
+  const enabled = settings.notify_whatsapp !== false;
+  // قاعدة الحدث المخصصة (الجولة 27): إيقاف الحدث = تخطٍّ صامت مسجل
+  if (settings.notify_rules?.[event.kind] === false) {
+    try {
+      await admin.from("notification_log").insert({
+        tenant_id: tenantId, user_id: studentId, event: event.kind, channel: "whatsapp",
+        payload: { reason: "disabled_by_rule" }, status: "skipped",
+        dedupe_key: dedupeKey, sent_at: null,
+      });
+    } catch {}
+    return { sent: false, reason: "disabled_by_rule" };
+  }
 
   // تجاوز قالب السنتر المخصص (قوالب الجولة 21) — {placeholders}
   const TPL_KEY: Record<NotifyEvent["kind"], string> = {

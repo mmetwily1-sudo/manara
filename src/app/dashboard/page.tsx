@@ -7,6 +7,7 @@ import OnboardingChecklist from "@/components/OnboardingChecklist";
 import TrialBanner from "@/components/TrialBanner";
 import FeedbackWidget from "@/components/FeedbackWidget";
 import HealthScore from "@/components/HealthScore";
+import InstallPwa from "@/components/InstallPwa";
 
 export default async function DashboardHome() {
   const [kpis, groups, warnings, feed] = await Promise.all([getKpis(), getGroups(), getEarlyWarning(), getFeed()]);
@@ -19,7 +20,10 @@ export default async function DashboardHome() {
           <h1 className="text-h1">يومك في شاشة واحدة</h1>
           <p className="mt-1 text-small text-slate-500">{todayStr} — {groups.length} {groups.length === 1 ? "جلسة" : "جلسات"} النهاردة</p>
         </div>
-        <Link href="/dashboard/attendance" className="btn-primary text-small">ابدأ التحضير</Link>
+        <div className="flex gap-2">
+          <InstallPwa />
+          <Link href="/dashboard/attendance" className="btn-primary text-small">ابدأ التحضير</Link>
+        </div>
       </header>
 
       {/* KPIs — أرقام ضخمة (نمط حاضر) */}
