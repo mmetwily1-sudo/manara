@@ -19,7 +19,7 @@ export async function GET() {
   const tid = (urow as any).tenant_id;
   const isTeacher = (urow as any).role === "teacher_admin";
   try {
-    let q = admin.from("products").select("id,title,description,price,is_active,created_at")
+    let q = admin.from("products").select("id,title,description,price,is_active,stock_qty,low_stock_at,created_at")
       .eq("tenant_id", tid).order("created_at", { ascending: false }).limit(100);
     if (!isTeacher) q = q.eq("is_active", true);
     const { data: prods, error } = await q;

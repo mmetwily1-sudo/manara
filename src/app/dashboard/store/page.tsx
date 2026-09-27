@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 
-type Product = { id: string; title: string; description: string | null; price: number; is_active: boolean };
+type Product = { id: string; title: string; description: string | null; price: number; is_active: boolean; stock_qty?: number; low_stock_at?: number };
+type PosLine = { product_id: string; qty: number };
 type Order = { id: string; status: string; created_at: string; student_name: string; products: { title: string; price: number } };
 
 export default function StorePage() {
@@ -57,6 +58,52 @@ export default function StorePage() {
     load();
   }
 
+  const [students, setStudents] = useState<{ id: string; name: string }[]>([]);
+  const [pos, setPos] = useState<PosLine[]>([{ product_id: "", qty: 1 }]);
+  const [posStudent, setPosStudent] = useState("");
+  const [posBusy, setPosBusy] = useState(false);
+  const [stockEdit, setStockEdit] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    fetch("/api/students").then(async (r) => {
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) setStudents((j.students ?? []).map((s: any) => ({ id: s.id, name: s.name })));
+    }).catch(() => {});
+  }, []);
+
+  async function saveStock(id: string) {
+    const v = stockEdit[id];
+    if (v === undefined) return;
+    try {
+      const r = await fetch("/api/store/stock", {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ product_id: id, stock_qty: Number(v) }),
+      });
+      if (r.ok) { setMsg("تم تحديث المخزون ✅"); load(); }
+      else setMsg("فشل التحديث.");
+    } catch { setMsg("تعذر الاتصال."); }
+  }
+
+  async function sell(e: React.FormEvent) {
+    e.preventDefault();
+    if (!posStudent) { setMsg("اختر الطالب أولاً."); return; }
+    const items = pos.filter((l) => l.product_id && l.qty > 0);
+    if (!items.length) { setMsg("أضف صنفاً واحداً على الأقل."); return; }
+    setPosBusy(true); setMsg("");
+    try {
+      const r = await fetch("/api/store/pos", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items, student_id: posStudent }),
+      });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) {
+        setMsg(`تم البيع ✅ ${j.sold} قطعة بإجمالي ${j.total} جنيه${(j.lacking ?? []).length ? ` — تعذر: ${(j.lacking ?? []).join("، ")}` : ""}`);
+        setPos([{ product_id: "", qty: 1 }]); setPosStudent(""); load();
+      } else setMsg("فشل البيع: " + (j?.error ?? ""));
+    } catch { setMsg("تعذر الاتصال."); }
+    finally { setPosBusy(false); }
+  }
+
   if (notReady) return <div className="mx-auto max-w-3xl"><div className="card border-warning/30 bg-warning/5 p-6 text-small font-bold text-warning">{notReady}</div></div>;
 
   return (
@@ -83,17 +130,58 @@ export default function StorePage() {
 
       {prods && prods.length > 0 && (
         <section className="card space-y-2 p-5">
-          <h2 className="font-bold">منتجاتي ({prods.length})</h2>
+          <h2 className="font-bold">منتجاتي ومخزونها ({prods.length})</h2>
+          {prods.some((p) => (p.stock_qty ?? -1) >= 0 && (p.stock_qty ?? 0) <= (p.low_stock_at ?? 5)) && (
+            <div className="rounded-xl bg-danger/5 p-3 text-xs font-bold text-danger">
+              ⚠️ مخزون منخفض: {prods.filter((p) => (p.stock_qty ?? -1) >= 0 && (p.stock_qty ?? 0) <= (p.low_stock_at ?? 5)).map((p) => p.title).join("، ")}
+            </div>
+          )}
           <ul className="space-y-2">
             {prods.map((p) => (
-              <li key={p.id} className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-2.5 text-small">
-                <span className="font-bold">{p.title}</span>
-                <span className="text-slate-500">{Number(p.price) <= 0 ? "مجاني" : `${p.price} جنيه`}</span>
+              <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 px-4 py-2.5 text-small">
+                <div>
+                  <span className="font-bold">{p.title}</span>
+                  <span className="mx-2 text-slate-500">{Number(p.price) <= 0 ? "مجاني" : `${p.price} جنيه`}</span>
+                  <span className={`text-xs font-bold ${(p.stock_qty ?? -1) < 0 ? "text-slate-400" : (p.stock_qty ?? 0) <= (p.low_stock_at ?? 5) ? "text-danger" : "text-success"}`}>
+                    {(p.stock_qty ?? -1) < 0 ? "مخزون ∞" : `مخزون: ${p.stock_qty}`}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <input value={stockEdit[p.id] ?? ""} onChange={(e) => setStockEdit({ ...stockEdit, [p.id]: e.target.value })}
+                    placeholder="الكمية (-1=∞)" inputMode="numeric" className="w-24 rounded-lg border border-slate-200 px-2 py-1 text-center text-xs" />
+                  <button onClick={() => saveStock(p.id)} className="rounded-lg bg-slate-200 px-3 py-1 text-xs font-bold">حفظ</button>
+                </div>
               </li>
             ))}
           </ul>
         </section>
       )}
+
+      <section className="card space-y-3 p-5">
+        <h2 className="font-bold">بيع سريع (كاشير) 🧮</h2>
+        <select value={posStudent} onChange={(e) => setPosStudent(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-small">
+          <option value="">اختر الطالب المشتري…</option>
+          {students.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
+        {pos.map((l, i) => (
+          <div key={i} className="flex gap-2">
+            <select value={l.product_id} onChange={(e) => setPos(pos.map((x, j) => (j === i ? { ...x, product_id: e.target.value } : x)))}
+              className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2 text-small">
+              <option value="">اختر صنفاً…</option>
+              {(prods ?? []).map((p) => <option key={p.id} value={p.id}>{p.title} — {p.price} ج</option>)}
+            </select>
+            <input value={l.qty} onChange={(e) => setPos(pos.map((x, j) => (j === i ? { ...x, qty: Math.max(1, Number(e.target.value) || 1) } : x)))}
+              type="number" min={1} max={99} className="w-20 rounded-xl border border-slate-200 px-2 py-2 text-center text-small" />
+            {pos.length > 1 && (
+              <button type="button" onClick={() => setPos(pos.filter((_, j) => j !== i))} className="text-danger">✕</button>
+            )}
+          </div>
+        ))}
+        <div className="flex gap-2">
+          <button type="button" onClick={() => setPos([...pos, { product_id: "", qty: 1 }])} className="btn-secondary !px-3 !py-2 text-xs">+ صنف</button>
+          <button onClick={sell} disabled={posBusy} className="btn-primary flex-1 disabled:opacity-50">{posBusy ? "جاري..." : "إتمام البيع ✅"}</button>
+        </div>
+      </section>
 
       {orders.length > 0 && (
         <section className="card space-y-2 p-5">
