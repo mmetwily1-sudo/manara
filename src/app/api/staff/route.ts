@@ -17,10 +17,12 @@ export async function GET() {
     const { data: bs } = await res.ctx.admin.from("branches").select("id,name").in("id", bids as string[]);
     (bs ?? []).forEach((b: any) => { branches[b.id] = b.name; });
   }
+  const { data: allBranches } = await res.ctx.admin.from("branches").select("id,name").eq("tenant_id", res.ctx.tenantId).limit(50);
   return NextResponse.json({
     ok: true,
+    branches: allBranches ?? [],
     staff: (data ?? []).map((u: any) => ({
-      id: u.id, name: u.full_name, phone: u.phone, role: u.role,
+      id: u.id, name: u.full_name, phone: u.phone, role: u.role, branch_id: u.branch_id ?? null,
       role_label: u.role === "teacher_admin" ? "المالك" : (ROLE_LABEL[u.role] ?? u.role),
       branch: u.branch_id ? (branches[u.branch_id] ?? "—") : "كل الفروع",
       is_owner: u.id === res.ctx.userRow.id,
@@ -70,6 +72,43 @@ export async function POST(req: Request) {
     await admin.from("audit_log").insert({
       tenant_id: tid, actor_id: res.ctx.userRow.id,
       action: `staff:invite:${role}`, entity_type: "user", entity_id: au.user.id, details: { email },
+    });
+  } catch {}
+  return NextResponse.json({ ok: true });
+}
+
+/** PATCH /api/staff {id, branch_id?, role?} — نقل موظف لفرع / تغيير دوره / تعيين مدير فرع (مشرف+فرع) */
+export async function PATCH(req: Request) {
+  const res = await requireTeacher(["teacher_admin"]);
+  if ("error" in res) return res.error;
+  const admin = res.ctx.admin;
+  const tid = res.ctx.tenantId;
+  const b = await req.json().catch(() => ({} as any));
+  const { data: target } = await admin.from("users").select("id,role").eq("id", b?.id).eq("tenant_id", tid).single();
+  if (!target || (target as any).role === "teacher_admin" || b?.id === res.ctx.userRow.id) {
+    return NextResponse.json({ ok: false, error: "protected" }, { status: 400 });
+  }
+  const patch: any = {};
+  if (b?.branch_id !== undefined) {
+    if (b.branch_id) {
+      const { data: br } = await admin.from("branches").select("id").eq("id", b.branch_id).eq("tenant_id", tid).single();
+      if (!br) return NextResponse.json({ ok: false, error: "bad_branch" }, { status: 400 });
+      patch.branch_id = b.branch_id;
+    } else patch.branch_id = null;
+  }
+  if (b?.role !== undefined) {
+    if (!(STAFF_ROLES as readonly string[]).includes(b.role)) {
+      return NextResponse.json({ ok: false, error: "bad_role" }, { status: 400 });
+    }
+    patch.role = b.role;
+  }
+  if (!Object.keys(patch).length) return NextResponse.json({ ok: false, error: "empty" }, { status: 400 });
+  const { error } = await admin.from("users").update(patch).eq("id", b.id).eq("tenant_id", tid);
+  if (error) return dbFail("staff-update", error);
+  try {
+    await admin.from("audit_log").insert({
+      tenant_id: tid, actor_id: res.ctx.userRow.id,
+      action: "staff:move", entity_type: "user", entity_id: b.id, details: patch,
     });
   } catch {}
   return NextResponse.json({ ok: true });

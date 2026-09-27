@@ -15,6 +15,21 @@ export default function StudentsPage() {
   const [showImport, setShowImport] = useState(false);
   const [importText, setImportText] = useState("");
   const [importResult, setImportResult] = useState<{ imported: number; skipped: number; bad: string[] } | null>(null);
+  const [transferFor, setTransferFor] = useState<string | null>(null);
+  const [transferTo, setTransferTo] = useState("");
+
+  async function onTransfer(id: string) {
+    if (!transferTo) return;
+    try {
+      const r = await fetch("/api/students/transfer", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ student_id: id, to_group_id: transferTo }),
+      });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) { setTransferFor(null); setTransferTo(""); load(); }
+      else setErr(j?.error === "group_full" ? "المجموعة المستهدفة مكتملة — اختر مجموعة أخرى أو قائمة الانتظار." : "فشل النقل.");
+    } catch { setErr("تعذر الاتصال."); }
+  }
   const [form, setForm] = useState({ name: "", phone: "", groupId: "" });
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -164,7 +179,23 @@ export default function StudentsPage() {
                     {s.groups.length ? s.groups.map((g) => g.name).join("، ") : <span className="text-slate-300">—</span>}
                   </td>
                   <td className="px-4 py-3 font-mono text-xs text-slate-400" dir="ltr">{s.phone ?? "—"}</td>
-                  <td className="px-4 py-3"><a href={`/reports/parent/${s.id}`} className="text-xs font-bold text-primary hover:underline">تقرير 📄</a></td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap items-center gap-1">
+                      <a href={`/reports/parent/${s.id}`} className="text-xs font-bold text-primary hover:underline">تقرير 📄</a>
+                      {transferFor === s.id ? (
+                        <>
+                          <select value={transferTo} onChange={(e) => setTransferTo(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px]">
+                            <option value="">إلى مجموعة…</option>
+                            {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                          </select>
+                          <button onClick={() => onTransfer(s.id)} disabled={!transferTo} className="rounded-lg bg-primary-light px-2 py-1 text-[11px] font-bold text-primary disabled:opacity-50">نقل</button>
+                          <button onClick={() => { setTransferFor(null); setTransferTo(""); }} className="text-[11px] text-slate-400">✕</button>
+                        </>
+                      ) : (
+                        <button onClick={() => { setTransferFor(s.id); setTransferTo(""); }} className="text-xs font-bold text-slate-500 hover:underline">نقل 🔀</button>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-4 py-3">
                     {(() => {
                       const link = waTo(s.phone, `السلام عليكم 👋 تذكير من سنترنا: برجاء متابعة المصروفات الشهرية الخاصة بالطالب ${s.name} — للاستفسار تواصل معنا.`);

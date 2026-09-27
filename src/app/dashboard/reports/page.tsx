@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 type G = { id: string; name: string; branch: string; teacher: string; students: number; expected: number; collected: number; outstanding: number; rate: number };
-type B = { name: string; students: number; collected: number; outstanding: number };
+type B = { name: string; students: number; collected: number; outstanding: number; present7?: number };
 type T = { name: string; groups: number; students: number; collected: number };
 
 const fmt = (n: number) => `${Number(n).toLocaleString("ar-EG")} ج`;
@@ -141,6 +141,7 @@ export default function ReportsPage() {
                 <div className="font-bold">{b.name}</div>
                 <div className="mt-1 text-small">محصّل: <b className="text-success">{fmt(b.collected)}</b></div>
                 <div className="text-small">طلاب: <b>{b.students}</b> · متبقي: <b className="text-warning">{fmt(b.outstanding)}</b></div>
+                <div className="text-small">حضور 7 أيام: <b className="text-success">{b.present7 ?? 0}</b></div>
               </div>
             ))}
           </div>}

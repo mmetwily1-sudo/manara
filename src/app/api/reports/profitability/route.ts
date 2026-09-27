@@ -59,6 +59,23 @@ export async function GET() {
     if (t) { t.students += g.students; t.collected += g.collected; }
   });
 
+  // حضور 7 أيام لكل فرع (عبر الجلسات)
+  try {
+    const weekAgo = new Date(Date.now() - 7 * 864e5).toISOString();
+    const { data: sess } = await admin.from("sessions").select("id,group_id").eq("tenant_id", tid).gte("session_date", weekAgo.slice(0, 10)).limit(1000);
+    const sessIds = ((sess ?? []) as any[]).map((s) => s.id);
+    const sessBranch = new Map(((sess ?? []) as any[]).map((s) => {
+      const g = gs.find((x) => x.id === s.group_id);
+      return [s.id, g ? (bmap.get(g.branch_id) ?? "الرئيسي") : null];
+    }));
+    if (sessIds.length) {
+      const { data: att } = await admin.from("attendance").select("session_id").eq("tenant_id", tid).eq("status", "present").in("session_id", sessIds).limit(5000);
+      ((att ?? []) as any[]).forEach((a) => {
+        const bn = sessBranch.get(a.session_id);
+        if (bn && perBranch[bn]) (perBranch[bn] as any).present7 = (((perBranch[bn] as any).present7 ?? 0) + 1);
+      });
+    }
+  } catch {}
   const total = perGroup.reduce((s, g) => s + g.collected, 0);
   return NextResponse.json({
     ok: true, total,

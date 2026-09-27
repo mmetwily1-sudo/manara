@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 type Branch = { id: string; name: string; address: string | null };
-type Member = { id: string; name: string; phone: string; role: string; role_label: string; branch: string; is_owner: boolean };
+type Member = { id: string; name: string; phone: string; role: string; role_label: string; branch: string; branch_id: string | null; is_owner: boolean };
 
 const ROLES = [["supervisor", "مشرف"], ["assistant", "مساعد تحضير"], ["accountant", "محاسب"]];
 
@@ -68,6 +68,17 @@ export default function StaffPage() {
     } catch { setErr("تعذر الاتصال."); }
   }
 
+  async function move(id: string, patch: { branch_id?: string | null; role?: string }) {
+    try {
+      const r = await fetch("/api/staff", {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, ...patch }),
+      });
+      if (r.ok) load();
+      else setErr("فشل التحديث.");
+    } catch { setErr("تعذر الاتصال."); }
+  }
+
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <header>
@@ -120,7 +131,22 @@ export default function StaffPage() {
                 <td className="px-4 py-3">{s.role_label}</td>
                 <td className="px-4 py-3 text-slate-500">{s.branch}</td>
                 <td className="px-4 py-3 font-mono text-xs text-slate-400" dir="ltr">{s.phone}</td>
-                <td className="px-4 py-3"><div className="flex gap-2">
+                <td className="px-4 py-3"><div className="flex flex-wrap items-center gap-1">
+                  {!s.is_owner && s.role !== "teacher_admin" && (
+                    <>
+                      <select value={s.branch_id ?? ""} onChange={(e) => move(s.id, { branch_id: e.target.value || null })}
+                        title="الفرع" className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px]">
+                        <option value="">كل الفروع</option>
+                        {branches.map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                      </select>
+                      <select value={s.role} onChange={(e) => move(s.id, { role: e.target.value })}
+                        title="الدور" className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px]">
+                        <option value="supervisor">مشرف</option>
+                        <option value="assistant">مساعد</option>
+                        <option value="accountant">محاسب</option>
+                      </select>
+                    </>
+                  )}
                   <button
                     onClick={() => {
                       const link = `${window.location.origin}/t/${s.id}`;
