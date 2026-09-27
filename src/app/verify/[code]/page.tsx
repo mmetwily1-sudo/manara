@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import ShareCert from "@/components/ShareCert";
 
 export async function generateMetadata({ params }: { params: { code: string } }) {
   return { title: `شهادة ${params.code} — منارة` };
@@ -36,6 +37,7 @@ export default async function VerifyPage({ params }: { params: { code: string } 
         <div className="mt-4 rounded-xl bg-slate-50 p-3 font-mono text-small font-bold" dir="ltr">{cert.serial_code}</div>
         <p className="mt-2 text-xs text-slate-400">صدرت: {new Date(cert.issued_at).toLocaleDateString("ar-EG")}</p>
         <div className="mt-4 rounded-lg bg-success/5 px-3 py-2 text-xs font-semibold text-success">✓ شهادة موثقة — تحقق عبر رمز QR</div>
+        <ShareCert title={cert.title} name={(cert.users as any)?.full_name ?? "طالب"} center={(cert.tenants as any)?.name ?? "منارة"} />
       </div>
     </main>
   );

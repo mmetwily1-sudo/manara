@@ -4,6 +4,88 @@ import { useEffect, useState } from "react";
 
 type L = { rank: number; medal: string | null; name: string; points: number };
 
+/** معركة مجموعتين في امتحان — المتوسط يحدد الفائز */
+function BattleSection({ groups }: { groups: { id: string; name: string }[] }) {
+  const [exams, setExams] = useState<{ id: string; title: string }[]>([]);
+  const [f, setF] = useState({ exam_id: "", a: "", b: "" });
+  const [out, setOut] = useState<{ exam: string; a: { name: string; count: number; avg: number | null }; b: { name: string; count: number; avg: number | null }; winner: string | null } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/exams").then(async (r) => {
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) setExams((j.exams ?? []).map((e: any) => ({ id: e.id, title: e.title })));
+    }).catch(() => {});
+  }, []);
+
+  async function fight(e: React.FormEvent) {
+    e.preventDefault();
+    if (!f.exam_id || !f.a || !f.b || f.a === f.b) return;
+    setBusy(true);
+    try {
+      const r = await fetch(`/api/battles?exam_id=${f.exam_id}&a=${f.a}&b=${f.b}`);
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) setOut(j);
+    } catch {}
+    finally { setBusy(false); }
+  }
+
+  return (
+    <section className="card space-y-3 p-5">
+      <h2 className="font-bold">معركة المجموعات ⚔️ <span className="text-xs font-normal text-slate-400">متوسط الدرجات يحسم الفائز</span></h2>
+      <form onSubmit={fight} className="grid gap-2 sm:grid-cols-4">
+        <select value={f.exam_id} onChange={(e) => setF({ ...f, exam_id: e.target.value })} required className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-small">
+          <option value="">الامتحان…</option>
+          {exams.map((e) => <option key={e.id} value={e.id}>{e.title}</option>)}
+        </select>
+        <select value={f.a} onChange={(e) => setF({ ...f, a: e.target.value })} required className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-small">
+          <option value="">المجموعة أ…</option>
+          {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+        </select>
+        <select value={f.b} onChange={(e) => setF({ ...f, b: e.target.value })} required className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-small">
+          <option value="">المجموعة ب…</option>
+          {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+        </select>
+        <button className="btn-primary !py-2 text-small" disabled={busy}>{busy ? "..." : "ابدأ المعركة ⚔️"}</button>
+      </form>
+      {out && (
+        <div className="grid gap-2 sm:grid-cols-2">
+          {(["a", "b"] as const).map((k) => (
+            <div key={k} className={`rounded-xl p-4 text-center ${out.winner === k ? "bg-success/10 ring-2 ring-success" : "bg-slate-50"}`}>
+              <div className="font-bold">{out[k].name} {out.winner === k && "🏆"}</div>
+              <div className="mt-1 text-2xl font-extrabold">{out[k].avg !== null ? `${out[k].avg}%` : "—"}</div>
+              <div className="text-xs text-slate-400">{out[k].count} محاولة</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** لوحة شرف الأوائل — أعلى متوسط (3+ امتحانات) */
+function OlympicsSection() {
+  const [hall, setHall] = useState<{ rank: number; medal: string | null; name: string; avg: number; exams: number }[] | null>(null);
+  useEffect(() => {
+    fetch("/api/olympics").then(async (r) => {
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) setHall(j.hall);
+    }).catch(() => {});
+  }, []);
+  if (!hall || !hall.length) return null;
+  return (
+    <section className="card space-y-2 border-warning/25 bg-gradient-to-l from-warning/5 to-transparent p-5">
+      <h2 className="font-bold">لوحة الشرف 🏛️ <span className="text-xs font-normal text-slate-400">أوائل السنتر — أعلى متوسط</span></h2>
+      {hall.slice(0, 5).map((h) => (
+        <div key={h.rank} className="flex items-center justify-between rounded-xl bg-white/60 px-4 py-2 text-small">
+          <span className="font-bold">{h.medal ?? `#${h.rank}`} {h.name}</span>
+          <span className="font-extrabold text-primary">{h.avg}% <span className="font-normal text-slate-400">({h.exams} امتحانات)</span></span>
+        </div>
+      ))}
+    </section>
+  );
+}
+
 /** لوحة منافسة المجموعات — أسماء مخفاة تلقائياً */
 export default function LeaderboardPage() {
   const [groups, setGroups] = useState<{ id: string; name: string }[]>([]);
@@ -95,6 +177,9 @@ export default function LeaderboardPage() {
         )}
         {gname && <div className="mt-3 text-center text-xs text-slate-400">مجموعة: {gname}</div>}
       </div>
+
+      <BattleSection groups={groups} />
+      <OlympicsSection />
 
       <section className="card space-y-3 p-5">
         <div className="flex items-center justify-between">
