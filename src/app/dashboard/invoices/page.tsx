@@ -13,6 +13,115 @@ const ST: Record<string, [string, string]> = {
   overdue: ["متأخرة 🔴", "bg-danger/10 text-danger"],
 };
 
+/** تقسيط + عربون + استرداد — أدوات مالية بصفحة الفواتير */
+function FinanceTools({ onDone }: { onDone: () => void }) {
+  const [students, setStudents] = useState<{ id: string; name: string }[]>([]);
+  const [ins, setIns] = useState({ student_id: "", title: "", total: "", parts: "3" });
+  const [dep, setDep] = useState({ student_id: "", amount: "", note: "" });
+  const [refunds, setRefunds] = useState<{ id: string; amount: number; reason: string; status: string }[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => {
+    fetch("/api/students").then(async (r) => {
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) setStudents((j.students ?? []).map((s: any) => ({ id: s.id, name: s.name })));
+    }).catch(() => {});
+    fetch("/api/refunds").then(async (r) => {
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) setRefunds(j.refunds);
+    }).catch(() => {});
+  }, []);
+
+  async function installment(e: React.FormEvent) {
+    e.preventDefault(); setBusy(true); setMsg("");
+    try {
+      const r = await fetch("/api/invoices/installments", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...ins, total: Number(ins.total), parts: Number(ins.parts) }),
+      });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) { setMsg(`تم إنشاء خطة ${j.parts} أقساط بإجمالي ${j.total} ج ✅`); setIns({ student_id: "", title: "", total: "", parts: "3" }); onDone(); }
+      else setMsg("فشل إنشاء الخطة.");
+    } catch { setMsg("تعذر الاتصال."); }
+    finally { setBusy(false); }
+  }
+
+  async function deposit(e: React.FormEvent) {
+    e.preventDefault(); setBusy(true); setMsg("");
+    try {
+      const r = await fetch("/api/invoices/deposit", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...dep, amount: Number(dep.amount) }),
+      });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) { setMsg(`تم تسجيل عربون ${j.amount} ج 🪑`); setDep({ student_id: "", amount: "", note: "" }); onDone(); }
+      else setMsg("فشل التسجيل.");
+    } catch { setMsg("تعذر الاتصال."); }
+    finally { setBusy(false); }
+  }
+
+  async function decideRefund(id: string, status: string) {
+    try {
+      const r = await fetch("/api/refunds", {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, status }),
+      });
+      if (r.ok) {
+        const jr = await fetch("/api/refunds").then((x) => x.json()).catch(() => null);
+        if (jr?.ok) setRefunds(jr.refunds);
+        onDone();
+      }
+    } catch {}
+  }
+
+  return (
+    <>
+      {msg && <div className="card p-3 text-small font-bold text-primary">{msg}</div>}
+      <section className="grid gap-4 lg:grid-cols-2">
+        <form onSubmit={installment} className="card space-y-2 p-5">
+          <h2 className="font-bold">خطة تقسيط 🗓️</h2>
+          <select value={ins.student_id} onChange={(e) => setIns({ ...ins, student_id: e.target.value })} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-small">
+            <option value="">الطالب…</option>
+            {students.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <input value={ins.title} onChange={(e) => setIns({ ...ins, title: e.target.value })} required maxLength={120} placeholder="البيان (مثال: مصروفات الترم)" className="w-full rounded-xl border border-slate-200 px-4 py-2 text-small" />
+          <div className="flex gap-2">
+            <input value={ins.total} onChange={(e) => setIns({ ...ins, total: e.target.value })} required type="number" min={1} placeholder="الإجمالي" className="flex-1 rounded-xl border border-slate-200 px-4 py-2 text-small" />
+            <input value={ins.parts} onChange={(e) => setIns({ ...ins, parts: e.target.value })} type="number" min={2} max={24} placeholder="أقساط" className="w-24 rounded-xl border border-slate-200 px-3 py-2 text-small" />
+          </div>
+          <button className="btn-secondary w-full !py-2 text-small" disabled={busy}>إنشاء الأقساط</button>
+        </form>
+        <form onSubmit={deposit} className="card space-y-2 p-5">
+          <h2 className="font-bold">عربون حجز مقعد 🪑</h2>
+          <select value={dep.student_id} onChange={(e) => setDep({ ...dep, student_id: e.target.value })} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-small">
+            <option value="">الطالب…</option>
+            {students.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <div className="flex gap-2">
+            <input value={dep.amount} onChange={(e) => setDep({ ...dep, amount: e.target.value })} required type="number" min={1} placeholder="المبلغ" className="flex-1 rounded-xl border border-slate-200 px-4 py-2 text-small" />
+            <input value={dep.note} onChange={(e) => setDep({ ...dep, note: e.target.value })} maxLength={200} placeholder="ملاحظة" className="flex-1 rounded-xl border border-slate-200 px-4 py-2 text-small" />
+          </div>
+          <button className="btn-secondary w-full !py-2 text-small" disabled={busy}>تسجيل العربون</button>
+        </form>
+      </section>
+      {refunds.filter((x) => x.status === "pending").length > 0 && (
+        <section className="card space-y-2 border-warning/30 p-5">
+          <h2 className="font-bold text-warning">طلبات استرداد بانتظار قرارك 💸</h2>
+          {refunds.filter((x) => x.status === "pending").map((x) => (
+            <div key={x.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 px-4 py-2.5 text-small">
+              <span><b>{x.amount.toLocaleString("ar-EG")} ج</b> <span className="text-xs text-slate-400">· {x.reason || "بلا سبب"}</span></span>
+              <div className="flex gap-2">
+                <button onClick={() => decideRefund(x.id, "approved")} className="rounded-lg bg-success/10 px-3 py-1 text-xs font-bold text-success">اعتماد الاسترداد</button>
+                <button onClick={() => decideRefund(x.id, "rejected")} className="rounded-lg bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500">رفض</button>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+    </>
+  );
+}
+
 /** الفواتير: القائمة + الإصدار + المتأخرات + تصدير — ما كان موجوداً إلا عبر التحصيل */
 export default function InvoicesPage() {
   const [invs, setInvs] = useState<Inv[] | null>(null);
@@ -144,6 +253,8 @@ export default function InvoicesPage() {
           {coupons.length === 0 && <div className="text-small text-slate-400">لا كوبونات بعد.</div>}
         </section>
       )}
+
+      <FinanceTools onDone={load} />
 
       {overdues.length > 0 && (
         <section className="card space-y-2 border-danger/25 p-5">

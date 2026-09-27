@@ -242,7 +242,7 @@ export default function PaymentsPage() {
         ) : (
           <table className="w-full text-right text-small">
             <thead className="bg-slate-50 text-xs text-slate-500">
-              <tr>{["الطالب", "المبلغ", "الطريقة", "إيصال", "ملاحظة", "الوقت"].map((h) => <th key={h} className="px-4 py-3 font-semibold">{h}</th>)}</tr>
+              <tr>{["الطالب", "المبلغ", "الطريقة", "إيصال", "ملاحظة", "الوقت", ""].map((h) => <th key={h} className="px-4 py-3 font-semibold">{h}</th>)}</tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {history.map((p) => (
@@ -253,6 +253,27 @@ export default function PaymentsPage() {
                   <td className="px-4 py-3 font-mono text-xs text-slate-400" dir="ltr">{p.receipt_no != null ? `#${p.receipt_no}` : "—"}</td>
                   <td className="px-4 py-3 text-slate-400">{p.note ?? "—"}</td>
                   <td className="px-4 py-3 text-xs text-slate-400">{new Date(p.paid_at).toLocaleDateString("ar-EG", { day: "numeric", month: "short" })}</td>
+                  <td className="px-4 py-3">
+                    {p.status === "confirmed" && (
+                      <button
+                        onClick={async () => {
+                          const reason = prompt("سبب الاسترداد (يُعرض على المالك):", "");
+                          if (reason === null) return;
+                          try {
+                            const r = await fetch("/api/refunds", {
+                              method: "POST", headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ payment_id: p.id, reason }),
+                            });
+                            if (r.ok) alert("تم إرسال طلب الاسترداد للمالك 💸");
+                            else alert("تعذر إرسال الطلب.");
+                          } catch { alert("تعذر الاتصال."); }
+                        }}
+                        className="text-[11px] font-bold text-slate-400 hover:text-danger"
+                      >
+                        استرداد
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
