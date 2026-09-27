@@ -30,7 +30,8 @@ export async function GET() {
       .select("name,slug,plan")
       .eq("id", urow.tenant_id)
       .single();
-    return NextResponse.json({ ok: true, healed: false, tenant: t ?? null, role: urow.role });
+    const newDevice = await trackDevice(admin, urow as any);
+    return NextResponse.json({ ok: true, healed: false, tenant: t ?? null, role: urow.role, newDevice });
   }
 
   // شفاء ذاتي: ابحث عن سنتر يملكه هذا المستخدم عبر settings.owner_auth_id
@@ -59,11 +60,45 @@ export async function GET() {
   }
 
   await admin.from("tenants").update({ owner_user_id: created.id }).eq("id", owned.id);
+  const newDevice = await trackDevice(admin, { ...(created as any), tenant_id: owned.id });
 
   return NextResponse.json({
     ok: true,
     healed: true,
     tenant: { name: owned.name, slug: owned.slug, plan: owned.plan },
     role: "teacher_admin",
+    newDevice,
   });
+}
+
+/** تسجيل جهاز الدخول + كشف الغريب (يرجع true عند أول ظهور) */
+async function trackDevice(admin: any, urow: { id: string; tenant_id: string }): Promise<boolean> {
+  try {
+    const { headers } = await import("next/headers");
+    const { createHash } = await import("node:crypto");
+    const h = headers();
+    const ua = h.get("user-agent") ?? "";
+    const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? h.get("x-real-ip") ?? "unknown";
+    const mob = /mobile|android|iphone/i.test(ua);
+    const br = /edg/i.test(ua) ? "Edge" : /chrome/i.test(ua) ? "Chrome" : /firefox/i.test(ua) ? "Firefox" : /safari/i.test(ua) ? "Safari" : "متصفح";
+    const label = `${mob ? "📱 موبايل" : "💻 كمبيوتر"} · ${br}`.slice(0, 60);
+    const ipHash = createHash("sha256").update(`${urow.tenant_id}:${ip}`).digest("hex").slice(0, 32);
+    const { data: prev } = await admin.from("login_devices").select("id,revoked")
+      .eq("tenant_id", urow.tenant_id).eq("user_id", urow.id).eq("ip_hash", ipHash).eq("device_label", label).limit(1).single();
+    if (prev) {
+      await admin.from("login_devices").update({ last_seen: new Date().toISOString() }).eq("id", (prev as any).id);
+      return false;
+    }
+    await admin.from("login_devices").insert({
+      tenant_id: urow.tenant_id, user_id: urow.id, device_label: label, ip_hash: ipHash,
+    });
+    try {
+      await admin.from("audit_log").insert({
+        tenant_id: urow.tenant_id, actor_id: urow.id,
+        action: "auth:new_device", entity_type: "login_device", entity_id: urow.id,
+        details: { label },
+      });
+    } catch {}
+    return true;
+  } catch { return false; }
 }

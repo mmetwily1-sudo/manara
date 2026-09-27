@@ -22,7 +22,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   const { data: pay } = await admin
     .from("payments")
-    .select("id,student_id,amount,status")
+    .select("id,student_id,amount,status,receipt_no")
     .eq("id", params.id)
     .eq("tenant_id", tid)
     .single();
@@ -51,6 +51,26 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   } catch {}
 
   if (action === "confirm") {
+    // ترحيل المبلغ على أقدم الفواتير (FIFO — نفس منطق التحصيل المباشر)
+    try {
+      let rest = Number((pay as any).amount ?? 0);
+      const { data: open } = await admin.from("invoices").select("id,amount,paid")
+        .eq("tenant_id", tid).eq("student_id", (pay as any).student_id).neq("status", "paid")
+        .order("period", { ascending: true }).limit(20);
+      for (const iv of (open ?? []) as any[]) {
+        if (rest <= 0) break;
+        const owe = Number(iv.amount ?? 0) - Number(iv.paid ?? 0);
+        if (owe <= 0) continue;
+        const take = Math.min(owe, rest);
+        rest -= take;
+        const nPaid = Number(iv.paid ?? 0) + take;
+        await admin.from("invoices").update({
+          paid: nPaid,
+          status: nPaid >= Number(iv.amount ?? 0) ? "paid" : "partial",
+          paid_at: nPaid >= Number(iv.amount ?? 0) ? new Date().toISOString() : null,
+        }).eq("id", iv.id);
+      }
+    } catch {}
     try {
       const { notifyStudent } = await import("@/lib/notify");
       const { data: trow } = await admin.from("tenants").select("name").eq("id", tid).single();
@@ -62,6 +82,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
           studentName: "",
           amount: Number((pay as any).amount ?? 0),
           centerName: (trow as any)?.name ?? "",
+          receiptNo: (pay as any).receipt_no ?? null,
         },
         dedupeKey: `payment:${params.id}`,
       });

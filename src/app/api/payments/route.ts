@@ -128,15 +128,22 @@ export async function POST(req: Request) {
     receiptNo = Number((upd as any)?.receipt_seq ?? next);
   } catch {}
 
+  // العين الرابعة: مبلغ كبير (≥ حد السنتر، افتراضي 10000) → معلق لمراجعة المالك
+  let needsReview = false;
+  try {
+    const { data: tset } = await ctx.admin.from("tenants").select("settings").eq("id", ctx.tenantId).single();
+    const limit = Math.max(0, Number((tset as any)?.settings?.large_amount_limit ?? 10000));
+    if (limit > 0 && amount >= limit && ctx.userRow.role !== "teacher_admin") needsReview = true;
+  } catch {}
   const { data, error } = await ctx.admin.from("payments").insert({
     tenant_id: ctx.tenantId,
     student_id: studentId,
     group_id: enr?.group_id ?? null,
     amount,
     method,
-    status: "confirmed",
-    confirmed_by: ctx.userRow.id,
-    note,
+    status: needsReview ? "pending" : "confirmed",
+    confirmed_by: needsReview ? null : ctx.userRow.id,
+    note: needsReview ? `[بانتظار مراجعة المالك — مبلغ كبير] ${note ?? ""}`.trim() : note,
     receipt_no: receiptNo,
   }).select("id").single();
 
@@ -144,7 +151,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: error?.message ?? "insert_failed" }, { status: 500 });
   }
 
-  // ترحيل المبلغ تلقائياً على أقدم فواتير الطالب غير المسددة (FIFO)
+  // ترحيل المبلغ تلقائياً على أقدم فواتير الطالب غير المسددة (FIFO) — المؤكدة فقط
+  if (needsReview) {
+    try {
+      await ctx.admin.from("audit_log").insert({
+        tenant_id: ctx.tenantId, actor_id: ctx.userRow.id,
+        action: "payment:held_for_review", entity_type: "payment", entity_id: (data as any).id,
+        details: { studentId, amount, method },
+      });
+    } catch {}
+    return NextResponse.json({ ok: true, id: (data as any).id, receipt_no: receiptNo, needs_review: true, receipt_url: `/i/${(data as any).id}` });
+  }
   try {
     let rest = amount;
     const { data: open } = await ctx.admin.from("invoices").select("id,amount,paid")

@@ -6,7 +6,57 @@ type Task = { id: string; title: string; assignee_id: string | null; due_date: s
 type Leave = { id: string; from_date: string; to_date: string; reason: string; status: string; users: { full_name: string } | null };
 type Perf = { id: string; name: string; role: string; tasksDone: number; tasksOpen: number; attendanceMarked: number; score: number };
 
-/** فريق العمل: مهام + تقييم أداء + إجازات */
+/** أجهزة الدخول: جديد/موثوق/إنهاء عن بُعد (مالك فقط — تُخفى لغيره) */
+function DeviceSection() {
+  const [devs, setDevs] = useState<{ id: string; device_label: string; first_seen: string; last_seen: string; trusted: boolean; revoked: boolean; users: { full_name: string } | null }[] | null>(null);
+
+  async function load() {
+    try {
+      const r = await fetch("/api/auth/devices");
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok && j.isOwner) setDevs(j.devices);
+    } catch {}
+  }
+  useEffect(() => { load(); }, []);
+
+  async function act(id: string, action: string) {
+    if (action === "revoke" && !confirm("إنهاء كل جلسات هذا الجهاز فوراً؟")) return;
+    try {
+      const r = await fetch("/api/auth/devices", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, action }),
+      });
+      if (r.ok) load();
+    } catch {}
+  }
+
+  if (devs === null) return null;
+  return (
+    <section className="card space-y-2 p-5">
+      <h2 className="font-bold">أجهزة الدخول 📱 <span className="text-xs font-normal text-slate-400">الغريب يُسجل تلقائياً — وثّق المعروف وأنهِ المشبوه</span></h2>
+      {devs.slice(0, 20).map((d) => (
+        <div key={d.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 px-4 py-2.5 text-small">
+          <div>
+            <span className="font-bold">{d.users?.full_name ?? "—"}</span>
+            <span className="mx-2 text-xs text-slate-500">{d.device_label}</span>
+            {!d.trusted && !d.revoked && <span className="rounded-full bg-warning/15 px-2 py-0.5 text-[11px] font-bold text-warning">جهاز جديد 🆕</span>}
+            {d.revoked && <span className="rounded-full bg-danger/10 px-2 py-0.5 text-[11px] font-bold text-danger">مُنهى ⛔</span>}
+          </div>
+          {!d.revoked && (
+            <div className="flex gap-2">
+              {!d.trusted && (
+                <button onClick={() => act(d.id, "trust")} className="rounded-lg bg-success/10 px-3 py-1 text-xs font-bold text-success">توثيق ✓</button>
+              )}
+              <button onClick={() => act(d.id, "revoke")} className="rounded-lg bg-danger/10 px-3 py-1 text-xs font-bold text-danger">إنهاء الجلسات</button>
+            </div>
+          )}
+        </div>
+      ))}
+      {devs.length === 0 && <div className="text-small text-slate-400">لا أجهزة مسجلة بعد — تُسجل عند أول دخول.</div>}
+    </section>
+  );
+}
+
+/** فريق العمل: مهام + تقييم أداء + إجازات + أجهزة */
 export default function TeamPage() {
   const [tasks, setTasks] = useState<Task[] | null>(null);
   const [leaves, setLeaves] = useState<Leave[]>([]);
@@ -139,6 +189,8 @@ export default function TeamPage() {
           </div>
         </section>
       )}
+
+      <DeviceSection />
 
       <section className="card space-y-3 p-5">
         <h2 className="font-bold">المهام 📝</h2>
