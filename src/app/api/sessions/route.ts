@@ -24,24 +24,27 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "wrong_branch" }, { status: 403 });
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const isMakeup = (body as any)?.kind === "makeup";
+  const date = isMakeup && /^\d{4}-\d{2}-\d{2}$/.test(String((body as any)?.session_date ?? ""))
+    ? String((body as any).session_date) : new Date().toISOString().slice(0, 10);
   const { data: existing } = await ctx.admin
     .from("sessions")
     .select("id,topic,status")
     .eq("tenant_id", ctx.tenantId)
     .eq("group_id", groupId)
-    .eq("session_date", today)
+    .eq("session_date", date)
     .limit(1)
     .single();
 
-  if (existing) return NextResponse.json({ ok: true, session: existing, created: false });
+  if (existing && !isMakeup) return NextResponse.json({ ok: true, session: existing, created: false });
 
   const { data: created, error } = await ctx.admin.from("sessions").insert({
     tenant_id: ctx.tenantId,
     group_id: groupId,
-    session_date: today,
-    topic: null,
+    session_date: date,
+    topic: isMakeup ? `حصة تعويضية 🔁 ${String((body as any)?.topic ?? "").trim().slice(0, 100)}`.trim() : null,
     status: "scheduled",
+    kind: isMakeup ? "makeup" : "regular",
   }).select("id,topic,status").single();
 
   if (error || !created) {
