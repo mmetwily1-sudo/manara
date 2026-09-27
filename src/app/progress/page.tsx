@@ -102,6 +102,38 @@ type Game = {
   leaders: { name: string; points: number; me: boolean }[];
 };
 
+type MyPlan = { rank: number | null; of: number; groupAvg: number | null; myPts: number; groupName: string | null; lessons: { subject: string; lesson: string }[]; steps: string[] };
+
+/** خطتي الأسبوعية: ترتيبي + متوسط مجموعتي + دروسي المتأخرة */
+function MyPlanSection() {
+  const [p, setP] = useState<MyPlan | null>(null);
+  useEffect(() => {
+    fetch("/api/me/plan", { cache: "no-store" })
+      .then((r) => r.json()).then((j) => { if (j?.ok) setP(j); }).catch(() => {});
+  }, []);
+  if (!p) return null;
+  return (
+    <section className="card space-y-3 border-primary/20 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-bold">خطتي هذا الأسبوع 🗺️</h2>
+        {p.rank !== null && (
+          <span className="rounded-full bg-primary-light px-3 py-1 text-xs font-bold text-primary">
+            ترتيبك #{p.rank} من {p.of}{p.groupAvg !== null ? ` · متوسط المجموعة ${p.groupAvg} نقطة (نقاطك ${p.myPts})` : ""}
+          </span>
+        )}
+      </div>
+      {p.groupAvg !== null && p.rank !== null && p.rank > Math.ceil(p.of / 2) && (
+        <div className="rounded-xl bg-warning/10 p-3 text-small font-bold text-warning">
+          ⚠️ أنت تحت متوسط مجموعتك — ركز على الدروس بالأسفل لتتقدم هذا الأسبوع.
+        </div>
+      )}
+      <ul className="space-y-1 text-small text-slate-600">
+        {p.steps.map((s, i) => <li key={i}>• {s}</li>)}
+      </ul>
+    </section>
+  );
+}
+
 function GamificationSection() {
   const [g, setG] = useState<Game | null>(null);
   useEffect(() => {
@@ -314,6 +346,7 @@ export default function ProgressPage() {
       )}
 
       <HomeworkSection />
+      <MyPlanSection />
       <GamificationSection />
       <AnnouncementsFeed />
       <StoreCatalog />
