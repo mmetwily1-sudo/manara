@@ -14,6 +14,16 @@ export default function QuestionsPage() {
   const [showBulk, setShowBulk] = useState(false);
   const [bulkText, setBulkText] = useState("");
   const [stats, setStats] = useState<{ total: number; byLevel: Record<number, number> } | null>(null);
+  const [quality, setQuality] = useState<{ total: number; unused: number; broken: number; issues: { id: string; body: string; problem: string }[] } | null>(null);
+
+  async function loadQuality() {
+    try {
+      const r = await fetch("/api/questions/quality", { cache: "no-store" });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) setQuality(j);
+    } catch {}
+  }
+  useEffect(() => { loadQuality(); }, []);
   const [err, setErr] = useState("");
   const [okMsg, setOkMsg] = useState("");
   const [form, setForm] = useState({ body: "", subject: "", lesson: "", difficulty: "2", qtype: "mcq", options: "", correct: "", marks: "1", sourceDetail: "", share: false });
@@ -439,6 +449,20 @@ export default function QuestionsPage() {
           <span>الإجمالي: <b>{stats.total}</b></span>
           {[1, 2, 3, 4, 5].map((d) => (
             <span key={d}>مستوى {d}: <b>{stats.byLevel?.[d] ?? 0}</b></span>
+          ))}
+        </div>
+      )}
+
+      {quality && (quality.broken > 0 || quality.unused > 0) && (
+        <div className="card space-y-2 border-warning/25 p-4">
+          <div className="flex flex-wrap gap-x-5 text-xs font-bold">
+            <span>🔍 جودة البنك:</span>
+            {quality.broken > 0 && <span className="text-danger">{quality.broken} سؤال ناقص</span>}
+            {quality.unused > 0 && <span className="text-warning">{quality.unused} لم يُستخدم أبداً</span>}
+            {quality.broken === 0 && quality.unused === 0 && <span className="text-success">ممتاز ✅</span>}
+          </div>
+          {quality.issues.slice(0, 5).map((q) => (
+            <div key={q.id} className="text-xs text-slate-500">• <span className="font-bold text-danger">{q.problem}</span> — {q.body || "(بلا نص)"}</div>
           ))}
         </div>
       )}

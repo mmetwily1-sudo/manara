@@ -39,6 +39,42 @@ export default function ExamsListPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [form, setForm] = useState({ title: "", easy: 2, mid: 2, hard: 1, duration: 30 });
+  const [tpls, setTpls] = useState<{ id: string; title: string; questions: number }[] | null>(null);
+  const [tplId, setTplId] = useState("");
+  const [tplBusy, setTplBusy] = useState(false);
+
+  async function loadTemplates() {
+    try {
+      const { r, j } = await apiFetch("/api/exam-templates");
+      if (r.ok && j?.ok) setTpls(j.templates);
+      else setNotice({ kind: "err", text: "تعذر تحميل القوالب." });
+    } catch { setNotice({ kind: "err", text: "تعذر الاتصال بالخادم." }); }
+  }
+
+  async function onSaveTemplate(id: string, title: string) {
+    try {
+      const { r, j } = await apiFetch("/api/exam-templates", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "save", exam_id: id }),
+      });
+      if (r.ok && j?.ok) { setNotice({ kind: "ok", text: `حُفظ "${title}" كقالب (${j.questions} أسئلة).` }); setTpls(null); }
+      else setNotice({ kind: "err", text: "فشل الحفظ." });
+    } catch { setNotice({ kind: "err", text: "تعذر الاتصال بالخادم." }); }
+  }
+
+  async function onUseTemplate() {
+    if (!tplId) return;
+    setTplBusy(true);
+    try {
+      const { r, j } = await apiFetch("/api/exam-templates", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "use", template_id: tplId }),
+      });
+      if (r.ok && j?.ok) { setNotice({ kind: "ok", text: `أُنشئت مسودة من القالب (${j.questions} أسئلة) — راجعها وانشرها.` }); loadAll(); }
+      else setNotice({ kind: "err", text: "فشل الإنشاء." });
+    } catch { setNotice({ kind: "err", text: "تعذر الاتصال بالخادم." }); }
+    finally { setTplBusy(false); }
+  }
   const [auditingId, setAuditingId] = useState<string | null>(null);
   const [audits, setAudits] = useState<Record<string, AuditReport>>({});
 
@@ -327,7 +363,41 @@ export default function ExamsListPage() {
       </div>
 
       <div className="card space-y-4 p-6">
-        <h2 className="font-bold">توليد امتحان جديد</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-bold">توليد امتحان جديد</h2>
+          <div className="flex flex-wrap gap-2">
+            {([
+              ["شهري 📝", { title: "اختبار شهري — ", easy: 3, mid: 4, hard: 3, duration: 45 }],
+              ["كويز ⚡", { title: "كويز سريع — ", easy: 1, mid: 2, hard: 1, duration: 15 }],
+              ["نهائي 🎓", { title: "امتحان نهائي — ", easy: 5, mid: 8, hard: 5, duration: 90 }],
+            ] as const).map(([label, p]) => (
+              <button key={label} type="button" onClick={() => setForm((f) => ({ ...f, ...p }))}
+                className="rounded-lg bg-primary-light px-3 py-1.5 text-xs font-bold text-primary transition hover:bg-primary hover:text-white">
+                قالب {label}
+              </button>
+            ))}
+            <button type="button" onClick={loadTemplates} className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">
+              📑 من قالب محفوظ
+            </button>
+          </div>
+        </div>
+        {tpls !== null && (
+          <div className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 p-3">
+            {tpls.length === 0 ? (
+              <span className="text-xs text-slate-400">لا قوالب محفوظة بعد — احفظ أي امتحان كقالب بزر 📑 بجانبه.</span>
+            ) : (
+              <>
+                <select value={tplId} onChange={(e) => setTplId(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs">
+                  <option value="">اختر قالباً…</option>
+                  {tpls.map((t) => <option key={t.id} value={t.id}>{t.title} ({t.questions} سؤال)</option>)}
+                </select>
+                <button type="button" onClick={onUseTemplate} disabled={!tplId || tplBusy} className="btn-primary !px-3 !py-1.5 text-xs disabled:opacity-50">
+                  {tplBusy ? "جاري..." : "إنشاء مسودة من القالب"}
+                </button>
+              </>
+            )}
+          </div>
+        )}
         <form onSubmit={onGenerate} className="grid gap-4">
           <div>
             <label htmlFor="ex-title" className="mb-1 block text-xs font-bold text-slate-600">عنوان الامتحان</label>
@@ -505,6 +575,10 @@ export default function ExamsListPage() {
                   <button onClick={() => onDuplicate(ex.id)}
                     className="rounded-lg bg-primary-light px-4 py-1.5 text-xs font-bold text-primary transition hover:bg-primary hover:text-white">
                     نسخ 📋
+                  </button>
+                  <button onClick={() => onSaveTemplate(ex.id, ex.title)}
+                    className="rounded-lg px-4 py-1.5 text-xs font-bold text-slate-500 transition hover:bg-slate-100">
+                    حفظ كقالب 📑
                   </button>
                   <button onClick={() => copyLink(ex.id)} className="btn-secondary !px-4 !py-1.5 text-xs">
                     {copiedId === ex.id ? "✓ تم النسخ" : "نسخ رابط الطلاب"}
