@@ -12,6 +12,8 @@ export default function TeamPage() {
   const [leaves, setLeaves] = useState<Leave[]>([]);
   const [isOwner, setIsOwner] = useState(false);
   const [perf, setPerf] = useState<Perf[] | null>(null);
+  const [comm, setComm] = useState<{ rate: number; rows: { name: string; collected: number; commission: number }[] } | null>(null);
+  const [rateDraft, setRateDraft] = useState("");
   const [staff, setStaff] = useState<{ id: string; name: string }[]>([]);
   const [form, setForm] = useState({ title: "", assignee_id: "", due_date: "" });
   const [lv, setLv] = useState({ from_date: "", to_date: "", reason: "" });
@@ -29,6 +31,11 @@ export default function TeamPage() {
       if (rt.ok && jt?.ok) setTasks(jt.tasks);
       if (rl.ok && jl?.ok) { setLeaves(jl.leaves); setIsOwner(jl.isOwner); }
       if (rp.ok && jp?.ok) setPerf(jp.staff);
+      try {
+        const rc = await fetch("/api/team/commissions");
+        const jc = await rc.json().catch(() => null);
+        if (rc.ok && jc?.ok) { setComm(jc); setRateDraft(String(jc.rate)); }
+      } catch {}
       if (rs.ok && js?.ok) setStaff((js.staff ?? []).map((s: any) => ({ id: s.id, name: s.name })));
     } catch {}
   }
@@ -95,6 +102,40 @@ export default function TeamPage() {
                 <div className="mt-1 text-small font-extrabold text-primary">النقاط: {p.score}</div>
               </div>
             ))}
+          </div>
+        </section>
+      )}
+
+      {comm && (
+        <section className="card space-y-2 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-bold">عمولات التحصيل 💰 <span className="text-xs font-normal text-slate-400">(نسبة موحدة من تحصيل مجموعات كل مدرس)</span></h2>
+            <div className="flex items-center gap-1 text-xs">
+              <input value={rateDraft} onChange={(e) => setRateDraft(e.target.value)} type="number" min={0} max={50}
+                className="w-16 rounded-lg border border-slate-200 px-2 py-1 text-center" />
+              <span>%</span>
+              <button
+                onClick={async () => {
+                  const r = await fetch("/api/team/commissions", {
+                    method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rate: Number(rateDraft) }),
+                  });
+                  if (r.ok) load();
+                }}
+                className="rounded-lg bg-primary-light px-3 py-1 font-bold text-primary"
+              >
+                حفظ
+              </button>
+            </div>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {comm.rows.map((c) => (
+              <div key={c.name} className="rounded-xl bg-slate-50 p-3 text-small">
+                <div className="font-bold">{c.name}</div>
+                <div className="text-xs text-slate-500">محصّل مجموعاته: {c.collected.toLocaleString("ar-EG")} ج</div>
+                <div className="font-extrabold text-success">العمولة ({comm.rate}%): {c.commission.toLocaleString("ar-EG")} ج</div>
+              </div>
+            ))}
+            {comm.rows.length === 0 && <div className="text-small text-slate-400">لا بيانات تحصيل.</div>}
           </div>
         </section>
       )}
