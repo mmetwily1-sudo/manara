@@ -29,7 +29,7 @@ export default function TrialBanner() {
               : "جدد الآن ولا تفقد زخم سنترك — ضمان استرداد 30 يوماً بلا أسئلة."}
           </p>
         </div>
-        <a href="/pricing" className="btn-primary shrink-0 text-small">{expired ? "جدد الآن ←" : `جدد (${info.trialDaysLeft} يوم متبقٍ)`}</a>
+        <a href={expired ? "/pricing?plan=pro&expired=1" : "/pricing?plan=pro"} className="btn-primary shrink-0 text-small">{expired ? "جدد الآن ←" : `جدد (${info.trialDaysLeft} يوم متبقٍ)`}</a>
       </div>
     </section>
   );

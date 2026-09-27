@@ -10,6 +10,7 @@ export default async function AdminFeedback() {
   let counts: Record<string, number> = {};
   let rows: any[] = [];
   let openFollowups: number | null = null;
+  let trend: { month: string; avg: number; n: number }[] = [];
 
   if (url && key) {
     const admin = createClient(url, key, { auth: { persistSession: false } });
@@ -20,6 +21,18 @@ export default async function AdminFeedback() {
     const { data: latest } = await admin.from("feedback")
       .select("kind,score,text,page,created_at,tenants(name)")
       .order("created_at", { ascending: false }).limit(50);
+    const { data: npsAll } = await admin.from("feedback").select("score,created_at")
+      .eq("kind", "nps").not("score", "is", null).order("created_at", { ascending: false }).limit(500);
+    const byMonth: Record<string, { s: number; n: number }> = {};
+    (npsAll ?? []).forEach((r: any) => {
+      const m = String(r.created_at ?? "").slice(0, 7);
+      if (!m) return;
+      byMonth[m] ??= { s: 0, n: 0 };
+      byMonth[m].s += Number(r.score ?? 0);
+      byMonth[m].n += 1;
+    });
+    trend = Object.entries(byMonth).sort((a, b) => a[0].localeCompare(b[0])).slice(-6)
+      .map(([m, v]) => ({ month: m, avg: Math.round((v.s / v.n) * 10) / 10, n: v.n }));
     const { count: ofc } = await admin.from("support_tickets").select("id", { count: "exact", head: true })
       .eq("category", "nps_followup").eq("status", "open");
     openFollowups = ofc;
@@ -46,6 +59,22 @@ export default async function AdminFeedback() {
           </div>
         ))}
       </div>
+      {trend.length > 1 && (
+        <div className="card space-y-2 p-5">
+          <h2 className="text-small font-bold">اتجاه NPS الشهري 📈</h2>
+          <div className="flex items-end gap-2" dir="ltr">
+            {trend.map((t) => (
+              <div key={t.month} className="flex flex-1 flex-col items-center gap-1">
+                <span className="text-xs font-bold">{t.avg}</span>
+                <div className="w-full rounded-t bg-slate-100" style={{ height: 80 }}>
+                  <div className={`mx-auto w-3/4 rounded-t ${t.avg >= 8 ? "bg-success" : t.avg >= 6 ? "bg-warning" : "bg-danger"}`} style={{ height: `${Math.max(4, t.avg * 10)}%` }} title={`${t.month}: ${t.avg} (${t.n})`} />
+                </div>
+                <span className="text-[10px] text-slate-400">{t.month.slice(2)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <ul className="space-y-3">
         {(rows as any[]).map((r: any, i: number) => (
           <li key={i} className="card space-y-1 p-4">

@@ -230,6 +230,17 @@ export default function ExamsListPage() {
     }
   }
 
+  async function onDuplicate(id: string) {
+    if (!confirm("نسخ هذا الامتحان بكل أسئلته كمسودة جديدة؟ (تُراجع قبل النشر)")) return;
+    try {
+      const { r, j } = await apiFetch(`/api/exams/${id}/duplicate`, { method: "POST" });
+      if (r.ok && j?.ok) {
+        setNotice({ kind: "ok", text: `تم النسخ (${j.questions} أسئلة) — راجعه وانشره.` });
+        loadAll();
+      } else setNotice({ kind: "err", text: "فشل النسخ." });
+    } catch { setNotice({ kind: "err", text: "تعذر الاتصال بالخادم." }); }
+  }
+
   async function onPurgeImages(id: string) {
     if (!confirm("حذف صور المسح الأصلية؟ (الأسئلة النصية المعتمدة تبقى كما هي)")) return;
     try {
@@ -491,6 +502,10 @@ export default function ExamsListPage() {
                     </button>
                   )}
                   <a href={`/exam/${ex.id}`} className="btn-secondary !px-4 !py-1.5 text-xs">معاينة وحل</a>
+                  <button onClick={() => onDuplicate(ex.id)}
+                    className="rounded-lg bg-primary-light px-4 py-1.5 text-xs font-bold text-primary transition hover:bg-primary hover:text-white">
+                    نسخ 📋
+                  </button>
                   <button onClick={() => copyLink(ex.id)} className="btn-secondary !px-4 !py-1.5 text-xs">
                     {copiedId === ex.id ? "✓ تم النسخ" : "نسخ رابط الطلاب"}
                   </button>

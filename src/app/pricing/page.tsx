@@ -63,25 +63,37 @@ const plans = [
   },
 ];
 
-export default function PricingPage() {
+export default function PricingPage({ searchParams }: { searchParams?: { plan?: string; expired?: string } }) {
+  const want = (searchParams?.plan ?? "").toLowerCase();
+  const planKey = (m: number) => (m === 450 ? "starter" : m === 750 ? "pro" : "scale");
+  const picked = ["starter", "pro", "scale"].includes(want) ? want : null;
+  const isReturn = searchParams?.expired === "1";
   return (
     <main className="px-4 py-16">
       <div className="mx-auto max-w-6xl">
-        <h1 className="section-title">أسعار واضحة — من غير مفاجآت</h1>
+        <h1 className="text-h1">أسعار واضحة — من غير مفاجآت</h1>
         <p className="section-sub">
           جرّب 14 يوم مجاناً بدون بطاقة. والاشتراك السنوي فيه شهرين مجاناً.
           <strong> وسعرك ثابت ما دمت مشترك</strong> — مهما زادت أسعارنا بعدين، حسابك مش هيتمسّ.
         </p>
+        {isReturn && (
+          <div className="card mx-auto mb-8 max-w-3xl border-success/30 bg-success/5 p-5 text-center">
+            <div className="font-bold text-success">🎉 رجعت في الوقت المناسب — سنترك وبياناتك محفوظة كما تركتها</div>
+            <p className="mt-1 text-small text-slate-600">اختر باقتك وكمّل من حيث توقفت — وضمان الاسترداد 30 يوماً سارٍ.</p>
+          </div>
+        )}
 
         <div className="grid gap-6 lg:grid-cols-3">
-          {plans.map((p) => (
+          {plans.map((p) => {
+            const hot = picked ? planKey(p.monthly) === picked : p.highlight;
+            return (
             <div
               key={p.name}
-              className={`card relative flex flex-col ${p.highlight ? "border-2 border-primary shadow-lg" : ""}`}
+              className={`card relative flex flex-col ${hot ? "border-2 border-primary shadow-lg" : ""}`}
             >
-              {p.highlight && (
+              {hot && (
                 <span className="absolute -top-3 right-6 rounded-full bg-primary px-4 py-1 text-xs font-bold text-white">
-                  الأكثر اختياراً ⭐
+                  {picked ? "مختارة لعودتك ✅" : "الأكثر اختياراً ⭐"}
                 </span>
               )}
               <h2 className="text-h2 font-extrabold">{p.name}</h2>
@@ -103,7 +115,8 @@ export default function PricingPage() {
               </Link>
               <PayOnlineButton plan={p.monthly === 450 ? "starter" : p.monthly === 750 ? "pro" : "scale"} />
             </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="card mx-auto mt-10 max-w-3xl bg-surface">
