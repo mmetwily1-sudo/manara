@@ -71,8 +71,11 @@ export async function POST(req: Request) {
   } catch {}
 
   // الطالب يجب أن ينتمي لنفس السنتر (منع تلويث سجلات سناتر أخرى)
-  const { data: student } = await admin.from("users").select("id").eq("id", studentId).eq("tenant_id", urow.tenant_id).single();
+  const { data: student } = await admin.from("users").select("id,suspended_until").eq("id", studentId).eq("tenant_id", urow.tenant_id).single();
   if (!student) return NextResponse.json({ ok: false, error: "bad_student" }, { status: 403 });
+  if ((student as any).suspended_until && String((student as any).suspended_until) >= new Date().toISOString().slice(0, 10)) {
+    return NextResponse.json({ ok: false, error: "suspended" }, { status: 403 });
+  }
 
   // مكافأة الحضور مرة واحدة فقط (إعادة التحضير لا تمنح مجدداً)
   const { data: prevAtt } = await admin.from("attendance").select("status")

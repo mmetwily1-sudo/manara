@@ -64,6 +64,12 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   if (urow.tenant_id !== exam.tenant_id) {
     return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
   }
+  {
+    const { data: sus } = await sb.from("users").select("suspended_until").eq("id", urow.id).single();
+    if ((sus as any)?.suspended_until && String((sus as any).suspended_until) >= new Date().toISOString().slice(0, 10)) {
+      return NextResponse.json({ ok: false, error: "suspended" }, { status: 403 });
+    }
+  }
 
   // 2.5) بوابة الكود: جلسة سارية + مؤقت السيرفر (لا يُعتمد على مؤقت المتصفح)
   let codeRow: any = null;

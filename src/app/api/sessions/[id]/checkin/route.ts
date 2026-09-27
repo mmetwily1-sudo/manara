@@ -25,6 +25,10 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     .eq("tenant_id", tid).eq("group_id", (s as any).group_id).eq("status", "active").limit(500);
   const hit = ((enr ?? []) as any[]).find((e) => String(e.student_id).toLowerCase().endsWith(suffix));
   if (!hit) return NextResponse.json({ ok: false, error: "not_enrolled" }, { status: 404 });
+  const { data: sus } = await admin.from("users").select("suspended_until").eq("id", hit.student_id).single();
+  if ((sus as any)?.suspended_until && String((sus as any).suspended_until) >= new Date().toISOString().slice(0, 10)) {
+    return NextResponse.json({ ok: false, error: "suspended" }, { status: 403 });
+  }
 
   await admin.from("attendance").upsert({
     tenant_id: tid, session_id: params.id, student_id: hit.student_id,

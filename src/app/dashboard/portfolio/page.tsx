@@ -24,13 +24,14 @@ export default function PortfolioPage() {
   }, []);
 
   async function load(id: string) {
-    setSid(id); setP(null);
+    setSid(id); setP(null); setBeh(null);
     if (!id) return;
     try {
       const r = await fetch(`/api/students/${id}/portfolio`);
       const j = await r.json().catch(() => null);
       if (r.ok && j?.ok) setP(j.portfolio);
     } catch {}
+    loadBeh(id);
   }
 
   function copyCard() {
@@ -38,6 +39,40 @@ export default function PortfolioPage() {
     navigator.clipboard?.writeText(link).then(() => {
       setCopied(true); setTimeout(() => setCopied(false), 2000);
     }).catch(() => {});
+  }
+
+  const [beh, setBeh] = useState<{ notes: { id: string; kind: string; text: string; created_at: string }[]; negatives: number; level: string | null; suspended_until: string | null } | null>(null);
+  const [note, setNote] = useState({ kind: "negative", text: "" });
+  const [susUntil, setSusUntil] = useState("");
+
+  async function loadBeh(id: string) {
+    try {
+      const r = await fetch(`/api/students/${id}/behavior`);
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) { setBeh(j); }
+    } catch {}
+  }
+
+  async function addNote(e: React.FormEvent) {
+    e.preventDefault();
+    if (!sid || !note.text.trim()) return;
+    try {
+      const r = await fetch(`/api/students/${sid}/behavior`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(note),
+      });
+      if (r.ok) { setNote({ kind: "negative", text: "" }); loadBeh(sid); }
+    } catch {}
+  }
+
+  async function suspend() {
+    if (!sid) return;
+    try {
+      const r = await fetch(`/api/students/${sid}/suspend`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ until: susUntil || null }),
+      });
+      if (r.ok) { setSusUntil(""); loadBeh(sid); }
+    } catch {}
   }
 
   return (
@@ -100,6 +135,49 @@ export default function PortfolioPage() {
                 الأهداف: {p.goals.filter((g) => g.status === "done").length}/{p.goals.length} منجزة 🎯
               </div>
             )}
+          </section>
+
+          <section className="card space-y-3 p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="font-bold">السلوك والإنذارات ⚖️</h2>
+              {beh?.level && (
+                <span className="rounded-full bg-danger/10 px-3 py-1 text-xs font-bold text-danger">
+                  إنذار {beh.level} ({beh.negatives} سلبية)
+                </span>
+              )}
+              {beh?.suspended_until && (
+                <span className="rounded-full bg-danger px-3 py-1 text-xs font-bold text-white">موقوف حتى {beh.suspended_until} ⛔</span>
+              )}
+            </div>
+            <form onSubmit={addNote} className="flex flex-wrap gap-2">
+              <select value={note.kind} onChange={(e) => setNote({ ...note, kind: e.target.value })} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-small">
+                <option value="negative">سلبية 👎</option>
+                <option value="positive">إيجابية 👍</option>
+              </select>
+              <input value={note.text} onChange={(e) => setNote({ ...note, text: e.target.value })} maxLength={500}
+                placeholder="نص الملاحظة..." className="flex-1 rounded-xl border border-slate-200 px-4 py-2 text-small" />
+              <button className="btn-secondary !px-4 !py-2 text-xs">تسجيل</button>
+            </form>
+            {(beh?.notes ?? []).slice(0, 8).map((n) => (
+              <div key={n.id} className="rounded-xl bg-slate-50 px-4 py-2 text-small">
+                <span>{n.kind === "positive" ? "👍" : "👎"}</span> {n.text}
+                <span className="mx-2 text-xs text-slate-400">{String(n.created_at ?? "").slice(0, 10)}</span>
+              </div>
+            ))}
+            <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+              <input value={susUntil} onChange={(e) => setSusUntil(e.target.value)} type="date" className="rounded-xl border border-slate-200 px-3 py-1.5 text-small" />
+              <button onClick={suspend} className="rounded-lg bg-danger/10 px-4 py-1.5 text-xs font-bold text-danger">
+                {susUntil ? `إيقاف حتى ${susUntil}` : "فك الإيقاف"}
+              </button>
+              {p.phone && beh && beh.negatives > 0 && (
+                <a
+                  href={`https://wa.me/${String(p.phone).replace(/[^\d]/g, "")}?text=${encodeURIComponent(`تنبيه سلوكي من إدارة السنتر: نرجو التواصل العاجل بخصوص الطالب ${p.name} (إنذار ${beh.level ?? ""}) ⚠️`)}`}
+                  target="_blank" rel="noreferrer" className="rounded-lg bg-success px-4 py-1.5 text-xs font-bold text-white"
+                >
+                  إنذار واتساب لولي الأمر 💬
+                </a>
+              )}
+            </div>
           </section>
         </>
       )}
