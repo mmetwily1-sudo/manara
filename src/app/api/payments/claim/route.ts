@@ -4,6 +4,19 @@ import { isRateLimited } from "@/lib/rate-limit";
 
 const CLAIM_METHODS = ["instapay", "wallet", "fawry", "card"];
 
+/** GET /api/payments/claim — مطالباتي وحالاتها (طالب) */
+export async function GET() {
+  const user = await getSessionUser();
+  if (!user) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
+  const admin = adminClient();
+  const { data: urow } = await admin.from("users").select("id,tenant_id").eq("auth_user_id", user.id).single();
+  if (!urow) return NextResponse.json({ ok: false, error: "no_tenant" }, { status: 403 });
+  const { data } = await admin.from("payments").select("id,amount,method,status,note,paid_at")
+    .eq("tenant_id", (urow as any).tenant_id).eq("student_id", (urow as any).id)
+    .order("paid_at", { ascending: false }).limit(20);
+  return NextResponse.json({ ok: true, claims: data ?? [] });
+}
+
 /**
  * POST /api/payments/claim — الطالب يُبلغ عن تحويل (انستاباي/محفظة/فوري)
  * ينشئ دفعة pending يراجعها المعلم. { amount, method, reference }

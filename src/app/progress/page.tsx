@@ -177,6 +177,69 @@ function RateTodaySection() {
   );
 }
 
+/** اسأل معلمك + حالة مطالبات الدفع */
+function AskAndClaims() {
+  const [teachers, setTeachers] = useState<{ id: string; name: string }[]>([]);
+  const [tid, setTid] = useState("");
+  const [text, setText] = useState("");
+  const [sent, setSent] = useState(false);
+  const [claims, setClaims] = useState<{ id: string; amount: number; method: string; status: string; paid_at: string }[]>([]);
+
+  useEffect(() => {
+    fetch("/api/me/teachers").then(async (r) => {
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) setTeachers(j.teachers);
+    }).catch(() => {});
+    fetch("/api/payments/claim").then(async (r) => {
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) setClaims(j.claims);
+    }).catch(() => {});
+  }, []);
+
+  async function send(e: React.FormEvent) {
+    e.preventDefault();
+    if (!tid || !text.trim()) return;
+    try {
+      const r = await fetch("/api/dm", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teacher_id: tid, body: text }),
+      });
+      if (r.ok) { setText(""); setSent(true); setTimeout(() => setSent(false), 4000); }
+    } catch {}
+  }
+
+  const ST: Record<string, string> = { pending: "بانتظار المراجعة ⏳", confirmed: "مؤكدة ✅", rejected: "مرفوضة" };
+  return (
+    <section className="card grid gap-4 p-5 lg:grid-cols-2">
+      <div className="space-y-2">
+        <h2 className="font-bold">اسأل معلمك 💬</h2>
+        {teachers.length === 0 ? <div className="text-small text-slate-400">لا معلمين مرتبطين بمجموعاتك.</div> : (
+          <form onSubmit={send} className="space-y-2">
+            <select value={tid} onChange={(e) => setTid(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-small">
+              <option value="">اختر المعلم…</option>
+              {teachers.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+            <textarea value={text} onChange={(e) => setText(e.target.value)} rows={2} maxLength={2000}
+              placeholder="اكتب سؤالك..." className="w-full rounded-xl border border-slate-200 px-4 py-2 text-small" />
+            <button className="btn-primary !py-2 text-small">إرسال</button>
+            {sent && <div className="text-xs font-bold text-success">وصلت رسالتك ✅</div>}
+          </form>
+        )}
+      </div>
+      <div className="space-y-2">
+        <h2 className="font-bold">مطالبات الدفع 🧾</h2>
+        {claims.length === 0 ? <div className="text-small text-slate-400">لا مطالبات مسجلة.</div> :
+          claims.slice(0, 5).map((c) => (
+            <div key={c.id} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-small">
+              <span className="font-bold">{Number(c.amount).toLocaleString("ar-EG")} ج <span className="font-normal text-slate-400">· {c.method}</span></span>
+              <span className="text-xs font-bold">{ST[c.status] ?? c.status}</span>
+            </div>
+          ))}
+      </div>
+    </section>
+  );
+}
+
 function GamificationSection() {
   const [g, setG] = useState<Game | null>(null);
   useEffect(() => {
@@ -389,6 +452,7 @@ export default function ProgressPage() {
       )}
 
       <HomeworkSection />
+      <AskAndClaims />
       <RateTodaySection />
       <MyPlanSection />
       <GamificationSection />

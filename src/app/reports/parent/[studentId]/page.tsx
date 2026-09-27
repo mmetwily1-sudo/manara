@@ -31,6 +31,9 @@ export default function ParentReportPage({ params }: { params: { studentId: stri
   return (
     <div className="mx-auto max-w-2xl space-y-5 bg-white p-6 print:max-w-none print:p-0">
       <style>{`@media print { body * { visibility: hidden; } #parent-report, #parent-report * { visibility: visible; } #parent-report { position: absolute; inset: 0; } .no-print { display: none !important; } }`}</style>
+      <div className="no-print flex justify-end">
+        <button onClick={() => window.print()} className="btn-secondary !px-4 !py-2 text-xs">طباعة التقرير 🖨️</button>
+      </div>
       <div id="parent-report" className="space-y-5" dir="rtl">
         <header className="border-b-2 border-primary pb-4 text-center">
           <h1 className="text-h1 font-extrabold">{rep.center}</h1>
