@@ -93,5 +93,13 @@ export async function POST(req: Request) {
     });
   }
 
+  // ويبهوك تسجيل طالب (best-effort)
+  try {
+    const { fireWebhooks } = await import("@/lib/webhooks");
+    await fireWebhooks(ctx.admin, ctx.tenantId, "student_registered", {
+      student_id: (row as any).id, name, group_id: groupId,
+    });
+  } catch {}
+
   return NextResponse.json({ ok: true, id: row.id });
 }

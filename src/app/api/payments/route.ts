@@ -215,5 +215,13 @@ export async function POST(req: Request) {
       `إيصال استلام 🧾\nالطالب: ${(srow as any)?.full_name ?? ""}\nالمبلغ: ${amount} جنيه${receiptNo ? `\nإيصال رقم: #${receiptNo}` : ""}\n${center}`);
   } catch {}
 
+  // ويبهوك payment_received (best-effort)
+  try {
+    const { fireWebhooks } = await import("@/lib/webhooks");
+    await fireWebhooks(ctx.admin, ctx.tenantId, "payment_received", {
+      payment_id: (data as any).id, student_id: studentId, amount, method, receipt_no: receiptNo,
+    });
+  } catch {}
+
   return NextResponse.json({ ok: true, id: (data as any).id, receipt_no: receiptNo, wa_receipt: waReceipt, receipt_url: `/i/${(data as any).id}` });
 }

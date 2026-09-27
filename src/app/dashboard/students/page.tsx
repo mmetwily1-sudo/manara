@@ -12,6 +12,9 @@ export default function StudentsPage() {
   const [filterGroup, setFilterGroup] = useState("");
   const [err, setErr] = useState("");
   const [showAdd, setShowAdd] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [importResult, setImportResult] = useState<{ imported: number; skipped: number; bad: string[] } | null>(null);
   const [form, setForm] = useState({ name: "", phone: "", groupId: "" });
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -76,6 +79,7 @@ export default function StudentsPage() {
           </button>
           <a href="/api/export?scope=students" className="btn-secondary text-small">تصدير CSV ⬇️</a>
           <button onClick={() => setShowAdd((v) => !v)} className="btn-primary text-small">طالب جديد</button>
+          <button onClick={() => { setShowImport((v) => !v); setShowAdd(false); }} className="btn-secondary text-small">استيراد 📥</button>
         </div>
       </header>
 
@@ -91,6 +95,40 @@ export default function StudentsPage() {
           </select>
           <button className="btn-primary sm:col-span-2" disabled={busy}>{busy ? "جاري الحفظ..." : "حفظ الطالب"}</button>
           <p className="text-xs text-slate-400 sm:col-span-2">سيتمكن الطالب من تفعيل حساب دخوله بنفس الرقم من صفحة التسجيل.</p>
+        </form>
+      )}
+
+      {showImport && (
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setBusy(true); setErr(""); setImportResult(null);
+            try {
+              const rows = importText.split("\n").map((l) => l.trim()).filter(Boolean).map((l) => {
+                const [name, phone] = l.split(/[,،\t]/).map((s) => s.trim());
+                return { name, phone, group_id: filterGroup || undefined };
+              }).filter((r) => r.name);
+              const r = await fetch("/api/students/import", {
+                method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rows }),
+              });
+              const j = await r.json().catch(() => null);
+              if (r.ok && j?.ok) { setImportResult(j); setImportText(""); load(); }
+              else setErr("فشل الاستيراد.");
+            } catch { setErr("تعذر الاتصال."); }
+            finally { setBusy(false); }
+          }}
+          className="card space-y-3 p-5"
+        >
+          <h3 className="font-bold">استيراد طلاب 📥 <span className="text-xs font-normal text-slate-400">سطر لكل طالب: الاسم، الهاتف (للمجموعة المختارة بالأسفل إن وُجدت)</span></h3>
+          <textarea value={importText} onChange={(e) => setImportText(e.target.value)} rows={6} dir="auto"
+            placeholder={"أحمد محمد، 01001234567\nمنى علي، 01007654321"} className="input w-full font-mono" />
+          {importResult && (
+            <div className="rounded-xl bg-success/5 p-3 text-small font-bold text-success">
+              تم استيراد {importResult.imported} ✅ · متخطى (مكرر) {importResult.skipped}
+              {importResult.bad.length > 0 && <span className="text-warning"> · فشل: {importResult.bad.join("، ")}</span>}
+            </div>
+          )}
+          <button className="btn-primary" disabled={busy}>{busy ? "جاري..." : "استيراد"}</button>
         </form>
       )}
 
