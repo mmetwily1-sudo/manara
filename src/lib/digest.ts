@@ -1,5 +1,5 @@
-/** بناء تقرير ولي الأمر الأسبوعي لطالب: حضور + درجات + مستحق + نص واتساب جاهز */
-export async function buildDigest(admin: any, tenantId: string, studentId: string, days = 7) {
+/** بناء تقرير ولي الأمر (أسبوعي 7 أيام / شهري 30 يوماً): حضور + درجات + مستحق + نص واتساب جاهز */
+export async function buildDigest(admin: any, tenantId: string, studentId: string, days = 7, kind: "weekly" | "monthly" = "weekly") {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
   const period = since.toISOString().slice(0, 10);
 
@@ -51,9 +51,9 @@ export async function buildDigest(admin: any, tenantId: string, studentId: strin
     });
   } catch {}
 
-  const payload = { studentName, centerName, period, days, present, absent, exams, due, periods };
+  const payload = { studentName, centerName, period, days, kind, present, absent, exams, due, periods };
   const lines = [
-    `تقرير ${centerName} الأسبوعي 📊`,
+    `تقرير ${centerName} ${kind === "monthly" ? "الشهري" : "الأسبوعي"} 📊`,
     `الطالب: ${studentName}`,
     `الحضور: ${present} حضور / ${absent} غياب`,
     ...exams.map((e) => `• ${e.title}: ${e.score}${e.total ? `/${e.total}` : ""}`),

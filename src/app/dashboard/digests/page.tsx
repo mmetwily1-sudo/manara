@@ -5,7 +5,7 @@ import { waTo } from "@/lib/wa";
 
 type Digest = {
   id: string; student: string; phone: string | null; period: string;
-  payload: { present: number; absent: number; due: number; exams: { title: string; score: number; total: number }[] };
+  payload: { kind?: string; present: number; absent: number; due: number; exams: { title: string; score: number; total: number }[] };
   wa_text: string; created_at: string;
 };
 
@@ -26,11 +26,14 @@ export default function DigestsPage() {
   }
   useEffect(() => { load(); }, []);
 
-  async function generate() {
-    if (!confirm("توليد تقارير الأسبوع الحالي لكل الطلاب؟ (يُرسل push للمشتركين تلقائياً)")) return;
+  async function generate(mode: "weekly" | "monthly") {
+    if (!confirm(mode === "monthly" ? "توليد الملخص الشهري لكل الطلاب؟ (يُرسل push للمشتركين تلقائياً)" : "توليد تقارير الأسبوع الحالي لكل الطلاب؟ (يُرسل push للمشتركين تلقائياً)")) return;
     setBusy(true); setErr("");
     try {
-      const r = await fetch("/api/digests", { method: "POST" });
+      const r = await fetch("/api/digests", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode }),
+      });
       const j = await r.json().catch(() => null);
       if (r.ok && j?.ok) load();
       else setErr("فشل التوليد.");
@@ -52,9 +55,14 @@ export default function DigestsPage() {
           <h1 className="text-h1">تقارير أولياء الأمور 📊</h1>
           <p className="mt-1 text-small text-slate-500">تقرير أسبوعي لكل طالب: حضور ودرجات ومستحق — push تلقائي + مشاركة واتساب</p>
         </div>
-        <button onClick={generate} disabled={busy} className="btn-primary text-small disabled:opacity-50">
-          {busy ? "جاري التوليد..." : "توليد تقارير الأسبوع"}
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => generate("weekly")} disabled={busy} className="btn-primary text-small disabled:opacity-50">
+            {busy ? "جاري التوليد..." : "توليد تقارير الأسبوع"}
+          </button>
+          <button onClick={() => generate("monthly")} disabled={busy} className="btn-secondary text-small disabled:opacity-50">
+            الملخص الشهري 📅
+          </button>
+        </div>
       </header>
 
       {err && <div className="card border-danger/20 bg-danger/5 p-4 text-small font-bold text-danger">{err}</div>}
@@ -72,7 +80,7 @@ export default function DigestsPage() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <span className="font-bold">{d.student}</span>
-                    <span className="mx-2 text-xs text-slate-400">أسبوع {d.period}</span>
+                    <span className="mx-2 text-xs text-slate-400">{d.payload.kind === "monthly" ? `شهري ${d.period}` : `أسبوع ${d.period}`}</span>
                   </div>
                   <div className="flex gap-2">
                     {link && <a href={link} target="_blank" rel="noreferrer" className="rounded-lg bg-success px-4 py-1.5 text-xs font-bold text-white">إرسال واتساب 💬</a>}

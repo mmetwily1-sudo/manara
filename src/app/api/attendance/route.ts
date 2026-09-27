@@ -112,12 +112,32 @@ export async function POST(req: Request) {
       const gname = (sessFull as any)?.groups?.name ?? "";
       const label = `${gname ? gname + " — " : ""}${(sessFull as any)?.session_date ?? ""}`.trim() || "حصة اليوم";
       const { data: trow } = await admin.from("tenants").select("name").eq("id", urow.tenant_id).single();
+      const centerName = (trow as any)?.name ?? "";
       await notifyStudent(admin, {
         tenantId: urow.tenant_id,
         studentId,
-        event: { kind: "attendance_absent", studentName: "", centerName: (trow as any)?.name ?? "", sessionLabel: label },
+        event: { kind: "attendance_absent", studentName: "", centerName, sessionLabel: label },
         dedupeKey: `attendance:${sessionId}:${studentId}`,
       });
+      // إنذار الغياب المبكر: 3 غيابات متتالية → تصعيد بملاحظة حمراء (مرة لكل سلسلة)
+      try {
+        const { data: last3 } = await admin.from("attendance")
+          .select("status,sessions!inner(session_date)")
+          .eq("tenant_id", urow.tenant_id).eq("student_id", studentId)
+          .order("session_date", { foreignTable: "sessions", ascending: false }).limit(3);
+        const rows = (last3 ?? []) as any[];
+        if (rows.length >= 3 && rows.every((a) => a.status === "absent")) {
+          await notifyStudent(admin, {
+            tenantId: urow.tenant_id,
+            studentId,
+            event: {
+              kind: "attendance_absent", studentName: "", centerName,
+              sessionLabel: `⚠️ الغياب الثالث على التوالي — ${label} — برجاء التواصل الفوري مع الإدارة`,
+            },
+            dedupeKey: `absence-streak:${studentId}:${sessionId}`,
+          });
+        }
+      } catch {}
     } catch {}
   }
 

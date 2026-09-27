@@ -26,21 +26,23 @@ export async function GET() {
   });
 }
 
-/** POST /api/digests {period?} — توليد تقارير الأسبوع يدوياً (مالك + مشرف) */
+/** POST /api/digests {mode?: "weekly"|"monthly"} — توليد التقارير يدوياً (مالك + مشرف) */
 export async function POST(req: Request) {
   const res = await requireTeacher(R.content);
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const tid = res.ctx.tenantId;
   try {
+    const body = await req.json().catch(() => ({} as any));
+    const monthly = body?.mode === "monthly";
     const { buildDigest } = await import("@/lib/digest");
-    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const period = since.toISOString().slice(0, 10);
+    const since = new Date(Date.now() - (monthly ? 30 : 7) * 24 * 60 * 60 * 1000);
+    const period = monthly ? since.toISOString().slice(0, 7) : since.toISOString().slice(0, 10);
     const { data: students } = await admin.from("users").select("id")
       .eq("tenant_id", tid).eq("role", "student").limit(300);
     let created = 0;
     for (const s of (students ?? []) as any[]) {
-      const d = await buildDigest(admin, tid, s.id);
+      const d = await buildDigest(admin, tid, s.id, monthly ? 30 : 7, monthly ? "monthly" : "weekly");
       const { error } = await admin.from("parent_digests").insert({
         tenant_id: tid, student_id: s.id, period, payload: d, wa_text: d.wa_text,
       });
@@ -50,12 +52,12 @@ export async function POST(req: Request) {
         try {
           const { sendPushToUser } = await import("@/lib/push");
           await sendPushToUser(admin, tid, s.id, {
-            title: `التقرير الأسبوعي 📊`, body: `حضور ${d.present} · غياب ${d.absent}${d.due > 0 ? ` · مستحق ${d.due} ج` : ""}`, url: "/progress",
+            title: monthly ? `التقرير الشهري 📊` : `التقرير الأسبوعي 📊`, body: `حضور ${d.present} · غياب ${d.absent}${d.due > 0 ? ` · مستحق ${d.due} ج` : ""}`, url: "/progress",
           });
         } catch {}
       }
     }
-    return NextResponse.json({ ok: true, created, period });
+    return NextResponse.json({ ok: true, created, period, mode: monthly ? "monthly" : "weekly" });
   } catch (e: any) {
     return dbFail("digests", e);
   }

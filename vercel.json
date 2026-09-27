@@ -11,7 +11,11 @@
     },
     {
       "path": "/api/digests/run",
-      "schedule": "30 6 * * *"
+      "schedule": "30 6 * * 6"
+    },
+    {
+      "path": "/api/digests/run-monthly",
+      "schedule": "30 7 1 * *"
     },
     {
       "path": "/api/invoices/remind/run",
