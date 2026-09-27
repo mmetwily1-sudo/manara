@@ -110,6 +110,27 @@ async function settle(req: Request) {
           .eq("referee_tenant_id", r.referee_tenant_id).eq("status", "rewarded");
         if (!prevRef) refereeExt = await extendSub(admin, r.referee_tenant_id, REFEREE_DAYS);
       }
+      // المستوى الثاني: مُحيل المُحيل (الجد) يكافأ 7 أيام — ضد الاحتيال: سنتر مختلف + مرة واحدة
+      let l2: string | null = null;
+      try {
+        const L2_DAYS = 7;
+        const { data: parent } = await admin.from("referrals").select("referrer_tenant_id")
+          .eq("referee_tenant_id", r.referrer_tenant_id).eq("status", "rewarded").limit(1).single();
+        const gp = (parent as any)?.referrer_tenant_id as string | undefined;
+        if (gp && gp !== r.referrer_tenant_id && gp !== r.referee_tenant_id) {
+          const { count: prevL2 } = await admin.from("audit_log").select("id", { count: "exact", head: true })
+            .eq("tenant_id", gp).eq("action", "referral:reward_l2").eq("entity_id", r.id);
+          if (!prevL2) {
+            l2 = await extendSub(admin, gp, L2_DAYS);
+            if (l2) {
+              await admin.from("audit_log").insert({
+                tenant_id: gp, actor_id: null, action: "referral:reward_l2",
+                entity_type: "referral", entity_id: r.id, details: { days: L2_DAYS, via: r.referrer_tenant_id },
+              });
+            }
+          }
+        }
+      } catch {}
       await admin.from("referrals").update({
         status: "rewarded", rewarded_at: new Date().toISOString(), reward_days: referrerDays,
       }).eq("id", r.id);
@@ -117,7 +138,7 @@ async function settle(req: Request) {
         await admin.from("audit_log").insert({
           tenant_id: r.referrer_tenant_id, actor_id: null,
           action: "referral:reward", entity_type: "referral", entity_id: r.id,
-          details: { days: referrerDays, referee: r.referee_tenant_id, referee_extended: !!refereeExt, launch: launchOn },
+          details: { days: referrerDays, referee: r.referee_tenant_id, referee_extended: !!refereeExt, launch: launchOn, l2_extended: !!l2 },
         });
       } catch {}
       out.rewarded++;

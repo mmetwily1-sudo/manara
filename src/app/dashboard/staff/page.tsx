@@ -120,9 +120,20 @@ export default function StaffPage() {
                 <td className="px-4 py-3">{s.role_label}</td>
                 <td className="px-4 py-3 text-slate-500">{s.branch}</td>
                 <td className="px-4 py-3 font-mono text-xs text-slate-400" dir="ltr">{s.phone}</td>
-                <td className="px-4 py-3">{!s.is_owner && s.role !== "teacher_admin" && (
-                  <button onClick={() => remove(s.id, s.name)} className="text-xs font-bold text-danger">إزالة</button>
-                )}</td>
+                <td className="px-4 py-3"><div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      const link = `${window.location.origin}/t/${s.id}`;
+                      navigator.clipboard?.writeText(link).then(() => alert("رابط صفحته العامة:\n" + link)).catch(() => {});
+                    }}
+                    className="text-xs font-bold text-primary"
+                  >
+                    رابط عام 🔗
+                  </button>
+                  {!s.is_owner && s.role !== "teacher_admin" && (
+                    <button onClick={() => remove(s.id, s.name)} className="text-xs font-bold text-danger">إزالة</button>
+                  )}
+                </div></td>
               </tr>
             ))}
           </tbody>

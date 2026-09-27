@@ -20,6 +20,14 @@ export default function ReferralsPage() {
   const [info, setInfo] = useState<Info | null>(null);
   const [copied, setCopied] = useState(false);
   const [err, setErr] = useState("");
+  const [funnel, setFunnel] = useState<{ label: string; count: number; rate: number }[] | null>(null);
+
+  useEffect(() => {
+    fetch("/api/analytics/funnel").then(async (r) => {
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) setFunnel(j.funnel);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetch("/api/referrals").then(async (r) => {
@@ -96,6 +104,21 @@ export default function ReferralsPage() {
               </tbody>
             </table>
           </section>
+
+          {funnel && funnel.length > 0 && (
+            <section className="card space-y-3 p-5">
+              <h2 className="font-bold">قمع التحويل 📉 <span className="text-xs font-normal text-slate-400">مسجل → نشط → حاضر → دافع</span></h2>
+              <div className="grid gap-3 sm:grid-cols-4">
+                {funnel.map((f) => (
+                  <div key={f.label} className="rounded-xl bg-slate-50 p-4 text-center">
+                    <div className="text-2xl font-extrabold text-primary">{f.count}</div>
+                    <div className="mt-1 text-xs text-slate-500">{f.label}</div>
+                    <div className="mt-1 text-xs font-bold text-success">{f.rate}%</div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
         </>
       )}
     </div>
