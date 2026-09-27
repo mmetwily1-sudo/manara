@@ -11,6 +11,7 @@ const fmt = (n: number) => `${Number(n).toLocaleString("ar-EG")} ج`;
 /** تقارير الربحية: فرع/مجموعة/مدرس — آخر 30 يوماً */
 export default function ReportsPage() {
   const [data, setData] = useState<{ total: number; branches: B[]; groups: G[]; teachers: T[] } | null>(null);
+  const [fc, setFc] = useState<{ collection: { monthlyAvg: number; overdue: number; collectible: number; forecast: number; history: { key: string; total: number }[] }; churn: { inactive14d: number; total: number } } | null>(null);
   const [err, setErr] = useState("");
 
   useEffect(() => {
@@ -19,6 +20,10 @@ export default function ReportsPage() {
       if (r.ok && j?.ok) setData(j);
       else setErr("تعذر التحميل — هذه الصفحة للمالك فقط.");
     }).catch(() => setErr("تعذر الاتصال."));
+    fetch("/api/analytics/forecast").then(async (r) => {
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) setFc(j);
+    }).catch(() => {});
   }, []);
 
   if (err) return <div className="mx-auto max-w-5xl"><div className="card border-danger/20 bg-danger/5 p-4 text-small font-bold text-danger">{err}</div></div>;
@@ -33,6 +38,26 @@ export default function ReportsPage() {
         </div>
         <button onClick={() => window.print()} className="btn-secondary text-small">طباعة 🖨️</button>
       </header>
+
+      {fc && (
+        <section className="card grid gap-4 p-5 sm:grid-cols-2">
+          <div className="rounded-xl bg-primary/5 p-4">
+            <div className="font-bold">تنبؤ تحصيل الشهر القادم 🔮</div>
+            <div className="mt-1 text-2xl font-extrabold text-primary">{fmt(fc.collection.forecast)}</div>
+            <div className="mt-1 text-xs text-slate-500">
+              متوسط 3 شهور: {fmt(fc.collection.monthlyAvg)} + متوقع تحصيله من المتأخرات: {fmt(fc.collection.collectible)}
+            </div>
+            <div className="mt-2 text-xs text-slate-400" dir="ltr">
+              {fc.collection.history.map((h) => `${h.key}: ${h.total}`).join(" · ")}
+            </div>
+          </div>
+          <div className="rounded-xl bg-warning/5 p-4">
+            <div className="font-bold">تنبؤ التسرب ⚠️</div>
+            <div className="mt-1 text-2xl font-extrabold text-warning">{fc.churn.inactive14d}<span className="text-xs font-normal text-slate-400"> / {fc.churn.total} طالب بلا حضور 14 يوماً</span></div>
+            <div className="mt-1 text-xs text-slate-500">تابعهم من الإنذار المبكر باللوحة الرئيسية قبل أن يتسربوا.</div>
+          </div>
+        </section>
+      )}
 
       <section className="card space-y-2 p-5">
         <h2 className="font-bold">الفروع 🏢</h2>
