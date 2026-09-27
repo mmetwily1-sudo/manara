@@ -26,6 +26,15 @@ export async function POST(req: Request) {
     created_by: res.ctx.userRow.id,
   }).select("id").single();
   if (error || !data) return dbFail("task-create", error);
+  // إشعار المكلف فوراً (best-effort)
+  if (b?.assignee_id && b.assignee_id !== res.ctx.userRow.id) {
+    try {
+      const { sendPushToUser } = await import("@/lib/push");
+      await sendPushToUser(res.ctx.admin, res.ctx.tenantId, b.assignee_id, {
+        title: "مهمة جديدة 📝", body: title.slice(0, 120), url: "/dashboard/team",
+      });
+    } catch {}
+  }
   return NextResponse.json({ ok: true, id: (data as any).id });
 }
 

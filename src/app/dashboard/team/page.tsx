@@ -79,6 +79,61 @@ function SupportFlags() {
   );
 }
 
+/** حضوري اليوم: دخول/خروج + سجل الشهر */
+function PresenceSection() {
+  const [mine, setMine] = useState<{ check_in: string | null; check_out: string | null } | null>(null);
+  const [month, setMonth] = useState(0);
+  const [rows, setRows] = useState<{ work_date: string; check_in: string | null; check_out: string | null; users?: { full_name: string } | null }[]>([]);
+  const [isOwner, setIsOwner] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  async function load() {
+    try {
+      const r = await fetch("/api/team/presence");
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) { setMine(j.mine); setMonth(j.monthCount); setRows(j.rows ?? []); setIsOwner(j.isOwner); }
+    } catch {}
+  }
+  useEffect(() => { load(); }, []);
+
+  async function mark(action: string) {
+    setBusy(true);
+    try {
+      const r = await fetch("/api/team/presence", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }),
+      });
+      if (r.ok) load();
+    } catch {}
+    finally { setBusy(false); }
+  }
+
+  const fmtT = (t: string | null) => (t ? new Date(t).toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" }) : "—");
+  return (
+    <section className="card space-y-3 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-bold">حضوري 🕗 <span className="text-xs font-normal text-slate-400">أيام الحضور هذا الشهر: {month}</span></h2>
+        <div className="flex gap-2">
+          <button onClick={() => mark("in")} disabled={busy || !!mine?.check_in} className="rounded-lg bg-success/10 px-4 py-1.5 text-xs font-bold text-success disabled:opacity-40">
+            {mine?.check_in ? `دخلت ${fmtT(mine.check_in)}` : "تسجيل دخول"}
+          </button>
+          <button onClick={() => mark("out")} disabled={busy || !mine?.check_in || !!mine?.check_out} className="rounded-lg bg-slate-100 px-4 py-1.5 text-xs font-bold text-slate-600 disabled:opacity-40">
+            {mine?.check_out ? `خرجت ${fmtT(mine.check_out)}` : "تسجيل خروج"}
+          </button>
+        </div>
+      </div>
+      {isOwner && rows.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {rows.slice(0, 14).map((x, i) => (
+            <span key={i} className="rounded-full bg-slate-50 px-3 py-1 text-[11px]">
+              <b>{x.users?.full_name ?? ""}</b> · <span dir="ltr">{x.work_date}</span> · {fmtT(x.check_in)} → {fmtT(x.check_out)}
+            </span>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 /** فريق العمل: مهام + تقييم أداء + إجازات + أجهزة */
 export default function TeamPage() {
   const [tasks, setTasks] = useState<Task[] | null>(null);
@@ -215,6 +270,7 @@ export default function TeamPage() {
 
       <DeviceSection />
       <SupportFlags />
+      <PresenceSection />
 
       <section className="card space-y-3 p-5">
         <h2 className="font-bold">المهام 📝</h2>

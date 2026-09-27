@@ -40,8 +40,18 @@ export async function PATCH(req: Request) {
   if (!["approved", "rejected"].includes(b?.status)) {
     return NextResponse.json({ ok: false, error: "bad_status" }, { status: 400 });
   }
+  const { data: lv } = await res.ctx.admin.from("leave_requests").select("user_id,from_date,to_date")
+    .eq("id", b.id).eq("tenant_id", res.ctx.tenantId).eq("status", "pending").single();
+  if (!lv) return NextResponse.json({ ok: false, error: "not_pending" }, { status: 400 });
   const { error } = await res.ctx.admin.from("leave_requests").update({ status: b.status, decided_by: res.ctx.userRow.id })
     .eq("id", b.id).eq("tenant_id", res.ctx.tenantId).eq("status", "pending");
   if (error) return dbFail("leave-decide", error);
+  try {
+    const { sendPushToUser } = await import("@/lib/push");
+    await sendPushToUser(res.ctx.admin, res.ctx.tenantId, (lv as any).user_id, {
+      title: b.status === "approved" ? "إجازتك اتقبلت 🏖️" : "طلب الإجازة اترفض",
+      body: `الفترة ${(lv as any).from_date} ← ${(lv as any).to_date}`, url: "/dashboard/team",
+    });
+  } catch {}
   return NextResponse.json({ ok: true });
 }
