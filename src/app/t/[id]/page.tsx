@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import BookingForm from "@/components/BookingForm";
 
 export async function generateMetadata({ params }: { params: { id: string } }) {
   return { title: `صفحة معلم — منارة` };
@@ -58,7 +59,11 @@ export default async function TeacherPage({ params }: { params: { id: string } }
             ))}
           </ul>
         )}
-        {wa && <a href={wa} target="_blank" rel="noreferrer" className="btn-primary block w-full">احجز حصتك التجريبية 💬</a>}
+        <BookingForm
+          teacherId={params.id}
+          groups={(groups ?? []).map((g: any) => ({ id: g.id, name: `${g.name}${g.grade_level ? ` · ${g.grade_level}` : ""}` }))}
+        />
+        {wa && <a href={wa} target="_blank" rel="noreferrer" className="block w-full text-center text-xs font-bold text-slate-400">أو استفسر واتساب مباشرة 💬</a>}
         <p className="text-xs text-slate-400">مدعوم بمنصة منارة 🚀</p>
       </div>
     </main>
