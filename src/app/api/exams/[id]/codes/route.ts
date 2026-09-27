@@ -38,6 +38,32 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   });
 }
 
+/** PATCH — وقت إضافي فردي {code_id, extra_minutes} (حتى 120) لظروف خاصة */
+export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+  const res = await requireTeacher(R.content);
+  if ("error" in res) return res.error;
+  const admin = res.ctx.admin;
+  const tid = res.ctx.tenantId;
+  const b = await req.json().catch(() => ({} as any));
+  const mins = Math.min(120, Math.max(1, Number(b?.extra_minutes) || 0));
+  if (!b?.code_id || !mins) return NextResponse.json({ ok: false, error: "bad_input" }, { status: 400 });
+  const { data: c } = await admin.from("exam_codes").select("id,expires_at,status")
+    .eq("id", b.code_id).eq("exam_id", params.id).eq("tenant_id", tid).single();
+  if (!c) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
+  if ((c as any).status === "submitted") return NextResponse.json({ ok: false, error: "already_submitted" }, { status: 400 });
+  const base = Math.max(Date.now(), new Date((c as any).expires_at ?? Date.now()).getTime());
+  const next = new Date(base + mins * 60000).toISOString();
+  const { error } = await admin.from("exam_codes").update({ expires_at: next }).eq("id", (c as any).id);
+  if (error) return dbFail("code-extend", error);
+  try {
+    await admin.from("audit_log").insert({
+      tenant_id: tid, actor_id: res.ctx.userRow.id,
+      action: "examcode:extend", entity_type: "exam_code", entity_id: (c as any).id, details: { mins },
+    });
+  } catch {}
+  return NextResponse.json({ ok: true, expires_at: next });
+}
+
 /** POST — توليد أكواد {student_ids?: string[], count?: number} — يعيد الأكواد الصريحة مرة واحدة فقط */
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const res = await requireTeacher(R.content);

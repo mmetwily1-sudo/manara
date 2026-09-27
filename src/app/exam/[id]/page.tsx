@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Q = { id: string; body: string; options: string[] | null; qtype: string; marks: number };
 
@@ -47,6 +47,7 @@ export default function ExamPage({ params }: { params: { id: string } }) {
   const [codeBusy, setCodeBusy] = useState(false);
   const [codeErr, setCodeErr] = useState("");
   const [tabSwitches, setTabSwitches] = useState(0);
+  const [warned, setWarned] = useState(false);
 
   function load() {
     fetch(`/api/exams/${params.id}`)
@@ -67,9 +68,18 @@ export default function ExamPage({ params }: { params: { id: string } }) {
 
   useEffect(() => { load(); }, [params.id]);
 
-  // عدّاد تبديل التبويب (مؤشر اشتباه يُرسل مع التسليم — يُرى في سجل المعلم)
+  // عدّاد تبديل التبويب: تحذير عند الأول + تسليم تلقائي عند الثالث (وضع آمن)
+  const submitRef = useRef<(() => void) | null>(null);
   useEffect(() => {
-    const onVis = () => { if (document.hidden && qs) setTabSwitches((n) => n + 1); };
+    const onVis = () => {
+      if (!document.hidden || !qs) return;
+      setWarned(true);
+      setTabSwitches((n) => {
+        const next = n + 1;
+        if (next >= 3) setTimeout(() => submitRef.current?.(), 300);
+        return next;
+      });
+    };
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [qs]);
@@ -98,6 +108,7 @@ export default function ExamPage({ params }: { params: { id: string } }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [secLeft === null]);
 
+  useEffect(() => { submitRef.current = submit; });
   async function submit() {
     if (submitting || result) return;
     setSubmitting(true);
@@ -172,9 +183,13 @@ export default function ExamPage({ params }: { params: { id: string } }) {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4 p-4" onCopy={(e) => e.preventDefault()} onContextMenu={(e) => e.preventDefault()}>
-      {tabSwitches > 0 && (
-        <div className="rounded-xl bg-warning/10 px-4 py-2 text-center text-xs font-bold text-warning">
-          ⚠️ غادرت صفحة الامتحان {tabSwitches} {tabSwitches === 1 ? "مرة" : "مرات"} — يُسجَّل ذلك في تقرير معلمك.
+      {(warned || tabSwitches > 0) && (
+        <div className={`rounded-xl px-4 py-2 text-center text-xs font-bold ${tabSwitches >= 2 ? "bg-danger/10 text-danger" : "bg-warning/10 text-warning"}`}>
+          {tabSwitches >= 3
+            ? "⛔ تم تسليم امتحانك تلقائياً لتكرار مغادرة الصفحة (3 مرات)."
+            : tabSwitches === 2
+              ? "⛔ تحذير أخير: مغادرة أخرى = تسليم تلقائي."
+              : `⚠️ غادرت صفحة الامتحان ${tabSwitches} ${tabSwitches === 1 ? "مرة" : "مرات"} — يُسجَّل ذلك في تقرير معلمك.`}
         </div>
       )}
       <div className="sticky top-0 z-10 flex items-center justify-between rounded-xl bg-white p-3 shadow select-none">
