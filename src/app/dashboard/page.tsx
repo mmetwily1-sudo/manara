@@ -9,6 +9,7 @@ import FeedbackWidget from "@/components/FeedbackWidget";
 import HealthScore from "@/components/HealthScore";
 import InstallPwa from "@/components/InstallPwa";
 import DarkToggle from "@/components/DarkToggle";
+import SourceSurvey from "@/components/SourceSurvey";
 
 export default async function DashboardHome() {
   const [kpis, groups, warnings, feed] = await Promise.all([getKpis(), getGroups(), getEarlyWarning(), getFeed()]);
@@ -50,6 +51,7 @@ export default async function DashboardHome() {
       </section>
 
       <TrialBanner />
+      <SourceSurvey />
       <HealthScore />
       <OnboardingChecklist />
       <NpsBanner />

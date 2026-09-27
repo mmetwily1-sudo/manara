@@ -3,7 +3,7 @@ import { dbFail } from "@/lib/api-error";
 import { requireTeacher } from "@/lib/server-auth";
 import { R } from "@/lib/permissions";
 
-/** POST /api/feedback {kind: nps|idea|bug|praise, score?, text?, page?} — صوت المعلم */
+/** POST /api/feedback {kind: nps|idea|bug|praise|survey, score?, text?, page?} — صوت المعلم */
 export async function POST(req: Request) {
   const res = await requireTeacher(R.feedback);
   if ("error" in res) return res.error;
@@ -11,7 +11,7 @@ export async function POST(req: Request) {
 
   const body = await req.json().catch(() => ({} as any));
   const kind = String(body?.kind ?? "idea");
-  if (!["nps", "idea", "bug", "praise"].includes(kind)) {
+  if (!["nps", "idea", "bug", "praise", "survey"].includes(kind)) {
     return NextResponse.json({ ok: false, error: "bad_kind" }, { status: 400 });
   }
   const score = body?.score == null ? null : Math.max(1, Math.min(10, Number(body.score) || 0)) || null;

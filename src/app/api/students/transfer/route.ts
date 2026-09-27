@@ -44,5 +44,19 @@ export async function POST(req: Request) {
       },
     });
   } catch {}
-  return NextResponse.json({ ok: true, to: (g as any).name });
+  // تحويل الانتظار: أول معلق بقائمة انتظار مجموعة غادرها → مؤكد تلقائياً
+  let promoted: string | null = null;
+  try {
+    const oldGids = ((old ?? []) as any[]).map((e) => e.group_id).filter(Boolean);
+    if (oldGids.length) {
+      const { data: wl } = await sb.from("trial_bookings").select("id,name")
+        .eq("tenant_id", tid).eq("kind", "waitlist").eq("status", "pending")
+        .in("group_id", oldGids).order("created_at", { ascending: true }).limit(1).single();
+      if (wl) {
+        await sb.from("trial_bookings").update({ status: "confirmed" }).eq("id", (wl as any).id);
+        promoted = (wl as any).name;
+      }
+    }
+  } catch {}
+  return NextResponse.json({ ok: true, to: (g as any).name, promoted });
 }
