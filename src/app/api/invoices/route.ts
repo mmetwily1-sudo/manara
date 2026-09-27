@@ -78,14 +78,32 @@ export async function POST(req: Request) {
   const period = /^\d{4}-\d{2}$/.test(String(body?.period ?? "")) ? String(body.period) : curPeriod();
 
   try {
+    // كوبون خصم اختياري على الإصدار (يُستهلك مرة واحدة لكل إصدار)
+    let pct = 0;
+    const couponCode = String(body?.coupon_code ?? "").trim().toUpperCase();
+    if (couponCode) {
+      const today = new Date().toISOString().slice(0, 10);
+      const { data: cp } = await admin.from("coupons").select("id,pct,max_uses,used,expires_at")
+        .eq("tenant_id", tid).eq("code", couponCode).eq("is_active", true).single();
+      if ((cp as any) && Number((cp as any).used ?? 0) < Number((cp as any).max_uses ?? 0)
+        && (!(cp as any).expires_at || String((cp as any).expires_at) >= today)) {
+        pct = Number((cp as any).pct);
+        await admin.from("coupons").update({ used: Number((cp as any).used ?? 0) + 1 }).eq("id", (cp as any).id);
+      } else {
+        return NextResponse.json({ ok: false, error: "bad_coupon" }, { status: 400 });
+      }
+    }
     const { data: enr } = await admin.from("enrollments")
       .select("student_id,group_id,special_price,groups(monthly_fee)")
       .eq("tenant_id", tid).eq("status", "active").limit(2000);
     const rows = (enr ?? [])
-      .map((e: any) => ({
-        tenant_id: tid, student_id: e.student_id, group_id: e.group_id, period,
-        amount: Number(e.special_price ?? e.groups?.monthly_fee ?? 0),
-      }))
+      .map((e: any) => {
+        const base = Number(e.special_price ?? e.groups?.monthly_fee ?? 0);
+        return {
+          tenant_id: tid, student_id: e.student_id, group_id: e.group_id, period,
+          amount: pct > 0 ? Math.max(1, Math.round(base * (100 - pct) / 100)) : base,
+        };
+      })
       .filter((r: any) => r.student_id && r.amount > 0);
     let created = 0;
     // دفعات صغيرة لتفادي حد الصفوف + تجاهل الموجود (unique)
@@ -110,7 +128,7 @@ export async function POST(req: Request) {
         action: "invoices:issue", entity_type: "invoice", entity_id: period, details: { created, period },
       });
     } catch {}
-    return NextResponse.json({ ok: true, created, period });
+    return NextResponse.json({ ok: true, created, period, coupon_pct: pct });
   } catch (e: any) {
     return dbFail("invoices-issue", e);
   }

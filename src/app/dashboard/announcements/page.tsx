@@ -7,7 +7,7 @@ type Ann = { id: string; group_name: string; body: string; sender: string; creat
 export default function AnnouncementsPage() {
   const [list, setList] = useState<Ann[] | null>(null);
   const [groups, setGroups] = useState<{ id: string; name: string }[]>([]);
-  const [form, setForm] = useState({ group_id: "", body: "" });
+  const [form, setForm] = useState({ group_id: "", body: "", publish_at: "" });
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
 
@@ -31,10 +31,10 @@ export default function AnnouncementsPage() {
     try {
       const r = await fetch("/api/announcements", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ group_id: form.group_id || null, body: form.body }),
+        body: JSON.stringify({ group_id: form.group_id || null, body: form.body, publish_at: form.publish_at || undefined }),
       });
       const j = await r.json().catch(() => null);
-      if (r.ok && j?.ok) { setMsg("تم النشر 📢"); setForm({ group_id: "", body: "" }); load(); }
+      if (r.ok && j?.ok) { setMsg(form.publish_at ? "تمت الجدولة ⏰" : "تم النشر 📢"); setForm({ group_id: "", body: "", publish_at: "" }); load(); }
       else setMsg(j?.message ?? "فشل النشر.");
     } catch { setMsg("تعذر الاتصال."); }
     finally { setBusy(false); }
@@ -55,7 +55,12 @@ export default function AnnouncementsPage() {
         </select>
         <textarea value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} required rows={3}
           placeholder="اكتب الإعلان..." className="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:border-primary" />
-        <button className="btn-primary" disabled={busy}>{busy ? "جاري النشر..." : "نشر الإعلان"}</button>
+        <label className="flex items-center gap-2 text-small text-slate-500">
+          ⏰ جدولة النشر (اختياري):
+          <input value={form.publish_at} onChange={(e) => setForm({ ...form, publish_at: e.target.value })}
+            type="datetime-local" className="rounded-xl border border-slate-200 px-3 py-2 text-small" />
+        </label>
+        <button className="btn-primary" disabled={busy}>{busy ? "جاري..." : form.publish_at ? "جدولة الإعلان ⏰" : "نشر الإعلان"}</button>
       </form>
       {list === null ? <div className="card p-8 text-center text-slate-400">جاري التحميل...</div> : (
         <ul className="space-y-3">

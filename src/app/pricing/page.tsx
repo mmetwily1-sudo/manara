@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { PayOnlineButton } from "@/components/PayOnlineButton";
+import Testimonials from "@/components/Testimonials";
 
 export const metadata: Metadata = {
   title: "الأسعار — منارة",
@@ -134,6 +135,8 @@ export default function PricingPage({ searchParams }: { searchParams?: { plan?: 
           <p className="mx-auto mt-1 max-w-md text-small text-slate-600">كل إحالة مؤهلة = أيام مجانية لك وله — بلا حد أدنى وبلا عمولة.</p>
           <Link href="/referral" className="btn-primary mt-3 inline-block">اعرف عن برنامج الإحالة ←</Link>
         </div>
+
+        <Testimonials />
 
         <div className="mx-auto mt-10 max-w-3xl text-center">
           <h2 className="text-h2 mb-4">أسئلة عن الدفع</h2>

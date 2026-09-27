@@ -30,7 +30,8 @@ export async function GET() {
     gids = ((en ?? []) as any[]).map((e) => e.group_id);
   }
 
-  let q = admin.from("threads").select("id,group_id,groups(name)").eq("tenant_id", tid).eq("ttype", "announcement").order("id", { ascending: false }).limit(30);
+  const nowIso = new Date().toISOString();
+  let q = admin.from("threads").select("id,group_id,groups(name)").eq("tenant_id", tid).eq("ttype", "announcement").or(`publish_at.is.null,publish_at.lte.${nowIso}`).order("id", { ascending: false }).limit(30);
   if (!isTeacher && gids) {
     q = gids.length ? q.or(`group_id.is.null,group_id.in.(${gids.join(",")})`) : q.is("group_id", null);
   }
@@ -84,8 +85,10 @@ export async function POST(req: Request) {
     const { data: g } = await admin.from("groups").select("id").eq("id", groupId).eq("tenant_id", tid).single();
     if (!g) return NextResponse.json({ ok: false, error: "bad_group" }, { status: 400 });
   }
+  const publishAt = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(String(body.publish_at ?? ""))
+    ? new Date(String(body.publish_at)).toISOString() : null;
   const { data: th, error: e1 } = await admin.from("threads").insert({
-    tenant_id: tid, group_id: groupId, ttype: "announcement",
+    tenant_id: tid, group_id: groupId, ttype: "announcement", publish_at: publishAt,
   }).select("id").single();
   if (e1) return dbFail("ann-create", e1);
   const { error: e2 } = await admin.from("messages").insert({
