@@ -88,6 +88,12 @@ export async function PATCH(req: Request) {
   if (!run) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
   if (b?.action === "approve") {
     if ((run as any).status === "approved") return NextResponse.json({ ok: false, error: "already" }, { status: 400 });
+    const { totpRequired, totpOk } = await import("@/lib/totp");
+    if (await totpRequired(admin, res.ctx.userRow.id)) {
+      if (!(await totpOk(admin, res.ctx.userRow.id, b?.totp))) {
+        return NextResponse.json({ ok: false, error: "totp_required" }, { status: 403 });
+      }
+    }
     const { error } = await admin.from("payroll_runs").update({ status: "approved", approved_at: new Date().toISOString() })
       .eq("id", b.run_id).eq("tenant_id", tid);
     if (error) return dbFail("payroll-approve", error);

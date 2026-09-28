@@ -56,13 +56,19 @@ export default function PayrollPage() {
     } catch { setErr("تعذر الاتصال."); }
   }
 
-  async function approve(run_id: string) {
-    if (!confirm("اعتماد المسير نهائياً؟")) return;
+  async function approve(run_id: string, totp?: string) {
+    if (!totp && !confirm("اعتماد المسير نهائياً؟")) return;
     const r = await fetch("/api/payroll", {
       method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ run_id, action: "approve" }),
+      body: JSON.stringify({ run_id, action: "approve", totp }),
     });
+    const j = await r.json().catch(() => null);
     if (r.ok) load();
+    else if (j?.error === "totp_required") {
+      const code = prompt("أدخل كود التحقق بخطوتين (6 أرقام):") ?? "";
+      if (/^\d{6}$/.test(code)) approve(run_id, code);
+      else setErr("الاعتماد يحتاج كود التحقق.");
+    }
   }
 
   async function saveItem(e: React.FormEvent) {
