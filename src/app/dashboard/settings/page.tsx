@@ -2,6 +2,7 @@ import { PasskeyManager } from "@/components/PasskeyManager";
 import { TotpManager } from "@/components/TotpManager";
 import { DevicesManager } from "@/components/DevicesManager";
 import { SecurityAlerts } from "@/components/SecurityAlerts";
+import { KeysManager } from "@/components/KeysManager";
 import { NotifyToggle, PayNumbersForm, VisionKeyForm, ThemeForm, SlugForm } from "@/components/NotifyToggle";
 import { PushSubscribeButton } from "@/components/PushSubscribeButton";
 import { getTenantInfoDB } from "@/lib/data";
@@ -82,6 +83,10 @@ export default async function SettingsPage() {
 
       <section className="card space-y-4 p-6">
         <SecurityAlerts />
+      </section>
+
+      <section className="card space-y-4 p-6">
+        <KeysManager />
       </section>
 
       <section className="card space-y-4 p-6">
