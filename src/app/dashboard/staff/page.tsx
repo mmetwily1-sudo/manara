@@ -18,6 +18,11 @@ export default function StaffPage() {
   type Contract = { id: string; user_id: string; name: string; salary_base: number; kind: string; kind_label: string; start_date: string; end_date: string | null };
   const [contracts, setContracts] = useState<Contract[] | null>(null);
   const [cform, setCform] = useState({ user_id: "", salary_base: "", kind: "monthly" });
+  type Review = { user_id: string; name: string; month: string; score: number; note: string };
+  const [reviews, setReviews] = useState<Review[] | null>(null);
+  const [rmonth, setRmonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [ravg, setRavg] = useState(0);
+  const [rform, setRform] = useState({ user_id: "", score: "5", note: "" });
 
   async function load() {
     try {
@@ -91,6 +96,27 @@ export default function StaffPage() {
       });
       if (r.ok) loadContracts();
     } catch {}
+  }
+
+  async function loadReviews(m: string) {
+    try {
+      const r = await fetch(`/api/staff/reviews?month=${m}`);
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) { setReviews(j.reviews); setRavg(j.avg); }
+    } catch {}
+  }
+  useEffect(() => { loadReviews(rmonth); }, [rmonth]);
+
+  async function saveReview(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      const r = await fetch("/api/staff/reviews", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: rform.user_id, month: rmonth, score: Number(rform.score), note: rform.note }),
+      });
+      if (r.ok) { setRform({ user_id: "", score: "5", note: "" }); loadReviews(rmonth); }
+      else setErr("تعذر حفظ التقييم.");
+    } catch { setErr("تعذر الاتصال."); }
   }
 
   async function remove(id: string, name: string) {
@@ -228,6 +254,42 @@ export default function StaffPage() {
                 <span className="font-bold">{c.name}</span>
                 <span className="text-slate-500">{c.salary_base} ج · {c.kind_label}</span>
                 <button onClick={() => endContract(c.id)} className="text-xs font-bold text-danger">إنهاء</button>
+              </li>
+            ))}
+          </ul>}
+      </section>
+      <section className="card space-y-3 p-5">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="font-bold">تقييم الأداء ⭐</h2>
+          <input value={rmonth} onChange={(e) => setRmonth(e.target.value)} type="month" required
+            className="rounded-xl border border-slate-200 px-3 py-1.5 text-small" dir="ltr" />
+        </div>
+        <div className="text-small text-slate-500">متوسط الشهر: <b>{ravg} / 5</b></div>
+        <form onSubmit={saveReview} className="grid gap-2 sm:grid-cols-4">
+          <select value={rform.user_id} onChange={(e) => setRform({ ...rform, user_id: e.target.value })} required
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-small">
+            <option value="">اختر الموظف...</option>
+            {staff.filter((s) => !s.is_owner && s.role !== "teacher_admin").map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+          <select value={rform.score} onChange={(e) => setRform({ ...rform, score: e.target.value })}
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-small">
+            {[5, 4, 3, 2, 1].map((n) => <option key={n} value={n}>{"⭐".repeat(n)} ({n})</option>)}
+          </select>
+          <input value={rform.note} onChange={(e) => setRform({ ...rform, note: e.target.value })}
+            placeholder="ملاحظة (اختياري)" maxLength={500}
+            className="rounded-xl border border-slate-200 px-4 py-2 text-small" />
+          <button className="btn-primary !py-2 text-small">حفظ التقييم</button>
+        </form>
+        {reviews === null ? <div className="text-xs text-slate-400">جاري التحميل...</div> :
+          reviews.length === 0 ? <div className="text-xs text-slate-400">لا تقييمات هذا الشهر.</div> :
+          <ul className="divide-y divide-slate-100 text-small">
+            {reviews.map((v) => (
+              <li key={v.user_id} className="flex items-center justify-between gap-2 py-2">
+                <span className="font-bold">{v.name}</span>
+                <span className="text-warning">{"⭐".repeat(v.score)}</span>
+                {v.note && <span className="text-xs text-slate-500" dir="auto">{v.note}</span>}
               </li>
             ))}
           </ul>}
