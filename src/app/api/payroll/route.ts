@@ -97,6 +97,12 @@ export async function PATCH(req: Request) {
     const { error } = await admin.from("payroll_runs").update({ status: "approved", approved_at: new Date().toISOString() })
       .eq("id", b.run_id).eq("tenant_id", tid);
     if (error) return dbFail("payroll-approve", error);
+    try {
+      await admin.from("audit_log").insert({
+        tenant_id: tid, actor_id: res.ctx.userRow.id,
+        action: "payroll:approve", entity_type: "payroll_run", entity_id: b.run_id, details: {},
+      });
+    } catch {}
     return NextResponse.json({ ok: true });
   }
   if (b?.action === "item") {

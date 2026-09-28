@@ -40,6 +40,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "bad_code" }, { status: 400 });
     }
     await admin.from("owner_secrets").update({ totp_enabled: true }).eq("user_id", uid);
+    try {
+      await admin.from("audit_log").insert({
+        tenant_id: tid, actor_id: uid, action: "auth:totp_enable", entity_type: "owner_secret", entity_id: uid, details: {},
+      });
+    } catch {}
     return NextResponse.json({ ok: true, enabled: true });
   }
   if (b?.step === "disable") {
