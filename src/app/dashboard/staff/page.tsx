@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-type Branch = { id: string; name: string; address: string | null };
+type Branch = { id: string; name: string; address: string | null; lat: number | null; lng: number | null };
 type Member = { id: string; name: string; phone: string; role: string; role_label: string; branch: string; branch_id: string | null; is_owner: boolean };
 
 const ROLES = [["supervisor", "مشرف"], ["assistant", "مساعد تحضير"], ["accountant", "محاسب"]];
@@ -13,6 +13,20 @@ export default function StaffPage() {
   const [staff, setStaff] = useState<Member[]>([]);
   const [err, setErr] = useState("");
   const [bName, setBName] = useState("");
+  const [geo, setGeo] = useState({ branch_id: "", lat: "", lng: "" });
+
+  async function saveGeo(e: React.FormEvent) {
+    e.preventDefault();
+    if (!geo.branch_id) return;
+    try {
+      const r = await fetch("/api/branches", {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: geo.branch_id, lat: Number(geo.lat), lng: Number(geo.lng) }),
+      });
+      if (r.ok) { setGeo({ branch_id: "", lat: "", lng: "" }); load(); }
+      else setErr("إحداثيات غير صالحة.");
+    } catch { setErr("تعذر الاتصال."); }
+  }
   const [form, setForm] = useState({ email: "", password: "", name: "", phone: "", role: "assistant", branch: "" });
   const [busy, setBusy] = useState(false);
   type Contract = { id: string; user_id: string; name: string; salary_base: number; kind: string; kind_label: string; start_date: string; end_date: string | null };
@@ -155,9 +169,27 @@ export default function StaffPage() {
           <button disabled={busy} className="btn-primary shrink-0">إضافة</button>
         </form>
         <ul className="flex flex-wrap gap-2 text-small">
-          {branches.map((b) => <li key={b.id} className="rounded-full bg-primary-light px-4 py-1.5 font-bold text-primary">{b.name}</li>)}
-          {branches.length === 0 && <li className="text-xs text-slate-400">لا فروع — الكل يعمل على السنتر الرئيسي.</li>}
+          {branches.map((b) => (
+            <li key={b.id} className="rounded-full bg-primary-light px-4 py-1.5 font-bold text-primary">
+              {b.name}{" "}
+              {b.lat != null && b.lng != null && (
+                <a href={`https://www.google.com/maps?q=${b.lat},${b.lng}`} target="_blank" rel="noreferrer" title="الاتجاهات" className="underline">📍</a>
+              )}
+            </li>
+          ))}
         </ul>
+        <form onSubmit={saveGeo} className="grid gap-2 sm:grid-cols-4">
+          <select value={geo.branch_id} onChange={(e) => setGeo({ ...geo, branch_id: e.target.value })}
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-small">
+            <option value="">موقع الفرع على الخريطة...</option>
+            {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
+          <input value={geo.lat} onChange={(e) => setGeo({ ...geo, lat: e.target.value })} placeholder="خط العرض lat" inputMode="decimal" dir="ltr"
+            className="rounded-xl border border-slate-200 px-3 py-2 text-small" />
+          <input value={geo.lng} onChange={(e) => setGeo({ ...geo, lng: e.target.value })} placeholder="خط الطول lng" inputMode="decimal" dir="ltr"
+            className="rounded-xl border border-slate-200 px-3 py-2 text-small" />
+          <button className="btn-secondary !py-2 text-small">حفظ الموقع 📍</button>
+        </form>
       </section>
 
       <section className="card space-y-3 p-5">

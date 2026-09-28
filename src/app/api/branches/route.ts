@@ -6,7 +6,7 @@ import { requireTeacher } from "@/lib/server-auth";
 export async function GET() {
   const res = await requireTeacher(["teacher_admin"]);
   if ("error" in res) return res.error;
-  const { data } = await res.ctx.admin.from("branches").select("id,name,address,created_at")
+  const { data } = await res.ctx.admin.from("branches").select("id,name,address,lat,lng,created_at")
     .eq("tenant_id", res.ctx.tenantId).order("created_at", { ascending: true });
   return NextResponse.json({ ok: true, branches: data ?? [] });
 }
@@ -26,6 +26,22 @@ export async function POST(req: Request) {
 }
 
 /** DELETE /api/branches?id= — حذف فرع (مالك فقط، يُحرر المرتبطين) */
+/** PATCH /api/branches {id, lat, lng} — إحداثيات الفرع للخريطة (مالك فقط) */
+export async function PATCH(req: Request) {
+  const res = await requireTeacher(["teacher_admin"]);
+  if ("error" in res) return res.error;
+  const b = await req.json().catch(() => ({} as any));
+  const lat = Number(b?.lat ?? NaN);
+  const lng = Number(b?.lng ?? NaN);
+  if (!b?.id || !(lat >= -90 && lat <= 90) || !(lng >= -180 && lng <= 180)) {
+    return NextResponse.json({ ok: false, error: "bad_input" }, { status: 400 });
+  }
+  const { error } = await res.ctx.admin.from("branches").update({ lat, lng })
+    .eq("id", b.id).eq("tenant_id", res.ctx.tenantId);
+  if (error) return dbFail("branch-geo", error);
+  return NextResponse.json({ ok: true });
+}
+
 export async function DELETE(req: Request) {
   const res = await requireTeacher(["teacher_admin"]);
   if ("error" in res) return res.error;
