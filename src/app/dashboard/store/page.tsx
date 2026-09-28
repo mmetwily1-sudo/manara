@@ -121,6 +121,82 @@ function PointsSection() {
   );
 }
 
+type Bundle = { id: string; title: string; subjects: string; price: number; active: boolean };
+
+/** باقات المواد: اشتراك شهري يولد فاتورة (طالب) + إدارة (معلم) */
+function BundlesSection() {
+  const [isTeacher, setIsTeacher] = useState(false);
+  const [bundles, setBundles] = useState<Bundle[]>([]);
+  const [mine, setMine] = useState<string[]>([]);
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [form, setForm] = useState({ title: "", subjects: "", price: "" });
+  const [msg, setMsg] = useState("");
+
+  async function load() {
+    try {
+      const r = await fetch("/api/bundles", { cache: "no-store" });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) {
+        setIsTeacher(!!j.isTeacher); setBundles(j.bundles ?? []);
+        setMine(j.mine ?? []); setCounts(j.subsThisMonth ?? {});
+      }
+    } catch {}
+  }
+  useEffect(() => { load(); }, []);
+
+  async function create(e: React.FormEvent) {
+    e.preventDefault();
+    const r = await fetch("/api/bundles", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: form.title, subjects: form.subjects, price: Number(form.price) }),
+    });
+    if (r.ok) { setForm({ title: "", subjects: "", price: "" }); load(); }
+  }
+
+  async function subscribe(bundle_id: string) {
+    if (!confirm("الاشتراك في الباقة؟ ستضاف فاتورة هذا الشهر.")) return;
+    const r = await fetch("/api/bundles", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ bundle_id }),
+    });
+    const j = await r.json().catch(() => null);
+    if (r.ok && j?.ok) { setMsg("تم الاشتراك ✅ — تجد الفاتورة في حسابك."); load(); }
+    else setMsg(j?.error === "already" ? "مشترك فيها هذا الشهر." : "فشل الاشتراك.");
+  }
+
+  return (
+    <section className="card space-y-3 p-5">
+      <h2 className="font-bold">باقات المواد 📦</h2>
+      {msg && <div className="text-xs font-bold text-primary">{msg}</div>}
+      <ul className="space-y-2">
+        {bundles.map((b) => (
+          <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 px-4 py-2.5 text-small">
+            <span><b>{b.title}</b> {b.subjects && <span className="text-xs text-slate-400">({b.subjects})</span>} — {b.price} ج/شهر
+              {isTeacher && <span className="text-xs text-slate-400"> · {counts[b.id] ?? 0} مشترك</span>}</span>
+            {!isTeacher ? (
+              mine.includes(b.id) ? <span className="text-xs font-bold text-success">مشترك ✅</span> :
+                <button onClick={() => subscribe(b.id)} className="rounded-lg bg-primary px-3 py-1 text-xs font-bold text-white">اشترك</button>
+            ) : (
+              <span className={`text-xs font-bold ${b.active ? "text-success" : "text-slate-400"}`}>{b.active ? "نشطة" : "موقوفة"}</span>
+            )}
+          </li>
+        ))}
+        {bundles.length === 0 && <li className="text-xs text-slate-400">لا باقات بعد.</li>}
+      </ul>
+      {isTeacher && (
+        <form onSubmit={create} className="grid gap-2 sm:grid-cols-4">
+          <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="اسم الباقة" required maxLength={120}
+            className="rounded-xl border border-slate-200 px-3 py-2 text-small" />
+          <input value={form.subjects} onChange={(e) => setForm({ ...form, subjects: e.target.value })} placeholder="المواد (مفصولة بفاصلة)" maxLength={300}
+            className="rounded-xl border border-slate-200 px-3 py-2 text-small" />
+          <input value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="السعر" required inputMode="decimal" dir="ltr"
+            className="rounded-xl border border-slate-200 px-3 py-2 text-small" />
+          <button className="btn-primary !py-2 text-small">إضافة</button>
+        </form>
+      )}
+    </section>
+  );
+}
+
 export default function StorePage() {
   const [prods, setProds] = useState<Product[] | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -318,6 +394,7 @@ export default function StorePage() {
       </section>
 
       <PointsSection />
+      <BundlesSection />
       {orders.length > 0 && (
         <section className="card space-y-2 p-5">
           <h2 className="font-bold">الطلبات ({orders.filter((o) => o.status === "pending").length} بانتظار التأكيد)</h2>
