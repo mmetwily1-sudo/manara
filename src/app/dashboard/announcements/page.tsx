@@ -10,6 +10,28 @@ export default function AnnouncementsPage() {
   const [form, setForm] = useState({ group_id: "", body: "", publish_at: "" });
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  type Ev = { id: string; title: string; event_at: string; fee: number; capacity: number; active: boolean };
+  const [events, setEvents] = useState<Ev[]>([]);
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [eform, setEform] = useState({ title: "", event_at: "", fee: "", capacity: "" });
+
+  async function loadEvents() {
+    try {
+      const r = await fetch("/api/events", { cache: "no-store" });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok && j.isTeacher) { setEvents(j.events ?? []); setCounts(j.counts ?? {}); }
+    } catch {}
+  }
+  useEffect(() => { loadEvents(); }, []);
+
+  async function createEvent(e: React.FormEvent) {
+    e.preventDefault();
+    const r = await fetch("/api/events", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: eform.title, event_at: eform.event_at, fee: Number(eform.fee || 0), capacity: eform.capacity === "" ? -1 : Number(eform.capacity) }),
+    });
+    if (r.ok) { setEform({ title: "", event_at: "", fee: "", capacity: "" }); loadEvents(); }
+  }
 
   async function load() {
     try {
@@ -73,6 +95,30 @@ export default function AnnouncementsPage() {
           ))}
         </ul>
       )}
+      <section className="card space-y-3 p-5">
+        <h2 className="font-bold">الفعاليات 🎪</h2>
+        <form onSubmit={createEvent} className="grid gap-2 sm:grid-cols-5">
+          <input value={eform.title} onChange={(e) => setEform({ ...eform, title: e.target.value })} placeholder="اسم الفعالية" required maxLength={150}
+            className="rounded-xl border border-slate-200 px-3 py-2 text-small sm:col-span-2" />
+          <input value={eform.event_at} onChange={(e) => setEform({ ...eform, event_at: e.target.value })} type="datetime-local" required
+            className="rounded-xl border border-slate-200 px-3 py-2 text-small" />
+          <input value={eform.fee} onChange={(e) => setEform({ ...eform, fee: e.target.value })} placeholder="الرسوم (0=مجاناً)" inputMode="decimal" dir="ltr"
+            className="rounded-xl border border-slate-200 px-3 py-2 text-small" />
+          <input value={eform.capacity} onChange={(e) => setEform({ ...eform, capacity: e.target.value })} placeholder="السعة (فارغ=مفتوحة)" inputMode="numeric" dir="ltr"
+            className="rounded-xl border border-slate-200 px-3 py-2 text-small" />
+          <button className="btn-primary !py-2 text-small sm:col-span-5">إضافة فعالية</button>
+        </form>
+        {events.length > 0 && (
+          <ul className="space-y-2">
+            {events.map((v) => (
+              <li key={v.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 px-4 py-2.5 text-small">
+                <span><b>{v.title}</b> — {new Date(v.event_at).toLocaleString("ar-EG")} · {v.fee > 0 ? `${v.fee} ج` : "مجاناً"} · {counts[v.id] ?? 0} مسجل</span>
+                <span className={`text-xs font-bold ${v.active ? "text-success" : "text-slate-400"}`}>{v.active ? "نشطة" : "موقوفة"}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

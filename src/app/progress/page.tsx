@@ -429,6 +429,47 @@ function ComplaintsSection() {
   );
 }
 
+/** الفعاليات القادمة: تسجيل الطالب (+ فاتورة إن برسوم) */
+function EventsSection() {
+  type Ev = { id: string; title: string; event_at: string; fee: number; capacity: number };
+  const [events, setEvents] = useState<Ev[]>([]);
+  const [mine, setMine] = useState<string[]>([]);
+  const [msg, setMsg] = useState("");
+  async function load() {
+    try {
+      const r = await fetch("/api/events", { cache: "no-store" });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok && !j.isTeacher) { setEvents(j.events ?? []); setMine(j.mine ?? []); }
+    } catch {}
+  }
+  useEffect(() => { load(); }, []);
+  async function register(event_id: string, fee: number) {
+    if (!confirm(fee > 0 ? `التسجيل برسوم ${fee} ج؟ ستضاف فاتورة.` : "تأكيد التسجيل؟")) return;
+    const r = await fetch("/api/events", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event_id }),
+    });
+    const j = await r.json().catch(() => null);
+    if (r.ok && j?.ok) { setMsg("تم تسجيلك ✅"); load(); }
+    else setMsg(j?.error === "full" ? "اكتمل العدد." : j?.error === "already" ? "مسجل فيها." : "فشل التسجيل.");
+  }
+  if (!events.length) return null;
+  return (
+    <section className="card space-y-3 p-5">
+      <h2 className="font-bold">فعاليات قادمة 🎪</h2>
+      {msg && <div className="text-xs font-bold text-primary">{msg}</div>}
+      <ul className="space-y-2">
+        {events.slice(0, 5).map((v) => (
+          <li key={v.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 px-4 py-2.5 text-small">
+            <span><b>{v.title}</b> — {new Date(v.event_at).toLocaleString("ar-EG")} · {v.fee > 0 ? `${v.fee} ج` : "مجاناً"}</span>
+            {mine.includes(v.id) ? <span className="text-xs font-bold text-success">مسجل ✅</span> :
+              <button onClick={() => register(v.id, v.fee)} className="rounded-lg bg-primary px-3 py-1 text-xs font-bold text-white">سجلني</button>}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export default function ProgressPage() {
   const [data, setData] = useState<Progress | null>(null);
   const [err, setErr] = useState("");
@@ -521,6 +562,7 @@ export default function ProgressPage() {
       <AnnouncementsFeed />
       <StoreCatalog />
       <ComplaintsSection />
+      <EventsSection />
 
       <section className="card space-y-3 p-5">
         <h2 className="font-bold">نتائج الامتحانات 📝</h2>
