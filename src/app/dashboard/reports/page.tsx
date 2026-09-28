@@ -9,6 +9,40 @@ type T = { name: string; groups: number; students: number; collected: number };
 const fmt = (n: number) => `${Number(n).toLocaleString("ar-EG")} ج`;
 
 /** تقارير الربحية: فرع/مجموعة/مدرس — آخر 30 يوماً */
+/** ملخص آخر 7 أيام للمالك: طلاب جدد + إيراد + فواتير + واجبات + معلق */
+function WeeklySummary() {
+  type W = { new_students: number; revenue: number; invoices_issued: number; invoices_collected: number; homework_submitted: number; open_complaints: number; pending_refunds: number };
+  const [w, setW] = useState<W | null>(null);
+  useEffect(() => {
+    fetch("/api/reports/weekly", { cache: "no-store" }).then(async (r) => {
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) setW(j.week);
+    }).catch(() => {});
+  }, []);
+  if (!w) return null;
+  const cards: [string, string | number][] = [
+    ["طلاب جدد 🆕", w.new_students],
+    ["إيراد محصل 💰", `${w.revenue} ج`],
+    ["فواتير مصدرة 🧾", `${w.invoices_issued} ج`],
+    ["واجبات مسلمة 📝", w.homework_submitted],
+    ["شكاوى مفتوحة 📮", w.open_complaints],
+    ["استرداد معلق 💸", w.pending_refunds],
+  ];
+  return (
+    <section className="card space-y-3 p-5">
+      <h2 className="font-bold">ملخص آخر 7 أيام 📊</h2>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {cards.map(([label, val]) => (
+          <div key={label} className="rounded-xl bg-slate-50 px-4 py-3 text-center">
+            <div className="text-lg font-bold">{val}</div>
+            <div className="text-xs text-slate-500">{label}</div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default function ReportsPage() {
   const [data, setData] = useState<{ total: number; branches: B[]; groups: G[]; teachers: T[] } | null>(null);
   const [fc, setFc] = useState<{ collection: { monthlyAvg: number; overdue: number; collectible: number; forecast: number; history: { key: string; total: number }[] }; churn: { inactive14d: number; total: number } } | null>(null);
@@ -61,6 +95,7 @@ export default function ReportsPage() {
         </div>
       </header>
 
+      <WeeklySummary />
       {fc && (
         <section className="card grid gap-4 p-5 sm:grid-cols-2">
           <div className="rounded-xl bg-primary/5 p-4">
