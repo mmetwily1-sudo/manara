@@ -12,15 +12,20 @@ async function me() {
   return { admin, urow: urow as any };
 }
 
-/** GET /api/complaints — طالب: شكاواي | معلم: الكل مع الأسماء */
-export async function GET() {
+/** GET /api/complaints — طالب: شكاواي | معلم: الكل مع الأسماء + فلترة فئة/أولوية */
+export async function GET(req: Request) {
   const m = await me();
   if (!m) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
   const { admin, urow } = m;
   const isTeacher = urow.role !== "student";
-  let q = admin.from("complaints").select("id,student_id,kind,body,status,reply,created_at")
-    .eq("tenant_id", urow.tenant_id).order("created_at", { ascending: false }).limit(200);
+  const url = new URL(req.url);
+  const catFilter = url.searchParams.get("category") || "";
+  const priFilter = url.searchParams.get("priority") || "";
+  let q = admin.from("complaints").select("id,student_id,kind,body,status,reply,category,priority,created_at")
+    .eq("tenant_id", urow.tenant_id).order("priority", { ascending: true }).order("created_at", { ascending: false }).limit(200);
   if (!isTeacher) q = q.eq("student_id", urow.id);
+  if (catFilter) q = q.eq("category", catFilter);
+  if (priFilter) q = q.eq("priority", priFilter);
   const { data: rows, error } = await q;
   if (error) return dbFail("complaints-list", error);
   let names: Record<string, string> = {};
@@ -49,6 +54,7 @@ export async function POST(req: Request) {
   if (body.length < 5) return NextResponse.json({ ok: false, error: "too_short" }, { status: 400 });
   const { error } = await m.admin.from("complaints").insert({
     tenant_id: m.urow.tenant_id, student_id: m.urow.id, kind, body,
+    ...(await import("@/lib/triage").then((t) => t.triageComplaint(body, kind))),
   });
   if (error) return dbFail("complaint-create", error);
   return NextResponse.json({ ok: true });

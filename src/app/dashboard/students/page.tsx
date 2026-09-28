@@ -17,17 +17,21 @@ export default function StudentsPage() {
   const [importResult, setImportResult] = useState<{ imported: number; skipped: number; bad: string[] } | null>(null);
   const [transferFor, setTransferFor] = useState<string | null>(null);
   const [transferTo, setTransferTo] = useState("");
-  type Complaint = { id: string; student: string; kind: string; body: string; status: string; reply: string };
+  type Complaint = { id: string; student: string; kind: string; body: string; status: string; reply: string; category: string; priority: string };
   const [complaints, setComplaints] = useState<Complaint[] | null>(null);
   const [copen, setCopen] = useState(0);
   const [replies, setReplies] = useState<Record<string, string>>({});
+  const [cfilter, setCfilter] = useState({ category: "", priority: "" });
   type Alum = { id: string; name: string; grad_year: number; achievement: string; featured: boolean };
   const [alums, setAlums] = useState<Alum[] | null>(null);
   const [aform, setAform] = useState({ name: "", grad_year: String(new Date().getFullYear()), achievement: "", phone: "" });
 
   async function loadComplaints() {
     try {
-      const r = await fetch("/api/complaints", { cache: "no-store" });
+      const params = new URLSearchParams();
+      if (cfilter.category) params.set("category", cfilter.category);
+      if (cfilter.priority) params.set("priority", cfilter.priority);
+      const r = await fetch(`/api/complaints?${params.toString()}`, { cache: "no-store" });
       const j = await r.json().catch(() => null);
       if (r.ok && j?.ok && j.isTeacher) { setComplaints(j.rows ?? []); setCopen(j.open ?? 0); }
     } catch {}
@@ -269,6 +273,25 @@ export default function StudentsPage() {
       </section>
       <section className="card space-y-3 p-5">
         <h2 className="font-bold">شكاوى ومقترحات 📮 {copen > 0 && <span className="rounded-full bg-danger px-2 py-0.5 text-[11px] text-white">{copen} مفتوحة</span>}</h2>
+        <div className="flex gap-2">
+          <select value={cfilter.category} onChange={(e) => setCfilter({ ...cfilter, category: e.target.value })}
+            className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs">
+            <option value="">كل الفئات</option>
+            <option value="billing">مصاريف</option>
+            <option value="attendance">حضور</option>
+            <option value="exams">امتحانات</option>
+            <option value="teaching">تدريس</option>
+            <option value="suggestion">اقتراح</option>
+            <option value="general">عام</option>
+          </select>
+          <select value={cfilter.priority} onChange={(e) => setCfilter({ ...cfilter, priority: e.target.value })}
+            className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs">
+            <option value="">كل الأولويات</option>
+            <option value="high">🔥 عاجلة</option>
+            <option value="normal">عادية</option>
+          </select>
+          <button onClick={loadComplaints} className="btn-secondary !px-3 !py-1.5 text-xs">تصفية</button>
+        </div>
         {complaints === null ? <div className="text-xs text-slate-400">جاري التحميل...</div> :
           complaints.length === 0 ? <div className="text-xs text-slate-400">لا رسائل.</div> :
           <ul className="space-y-2">
@@ -276,6 +299,12 @@ export default function StudentsPage() {
               <li key={c.id} className="rounded-xl bg-slate-50 px-4 py-2.5 text-small">
                 <div className="flex justify-between gap-2">
                   <span className="font-bold">{c.student || "—"} {c.kind === "suggestion" ? "💡" : "😟"}</span>
+                  <span className="flex items-center gap-1">
+                    {c.priority === "high" && <span className="rounded-full bg-danger px-2 py-0.5 text-[10px] font-bold text-white">🔥 عاجلة</span>}
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
+                      {{ billing: "مصاريف", attendance: "حضور", exams: "امتحانات", teaching: "تدريس", suggestion: "اقتراح", general: "عام" }[c.category as string] ?? c.category}
+                    </span>
+                  </span>
                   <span className={`text-xs font-bold ${c.status === "resolved" ? "text-success" : "text-warning"}`}>
                     {c.status === "resolved" ? "تم الرد" : "مفتوحة"}
                   </span>
