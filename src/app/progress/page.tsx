@@ -470,6 +470,45 @@ function EventsSection() {
   );
 }
 
+/** بياناتي: تنزيل نسخة + حذف الحساب (بشرط لا ديون) */
+function MyDataSection() {
+  const [msg, setMsg] = useState("");
+  async function download() {
+    try {
+      const r = await fetch("/api/me/export", { cache: "no-store" });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) {
+        const blob = new Blob([JSON.stringify(j, null, 2)], { type: "application/json" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "my-data.json";
+        a.click();
+        URL.revokeObjectURL(a.href);
+      } else setMsg("تعذر التصدير.");
+    } catch { setMsg("تعذر الاتصال."); }
+  }
+  async function remove() {
+    const c = prompt('للحذف النهائي اكتب: احذف حسابي');
+    if (c === null) return;
+    const r = await fetch("/api/me/delete", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ confirm: c }),
+    });
+    const j = await r.json().catch(() => null);
+    if (r.ok && j?.ok) { alert("تم حذف حسابك."); window.location.href = "/login"; }
+    else setMsg(j?.error === "has_debt" ? "لديك فواتير غير مدفوعة — سددها أولاً." : "اكتب جملة التأكيد حرفياً.");
+  }
+  return (
+    <section className="card space-y-3 p-5">
+      <h2 className="font-bold">بياناتي 🗂️</h2>
+      <div className="flex flex-wrap gap-2">
+        <button onClick={download} className="btn-secondary text-small">تنزيل نسخة من بياناتي ⬇️</button>
+        <button onClick={remove} className="rounded-xl bg-danger/10 px-4 py-2 text-small font-bold text-danger">حذف حسابي 🗑️</button>
+      </div>
+      {msg && <div className="text-xs font-bold text-primary">{msg}</div>}
+    </section>
+  );
+}
+
 export default function ProgressPage() {
   const [data, setData] = useState<Progress | null>(null);
   const [err, setErr] = useState("");
@@ -563,6 +602,7 @@ export default function ProgressPage() {
       <StoreCatalog />
       <ComplaintsSection />
       <EventsSection />
+      <MyDataSection />
 
       <section className="card space-y-3 p-5">
         <h2 className="font-bold">نتائج الامتحانات 📝</h2>
