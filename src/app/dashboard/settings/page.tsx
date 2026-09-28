@@ -4,6 +4,7 @@ import { DevicesManager } from "@/components/DevicesManager";
 import { SecurityAlerts } from "@/components/SecurityAlerts";
 import { KeysManager } from "@/components/KeysManager";
 import { FeaturesManager } from "@/components/FeaturesManager";
+import { BrandingManager } from "@/components/BrandingManager";
 import { NotifyToggle, PayNumbersForm, VisionKeyForm, ThemeForm, SlugForm } from "@/components/NotifyToggle";
 import { PushSubscribeButton } from "@/components/PushSubscribeButton";
 import { getTenantInfoDB } from "@/lib/data";
@@ -92,6 +93,10 @@ export default async function SettingsPage() {
 
       <section className="card space-y-4 p-6">
         <FeaturesManager />
+      </section>
+
+      <section className="card space-y-4 p-6">
+        <BrandingManager />
       </section>
 
       <section className="card space-y-4 p-6">

@@ -56,12 +56,15 @@ export async function GET(req: Request) {
   const present = ((att ?? []) as any[]).filter((a) => a.status === "present").length;
   const absent = ((att ?? []) as any[]).filter((a) => a.status === "absent").length;
   const due = ((inv ?? []) as any[]).reduce((s, x) => s + Math.max(0, Number(x.amount ?? 0) - Number(x.paid ?? 0)), 0);
+  const { data: brand } = await admin.from("tenants").select("name,logo_url,primary_color,online_payment_enabled")
+    .eq("id", (sess as any).tenant_id).single();
   return NextResponse.json({
     ok: true,
+    branding: { name: (brand as any)?.name ?? "", logo_url: (brand as any)?.logo_url ?? null, primary_color: (brand as any)?.primary_color ?? "#1A73E8" },
     student: { name: (st as any).full_name, phone: (st as any).phone },
     attendance: { present, absent, total: present + absent },
     grades: (grades ?? []).map((g) => ({ exam: (g.exams as any)?.title, score: g.score, total: (g.exams as any)?.total_marks, at: g.submitted_at })),
     dues: (inv ?? []).map((x) => ({ period: x.period, amount: x.amount, paid: x.paid, due: Number(x.amount) - Number(x.paid), status: x.status, receipt: x.receipt_no })),
-    online_payment: { enabled: (await admin.from("tenants").select("online_payment_enabled").eq("id", (sess as any).tenant_id).single()).data?.online_payment_enabled },
+    online_payment: { enabled: (brand as any)?.online_payment_enabled ?? false },
   });
 }

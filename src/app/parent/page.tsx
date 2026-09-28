@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 type Data = {
+  branding: { name: string; logo_url: string | null; primary_color: string };
   student: { name: string; phone: string | null };
   attendance: { present: number; absent: number; total: number };
   grades: { exam: string; score: number; total: number | null; at: string }[];
@@ -45,7 +46,12 @@ export default function ParentPortal() {
   return (
     <main className="mx-auto max-w-md p-4 space-y-4" dir="rtl">
       <header className="text-center">
-        <h1 className="text-h1">بوابة ولي الأمر 👨‍👩‍👧</h1>
+        {data.branding?.logo_url && (
+          <img src={data.branding.logo_url} alt={data.branding.name} className="mx-auto mb-2 h-16 w-16 rounded-2xl object-cover" />
+        )}
+        <h1 className="text-h1" style={{ color: data.branding?.primary_color || undefined }}>
+          {data.branding?.name || "بوابة ولي الأمر"} 🎓
+        </h1>
         <p className="mt-2 text-sm text-slate-500">متابعة ابنك <b>{data.student.name}</b> لحظة بلحظة</p>
       </header>
 
