@@ -11,6 +11,28 @@ export default function PayrollPage() {
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [err, setErr] = useState("");
   const [edit, setEdit] = useState({ run: "", user: "", bonus: "", deduction: "", note: "" });
+  type Adv = { id: string; user_id: string; name: string; amount: number; reason: string };
+  const [advs, setAdvs] = useState<Adv[] | null>(null);
+  const [staffList, setStaffList] = useState<{ id: string; name: string }[]>([]);
+  const [aform, setAform] = useState({ user_id: "", amount: "", reason: "" });
+
+  async function loadAdvs() {
+    try {
+      const r = await fetch("/api/payroll/advances");
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) { setAdvs(j.advances); setStaffList(j.staff ?? []); }
+    } catch {}
+  }
+  useEffect(() => { loadAdvs(); }, []);
+
+  async function saveAdv(e: React.FormEvent) {
+    e.preventDefault();
+    const r = await fetch("/api/payroll/advances", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: aform.user_id, amount: Number(aform.amount), reason: aform.reason }),
+    });
+    if (r.ok) { setAform({ user_id: "", amount: "", reason: "" }); loadAdvs(); }
+  }
 
   async function load() {
     try {
@@ -67,6 +89,31 @@ export default function PayrollPage() {
           className="flex-1 rounded-xl border border-slate-200 px-4 py-2" dir="ltr" />
         <button className="btn-primary !py-2 text-small">توليد المسير</button>
       </form>
+      <section className="card space-y-3 p-5">
+        <h2 className="font-bold">السلف المعلقة 💸 <span className="text-xs font-normal text-slate-400">تخصم تلقائياً من المسير القادم</span></h2>
+        <form onSubmit={saveAdv} className="grid gap-2 sm:grid-cols-4">
+          <select value={aform.user_id} onChange={(e) => setAform({ ...aform, user_id: e.target.value })} required
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-small">
+            <option value="">الموظف...</option>
+            {staffList.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <input value={aform.amount} onChange={(e) => setAform({ ...aform, amount: e.target.value })} placeholder="المبلغ" required inputMode="decimal" dir="ltr"
+            className="rounded-xl border border-slate-200 px-4 py-2 text-small" />
+          <input value={aform.reason} onChange={(e) => setAform({ ...aform, reason: e.target.value })} placeholder="السبب" maxLength={200}
+            className="rounded-xl border border-slate-200 px-4 py-2 text-small" />
+          <button className="btn-primary !py-2 text-small">تسجيل سلفة</button>
+        </form>
+        {advs === null ? <div className="text-xs text-slate-400">جاري التحميل...</div> :
+          advs.length === 0 ? <div className="text-xs text-slate-400">لا سلف معلقة.</div> :
+          <ul className="divide-y divide-slate-100 text-small">
+            {advs.map((a) => (
+              <li key={a.id} className="flex items-center justify-between gap-2 py-1.5">
+                <span className="font-bold">{a.name}</span>
+                <span className="text-slate-500">{a.amount} ج {a.reason && `· ${a.reason}`}</span>
+              </li>
+            ))}
+          </ul>}
+      </section>
       {runs === null ? <div className="card p-6 text-center text-slate-400">جاري التحميل...</div> :
         runs.length === 0 ? <div className="card p-6 text-center text-small text-slate-500">لا مسيرات بعد.</div> :
         runs.map((run) => (

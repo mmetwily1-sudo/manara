@@ -49,15 +49,31 @@ export async function POST(req: Request) {
   const { data: contracts } = await admin.from("staff_contracts").select("user_id,salary_base")
     .eq("tenant_id", tid).eq("active", true).limit(500);
   if (!contracts?.length) return NextResponse.json({ ok: false, error: "no_contracts" }, { status: 400 });
+  const { data: advs } = await admin.from("staff_advances").select("id,user_id,amount")
+    .eq("tenant_id", tid).eq("status", "pending").limit(1000);
+  const advByUser: Record<string, { ids: string[]; total: number }> = {};
+  ((advs ?? []) as any[]).forEach((a) => {
+    const e = (advByUser[a.user_id] ??= { ids: [], total: 0 });
+    e.ids.push(a.id); e.total += Number(a.amount ?? 0);
+  });
   const { data: run, error: re } = await admin.from("payroll_runs")
     .insert({ tenant_id: tid, month }).select("id").single();
   if (re || !run) return dbFail("payroll-create", re);
-  const rows = (contracts as any[]).map((c) => ({
-    tenant_id: tid, run_id: (run as any).id, user_id: c.user_id,
-    base: Number(c.salary_base ?? 0), bonus: 0, deduction: 0, net: Number(c.salary_base ?? 0),
-  }));
+  const rows = (contracts as any[]).map((c) => {
+    const adv = advByUser[c.user_id]?.total ?? 0;
+    const base = Number(c.salary_base ?? 0);
+    return {
+      tenant_id: tid, run_id: (run as any).id, user_id: c.user_id,
+      base, bonus: 0, deduction: adv, net: base - adv,
+      note: adv > 0 ? `خصم سلفة: ${adv}` : "",
+    };
+  });
   const { error: ie } = await admin.from("payroll_items").insert(rows);
   if (ie) return dbFail("payroll-items", ie);
+  const usedIds = Object.values(advByUser).flatMap((e) => e.ids);
+  if (usedIds.length) {
+    await admin.from("staff_advances").update({ status: "deducted" }).in("id", usedIds).eq("tenant_id", tid);
+  }
   return NextResponse.json({ ok: true, id: (run as any).id });
 }
 
