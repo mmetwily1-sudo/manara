@@ -134,6 +134,9 @@ export default function InvoicesPage() {
   type Sch = { id: string; student_id: string; student: string; pct: number; reason: string; active: boolean };
   const [schs, setSchs] = useState<Sch[] | null>(null);
   const [schStudents, setSchStudents] = useState<{ id: string; name: string }[]>([]);
+  type Stmt = { id: string; stmt_date: string; amount: number; reference: string; status: string; suggestions: { id: string; student: string; period: string; rest: number }[] };
+  const [stmts, setStmts] = useState<Stmt[] | null>(null);
+  const [bform, setBform] = useState({ stmt_date: "", amount: "", reference: "" });
   const [sform, setSform] = useState({ student_id: "", pct: "", reason: "" });
 
   async function loadCoupons() {
@@ -181,7 +184,31 @@ export default function InvoicesPage() {
     if (r.ok) loadSchs();
   }
 
-  useEffect(() => { load(); loadCoupons(); loadSchs(); }, []);
+  async function loadBank() {
+    try {
+      const r = await fetch("/api/bank");
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) setStmts(j.rows);
+    } catch {}
+  }
+
+  async function saveStmt(e: React.FormEvent) {
+    e.preventDefault();
+    const r = await fetch("/api/bank", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ stmt_date: bform.stmt_date, amount: Number(bform.amount), reference: bform.reference }),
+    });
+    if (r.ok) { setBform({ stmt_date: "", amount: "", reference: "" }); loadBank(); }
+  }
+
+  async function matchStmt(id: string, invoice_id: string | null) {
+    const r = await fetch("/api/bank", {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, invoice_id }),
+    });
+    if (r.ok) loadBank();
+  }
+
+  useEffect(() => { load(); loadCoupons(); loadSchs(); loadBank(); }, []);
 
   async function onIssue() {
     if (!confirm(`إصدار فواتير الشهر الحالي لكل التسجيلات النشطة؟${couponCode.trim() ? ` (بكوبون ${couponCode.trim().toUpperCase()})` : ""}`)) return;
@@ -265,6 +292,42 @@ export default function InvoicesPage() {
                   className={`text-xs font-bold ${s.active ? "text-danger" : "text-success"}`}>
                   {s.active ? "إيقاف" : "تفعيل"}
                 </button>
+              </li>
+            ))}
+          </ul>}
+      </section>
+      <section className="card space-y-3 p-5">
+        <h2 className="font-bold">المطابقة البنكية 🏦 <span className="text-xs font-normal text-slate-400">اربط حركات الكشف بالفواتير</span></h2>
+        <form onSubmit={saveStmt} className="grid gap-2 sm:grid-cols-4">
+          <input value={bform.stmt_date} onChange={(e) => setBform({ ...bform, stmt_date: e.target.value })} type="date" required
+            className="rounded-xl border border-slate-200 px-4 py-2 text-small" />
+          <input value={bform.amount} onChange={(e) => setBform({ ...bform, amount: e.target.value })} placeholder="المبلغ" required inputMode="decimal" dir="ltr"
+            className="rounded-xl border border-slate-200 px-4 py-2 text-small" />
+          <input value={bform.reference} onChange={(e) => setBform({ ...bform, reference: e.target.value })} placeholder="مرجع (اختياري)" maxLength={120}
+            className="rounded-xl border border-slate-200 px-4 py-2 text-small" />
+          <button className="btn-primary !py-2 text-small">إضافة حركة</button>
+        </form>
+        {stmts === null ? <div className="text-xs text-slate-400">جاري التحميل...</div> :
+          stmts.length === 0 ? <div className="text-xs text-slate-400">لا حركات بعد.</div> :
+          <ul className="divide-y divide-slate-100 text-small">
+            {stmts.slice(0, 30).map((s) => (
+              <li key={s.id} className="py-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span><b dir="ltr">{s.amount}</b> · {s.stmt_date} {s.reference && <span className="text-xs text-slate-400">({s.reference})</span>}</span>
+                  {s.status === "matched"
+                    ? <button onClick={() => matchStmt(s.id, null)} className="text-xs font-bold text-slate-400">فك الربط</button>
+                    : <span className="text-xs font-bold text-warning">غير مطابقة</span>}
+                </div>
+                {s.status !== "matched" && s.suggestions.length > 0 && (
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    {s.suggestions.map((g) => (
+                      <button key={g.id} onClick={() => matchStmt(s.id, g.id)}
+                        className="rounded-lg bg-primary-light px-2 py-1 text-[11px] font-bold text-primary">
+                        ربط: {g.student} · {g.period} · {g.rest} ✅
+                      </button>
+                    ))}
+                  </div>
+                )}
               </li>
             ))}
           </ul>}
