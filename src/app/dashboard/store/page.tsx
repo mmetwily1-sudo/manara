@@ -6,6 +6,121 @@ type Product = { id: string; title: string; description: string | null; price: n
 type PosLine = { product_id: string; qty: number };
 type Order = { id: string; status: string; created_at: string; student_name: string; products: { title: string; price: number } };
 
+type Reward = { id: string; title: string; cost_points: number; stock: number; active: boolean };
+type Redemption = { id: string; title: string; student: string; status: string; created_at: string };
+
+/** متجر النقاط: استبدال الرصيد بمكافآت (طالب) + إدارة وتسليم (معلم) */
+function PointsSection() {
+  const [isTeacher, setIsTeacher] = useState(false);
+  const [balance, setBalance] = useState(0);
+  const [rewards, setRewards] = useState<Reward[]>([]);
+  const [reds, setReds] = useState<Redemption[]>([]);
+  const [mine, setMine] = useState<{ id: string; reward_id: string; status: string }[]>([]);
+  const [form, setForm] = useState({ title: "", cost: "", stock: "" });
+  const [msg, setMsg] = useState("");
+
+  async function load() {
+    try {
+      const r = await fetch("/api/points/rewards", { cache: "no-store" });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) {
+        setIsTeacher(!!j.isTeacher); setBalance(j.balance ?? 0);
+        setRewards(j.rewards ?? []); setReds(j.redemptions ?? []); setMine(j.mine ?? []);
+      }
+    } catch {}
+  }
+  useEffect(() => { load(); }, []);
+
+  async function create(e: React.FormEvent) {
+    e.preventDefault();
+    const r = await fetch("/api/points/rewards", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: form.title, cost_points: Number(form.cost), stock: form.stock === "" ? -1 : Number(form.stock) }),
+    });
+    if (r.ok) { setForm({ title: "", cost: "", stock: "" }); load(); }
+  }
+
+  async function redeem(reward_id: string) {
+    if (!confirm("استبدال نقاطك بهذه المكافأة؟")) return;
+    const r = await fetch("/api/points/rewards", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reward_id }),
+    });
+    const j = await r.json().catch(() => null);
+    if (r.ok && j?.ok) { setMsg(`تم! رصيدك الآن ${j.balance} نقطة.`); load(); }
+    else setMsg(j?.error === "no_balance" ? "رصيدك لا يكفي." : j?.error === "out_of_stock" ? "نفدت الكمية." : "فشل الاستبدال.");
+  }
+
+  async function deliver(redemption_id: string) {
+    const r = await fetch("/api/points/rewards", {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ redemption_id }),
+    });
+    if (r.ok) load();
+  }
+
+  return (
+    <section className="card space-y-3 p-5">
+      <div className="flex items-center justify-between">
+        <h2 className="font-bold">متجر النقاط 🎁</h2>
+        {!isTeacher && <span className="rounded-full bg-warning/10 px-3 py-1 text-xs font-bold text-warning">رصيدك: {balance} نقطة</span>}
+      </div>
+      {msg && <div className="text-xs font-bold text-primary">{msg}</div>}
+      <ul className="space-y-2">
+        {rewards.map((w) => (
+          <li key={w.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 px-4 py-2.5 text-small">
+            <span><b>{w.title}</b> — {w.cost_points} نقطة {w.stock >= 0 && <span className="text-xs text-slate-400">(متبقي {w.stock})</span>}</span>
+            {!isTeacher ? (
+              <button onClick={() => redeem(w.id)} disabled={balance < w.cost_points}
+                className="rounded-lg bg-warning px-3 py-1 text-xs font-bold text-white disabled:opacity-40">استبدال</button>
+            ) : (
+              <span className={`text-xs font-bold ${w.active ? "text-success" : "text-slate-400"}`}>{w.active ? "نشطة" : "موقوفة"}</span>
+            )}
+          </li>
+        ))}
+        {rewards.length === 0 && <li className="text-xs text-slate-400">لا مكافآت بعد.</li>}
+      </ul>
+      {isTeacher && (
+        <>
+          <form onSubmit={create} className="grid gap-2 sm:grid-cols-4">
+            <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="المكافأة" required maxLength={120}
+              className="rounded-xl border border-slate-200 px-3 py-2 text-small" />
+            <input value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} placeholder="التكلفة (نقاط)" required inputMode="numeric" dir="ltr"
+              className="rounded-xl border border-slate-200 px-3 py-2 text-small" />
+            <input value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} placeholder="الكمية (فارغ=غير محدود)" inputMode="numeric" dir="ltr"
+              className="rounded-xl border border-slate-200 px-3 py-2 text-small" />
+            <button className="btn-primary !py-2 text-small">إضافة</button>
+          </form>
+          {reds.length > 0 && (
+            <ul className="space-y-1.5">
+              <h3 className="text-small font-bold">طلبات الاستبدال ({reds.filter((r) => r.status === "pending").length} معلقة)</h3>
+              {reds.slice(0, 20).map((r) => (
+                <li key={r.id} className="flex items-center justify-between gap-2 text-small">
+                  <span><b>{r.student}</b> — {r.title}</span>
+                  {r.status === "pending" ? (
+                    <button onClick={() => deliver(r.id)} className="rounded-lg bg-success px-3 py-1 text-xs font-bold text-white">تسليم ✅</button>
+                  ) : <span className="text-xs font-bold text-success">تم التسليم</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+      {!isTeacher && mine.length > 0 && (
+        <ul className="space-y-1 text-small">
+          <h3 className="font-bold">استبدالاتي</h3>
+          {mine.slice(0, 10).map((m) => (
+            <li key={m.id} className="flex justify-between gap-2">
+              <span>{rewards.find((w) => w.id === m.reward_id)?.title ?? ""}</span>
+              <span className={`text-xs font-bold ${m.status === "delivered" ? "text-success" : "text-warning"}`}>
+                {m.status === "delivered" ? "تم التسليم" : "قيد التسليم"}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 export default function StorePage() {
   const [prods, setProds] = useState<Product[] | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -202,6 +317,7 @@ export default function StorePage() {
         </div>
       </section>
 
+      <PointsSection />
       {orders.length > 0 && (
         <section className="card space-y-2 p-5">
           <h2 className="font-bold">الطلبات ({orders.filter((o) => o.status === "pending").length} بانتظار التأكيد)</h2>
