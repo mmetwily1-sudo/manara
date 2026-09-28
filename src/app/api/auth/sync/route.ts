@@ -101,6 +101,12 @@ async function trackDevice(admin: any, urow: { id: string; tenant_id: string }):
     await admin.from("login_devices").insert({
       tenant_id: urow.tenant_id, user_id: urow.id, device_label: label, ip_hash: ipHash,
     });
+    // دخول غريب: جهاز/IP جديد → تنبيه أمني لصاحبه والمالك
+    try {
+      await admin.from("security_alerts").insert({
+        tenant_id: urow.tenant_id, user_id: urow.id, label: `دخول جديد: ${label}`,
+      });
+    } catch {}
     try {
       await admin.from("audit_log").insert({
         tenant_id: urow.tenant_id, actor_id: urow.id,
