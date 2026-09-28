@@ -15,13 +15,13 @@ async function ctx() {
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const c = await ctx();
   if (!c) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
-  const { data: th } = await c.admin.from("threads").select("id,group_id,locked")
+  const { data: th } = await c.admin.from("threads").select("id,group_id,locked,pinned,category")
     .eq("id", params.id).eq("tenant_id", c.urow.tenant_id).eq("ttype", "discussion").single();
   if (!th) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
   const { data: msgs } = await c.admin.from("messages").select("id,body,sender_id,created_at,users(full_name)")
     .eq("thread_id", params.id).is("deleted_at", null).order("created_at", { ascending: true }).limit(200);
   return NextResponse.json({
-    ok: true, locked: !!(th as any).locked,
+    ok: true, locked: !!(th as any).locked, pinned: !!(th as any).pinned, category: (th as any).category ?? "general",
     messages: ((msgs ?? []) as any[]).map((m) => ({
       id: m.id, body: m.body, sender: (m.users as any)?.full_name ?? "", mine: m.sender_id === c.urow.id,
       created_at: m.created_at,
@@ -48,7 +48,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   return NextResponse.json({ ok: true });
 }
 
-/** PATCH /api/forum/[id] {action:"lock"|"unlock"|"delete_msg", message_id?} — إشراف المعلم */
+/** PATCH /api/forum/[id] {action:"lock"|"unlock"|"pin"|"unpin"|"delete_msg"|"move", message_id?, target_category?} — إشراف المعلم */
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   const c = await ctx();
   if (!c) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
@@ -58,9 +58,17 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     await c.admin.from("threads").update({ locked: b.action === "lock" }).eq("id", params.id).eq("tenant_id", c.urow.tenant_id);
     return NextResponse.json({ ok: true });
   }
+  if (b?.action === "pin" || b?.action === "unpin") {
+    await c.admin.from("threads").update({ pinned: b.action === "pin" }).eq("id", params.id).eq("tenant_id", c.urow.tenant_id);
+    return NextResponse.json({ ok: true });
+  }
   if (b?.action === "delete_msg" && b?.message_id) {
     await c.admin.from("messages").update({ deleted_at: new Date().toISOString() })
       .eq("id", b.message_id).eq("tenant_id", c.urow.tenant_id);
+    return NextResponse.json({ ok: true });
+  }
+  if (b?.action === "move" && b?.target_category) {
+    await c.admin.from("threads").update({ category: b.target_category }).eq("id", params.id).eq("tenant_id", c.urow.tenant_id);
     return NextResponse.json({ ok: true });
   }
   return NextResponse.json({ ok: false, error: "bad_action" }, { status: 400 });
