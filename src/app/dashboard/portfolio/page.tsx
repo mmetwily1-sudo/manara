@@ -41,8 +41,8 @@ export default function PortfolioPage() {
     }).catch(() => {});
   }
 
-  const [beh, setBeh] = useState<{ notes: { id: string; kind: string; text: string; created_at: string }[]; negatives: number; level: string | null; suspended_until: string | null } | null>(null);
-  const [note, setNote] = useState({ kind: "negative", text: "" });
+  const [beh, setBeh] = useState<{ notes: { id: string; kind: string; text: string; points: number; created_at: string }[]; negatives: number; level: string | null; suspended_until: string | null } | null>(null);
+  const [note, setNote] = useState({ kind: "negative", text: "", points: "" });
   const [susUntil, setSusUntil] = useState("");
 
   async function loadBeh(id: string) {
@@ -60,7 +60,7 @@ export default function PortfolioPage() {
       const r = await fetch(`/api/students/${sid}/behavior`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(note),
       });
-      if (r.ok) { setNote({ kind: "negative", text: "" }); loadBeh(sid); }
+      if (r.ok) { setNote({ kind: "negative", text: "", points: "" }); loadBeh(sid); }
     } catch {}
   }
 
@@ -155,12 +155,20 @@ export default function PortfolioPage() {
                 <option value="positive">إيجابية 👍</option>
               </select>
               <input value={note.text} onChange={(e) => setNote({ ...note, text: e.target.value })} maxLength={500}
-                placeholder="نص الملاحظة..." className="flex-1 rounded-xl border border-slate-200 px-4 py-2 text-small" />
+                placeholder="نص الملاحظة السلوكية..." className="flex-1 rounded-xl border border-slate-200 px-4 py-2 text-small" />
+              <input value={note.points} onChange={(e) => setNote({ ...note, points: e.target.value })} placeholder="±نقاط" inputMode="numeric" dir="ltr"
+                title="نقاط تضاف/تخصم من رصيد الطالب (-20..20، فارغ=تلقائي)"
+                className="w-24 rounded-xl border border-slate-200 px-3 py-2 text-small" />
               <button className="btn-secondary !px-4 !py-2 text-xs">تسجيل</button>
             </form>
             {(beh?.notes ?? []).slice(0, 8).map((n) => (
               <div key={n.id} className="rounded-xl bg-slate-50 px-4 py-2 text-small">
                 <span>{n.kind === "positive" ? "👍" : "👎"}</span> {n.text}
+                {(n.points ?? 0) !== 0 && (
+                  <span className={`mx-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${n.points > 0 ? "bg-success/10 text-success" : "bg-danger/10 text-danger"}`} dir="ltr">
+                    {n.points > 0 ? `+${n.points}` : n.points}
+                  </span>
+                )}
                 <span className="mx-2 text-xs text-slate-400">{String(n.created_at ?? "").slice(0, 10)}</span>
               </div>
             ))}
