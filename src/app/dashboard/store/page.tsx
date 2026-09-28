@@ -197,6 +197,93 @@ function BundlesSection() {
   );
 }
 
+type LibItem = { id: string; title: string; subject: string; price: number; active: boolean };
+
+/** المكتبة المدفوعة: شراء يفتح المحتوى الرقمي (طالب) + إدارة (معلم) */
+function LibrarySection() {
+  const [isTeacher, setIsTeacher] = useState(false);
+  const [items, setItems] = useState<LibItem[]>([]);
+  const [owned, setOwned] = useState<string[]>([]);
+  const [contents, setContents] = useState<Record<string, string>>({});
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [open, setOpen] = useState<string | null>(null);
+  const [form, setForm] = useState({ title: "", subject: "", price: "", content: "" });
+  const [msg, setMsg] = useState("");
+
+  async function load() {
+    try {
+      const r = await fetch("/api/library", { cache: "no-store" });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) {
+        setIsTeacher(!!j.isTeacher); setItems(j.items ?? []);
+        setOwned(j.owned ?? []); setContents(j.contents ?? {}); setCounts(j.counts ?? {});
+      }
+    } catch {}
+  }
+  useEffect(() => { load(); }, []);
+
+  async function create(e: React.FormEvent) {
+    e.preventDefault();
+    const r = await fetch("/api/library", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form),
+    });
+    if (r.ok) { setForm({ title: "", subject: "", price: "", content: "" }); load(); }
+  }
+
+  async function buy(item_id: string, price: number) {
+    if (!confirm(price > 0 ? `الشراء بـ${price} ج؟ ستضاف فاتورة ويفتح المحتوى.` : "فتح المحتوى؟")) return;
+    const r = await fetch("/api/library", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ item_id }),
+    });
+    const j = await r.json().catch(() => null);
+    if (r.ok && j?.ok) { setMsg("تم ✅ — المحتوى مفتوح لك الآن."); load(); }
+    else setMsg(j?.error === "already" ? "اشتريتها من قبل." : "فشل الشراء.");
+  }
+
+  return (
+    <section className="card space-y-3 p-5">
+      <h2 className="font-bold">المكتبة المدفوعة 📚</h2>
+      {msg && <div className="text-xs font-bold text-primary">{msg}</div>}
+      <ul className="space-y-2">
+        {items.map((t) => (
+          <li key={t.id} className="rounded-xl bg-slate-50 px-4 py-2.5 text-small">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span><b>{t.title}</b> {t.subject && <span className="text-xs text-slate-400">({t.subject})</span>} — {t.price > 0 ? `${t.price} ج` : "مجاناً"}
+                {isTeacher && <span className="text-xs text-slate-400"> · {counts[t.id] ?? 0} مشترٍ</span>}</span>
+              {!isTeacher ? (
+                owned.includes(t.id) ? (
+                  <button onClick={() => setOpen(open === t.id ? null : t.id)} className="rounded-lg bg-success px-3 py-1 text-xs font-bold text-white">
+                    {open === t.id ? "إخفاء" : "قراءة 📖"}
+                  </button>
+                ) : <button onClick={() => buy(t.id, t.price)} className="rounded-lg bg-primary px-3 py-1 text-xs font-bold text-white">شراء</button>
+              ) : (
+                <span className={`text-xs font-bold ${t.active ? "text-success" : "text-slate-400"}`}>{t.active ? "نشط" : "موقوف"}</span>
+              )}
+            </div>
+            {!isTeacher && open === t.id && owned.includes(t.id) && (
+              <div dir="auto" className="mt-2 whitespace-pre-wrap rounded-lg bg-white p-3 text-small">{contents[t.id] || "—"}</div>
+            )}
+          </li>
+        ))}
+        {items.length === 0 && <li className="text-xs text-slate-400">لا عناصر بعد.</li>}
+      </ul>
+      {isTeacher && (
+        <form onSubmit={create} className="grid gap-2 sm:grid-cols-4">
+          <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="العنوان" required maxLength={150}
+            className="rounded-xl border border-slate-200 px-3 py-2 text-small" />
+          <input value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} placeholder="المادة" maxLength={80}
+            className="rounded-xl border border-slate-200 px-3 py-2 text-small" />
+          <input value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="السعر (0=مجاناً)" inputMode="decimal" dir="ltr"
+            className="rounded-xl border border-slate-200 px-3 py-2 text-small" />
+          <textarea value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} placeholder="المحتوى..." rows={2} maxLength={20000}
+            className="rounded-xl border border-slate-200 px-3 py-2 text-small sm:col-span-4" />
+          <button className="btn-primary !py-2 text-small sm:col-span-4">نشر في المكتبة</button>
+        </form>
+      )}
+    </section>
+  );
+}
+
 export default function StorePage() {
   const [prods, setProds] = useState<Product[] | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -395,6 +482,7 @@ export default function StorePage() {
 
       <PointsSection />
       <BundlesSection />
+      <LibrarySection />
       {orders.length > 0 && (
         <section className="card space-y-2 p-5">
           <h2 className="font-bold">الطلبات ({orders.filter((o) => o.status === "pending").length} بانتظار التأكيد)</h2>
