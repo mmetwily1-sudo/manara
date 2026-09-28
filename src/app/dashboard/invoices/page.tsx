@@ -131,6 +131,10 @@ export default function InvoicesPage() {
   const [coupons, setCoupons] = useState<{ id: string; code: string; pct: number; max_uses: number; used: number; expires_at: string | null; is_active: boolean }[] | null>(null);
   const [cform, setCform] = useState({ code: "", pct: "", max_uses: "100", expires_at: "" });
   const [couponCode, setCouponCode] = useState("");
+  type Sch = { id: string; student_id: string; student: string; pct: number; reason: string; active: boolean };
+  const [schs, setSchs] = useState<Sch[] | null>(null);
+  const [schStudents, setSchStudents] = useState<{ id: string; name: string }[]>([]);
+  const [sform, setSform] = useState({ student_id: "", pct: "", reason: "" });
 
   async function loadCoupons() {
     try {
@@ -148,7 +152,36 @@ export default function InvoicesPage() {
       else setErr("تعذر التحميل.");
     } catch { setErr("تعذر الاتصال."); }
   }
-  useEffect(() => { load(); loadCoupons(); }, []);
+  async function loadSchs() {
+    try {
+      const r = await fetch("/api/scholarships");
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) setSchs(j.rows);
+    } catch {}
+    try {
+      const r = await fetch("/api/students");
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) setSchStudents((j.students ?? []).map((s: any) => ({ id: s.id, name: s.name ?? s.full_name ?? "" })));
+    } catch {}
+  }
+
+  async function saveSch(e: React.FormEvent) {
+    e.preventDefault();
+    const r = await fetch("/api/scholarships", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ student_id: sform.student_id, pct: Number(sform.pct), reason: sform.reason }),
+    });
+    if (r.ok) { setSform({ student_id: "", pct: "", reason: "" }); loadSchs(); }
+  }
+
+  async function toggleSch(id: string, active: boolean) {
+    const r = await fetch("/api/scholarships", {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, active }),
+    });
+    if (r.ok) loadSchs();
+  }
+
+  useEffect(() => { load(); loadCoupons(); loadSchs(); }, []);
 
   async function onIssue() {
     if (!confirm(`إصدار فواتير الشهر الحالي لكل التسجيلات النشطة؟${couponCode.trim() ? ` (بكوبون ${couponCode.trim().toUpperCase()})` : ""}`)) return;
@@ -208,6 +241,34 @@ export default function InvoicesPage() {
       </header>
       {err && <div className="card border-danger/20 bg-danger/5 p-4 text-small font-bold text-danger">{err}</div>}
 
+      <section className="card space-y-3 p-5">
+        <h2 className="font-bold">المنح الدراسية 🎓 <span className="text-xs font-normal text-slate-400">خصم دائم يطبق تلقائياً عند الإصدار</span></h2>
+        <form onSubmit={saveSch} className="grid gap-2 sm:grid-cols-4">
+          <select value={sform.student_id} onChange={(e) => setSform({ ...sform, student_id: e.target.value })} required
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-small">
+            <option value="">الطالب...</option>
+            {schStudents.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <input value={sform.pct} onChange={(e) => setSform({ ...sform, pct: e.target.value })} placeholder="الخصم %" required inputMode="numeric" dir="ltr"
+            className="rounded-xl border border-slate-200 px-4 py-2 text-small" />
+          <input value={sform.reason} onChange={(e) => setSform({ ...sform, reason: e.target.value })} placeholder="السبب (تفوق/ظروف...)" maxLength={200}
+            className="rounded-xl border border-slate-200 px-4 py-2 text-small" />
+          <button className="btn-primary !py-2 text-small">حفظ المنحة</button>
+        </form>
+        {schs === null ? <div className="text-xs text-slate-400">جاري التحميل...</div> :
+          schs.length === 0 ? <div className="text-xs text-slate-400">لا منح بعد.</div> :
+          <ul className="divide-y divide-slate-100 text-small">
+            {schs.map((s) => (
+              <li key={s.id} className="flex items-center justify-between gap-2 py-1.5">
+                <span><b>{s.student}</b> — خصم {s.pct}% {s.reason && <span className="text-xs text-slate-400">({s.reason})</span>}</span>
+                <button onClick={() => toggleSch(s.id, !s.active)}
+                  className={`text-xs font-bold ${s.active ? "text-danger" : "text-success"}`}>
+                  {s.active ? "إيقاف" : "تفعيل"}
+                </button>
+              </li>
+            ))}
+          </ul>}
+      </section>
       <section className="grid grid-cols-3 gap-4">
         {[
           ["إجمالي الفواتير", total, "primary"],

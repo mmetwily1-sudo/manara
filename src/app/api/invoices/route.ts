@@ -96,12 +96,17 @@ export async function POST(req: Request) {
     const { data: enr } = await admin.from("enrollments")
       .select("student_id,group_id,special_price,groups(monthly_fee)")
       .eq("tenant_id", tid).eq("status", "active").limit(2000);
+    const { data: schs } = await admin.from("scholarships").select("student_id,pct")
+      .eq("tenant_id", tid).eq("active", true).limit(2000);
+    const schMap: Record<string, number> = {};
+    ((schs ?? []) as any[]).forEach((s) => { schMap[s.student_id] = Number(s.pct ?? 0); });
     const rows = (enr ?? [])
       .map((e: any) => {
         const base = Number(e.special_price ?? e.groups?.monthly_fee ?? 0);
+        const eff = Math.max(pct, schMap[e.student_id] ?? 0);
         return {
           tenant_id: tid, student_id: e.student_id, group_id: e.group_id, period,
-          amount: pct > 0 ? Math.max(1, Math.round(base * (100 - pct) / 100)) : base,
+          amount: eff > 0 ? Math.max(1, Math.round(base * (100 - eff) / 100)) : base,
         };
       })
       .filter((r: any) => r.student_id && r.amount > 0);
