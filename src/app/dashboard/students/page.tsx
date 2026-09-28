@@ -34,6 +34,14 @@ export default function StudentsPage() {
   }
   useEffect(() => { loadComplaints(); }, []);
 
+  async function suggestReply(id: string) {
+    try {
+      const r = await fetch(`/api/complaints/suggest?id=${id}`, { cache: "no-store" });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) setReplies({ ...replies, [id]: j.suggestion });
+    } catch {}
+  }
+
   async function resolveComplaint(id: string) {
     const reply = (replies[id] ?? "").trim();
     if (reply.length < 2) return;
@@ -278,6 +286,7 @@ export default function StudentsPage() {
                     <input value={replies[c.id] ?? ""} onChange={(e) => setReplies({ ...replies, [c.id]: e.target.value })}
                       placeholder="اكتب الرد..." maxLength={1000}
                       className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-small" />
+                    <button onClick={() => suggestReply(c.id)} title="اقتراح رد تلقائي" className="rounded-lg bg-primary-light px-3 py-1.5 text-xs font-bold text-primary">✨</button>
                     <button onClick={() => resolveComplaint(c.id)} className="rounded-lg bg-success px-3 py-1.5 text-xs font-bold text-white">رد وإغلاق</button>
                   </div>
                 ) : c.reply ? <div dir="auto" className="mt-1 text-xs text-slate-500">ردك: {c.reply}</div> : null}
