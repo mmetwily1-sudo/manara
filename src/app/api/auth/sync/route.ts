@@ -86,6 +86,15 @@ async function trackDevice(admin: any, urow: { id: string; tenant_id: string }):
     const { data: prev } = await admin.from("login_devices").select("id,revoked")
       .eq("tenant_id", urow.tenant_id).eq("user_id", urow.id).eq("ip_hash", ipHash).eq("device_label", label).limit(1).single();
     if (prev) {
+      if ((prev as any).revoked) {
+        // جهاز منتهي يحاول الدخول: إنهاء جلساته فوراً
+        try {
+          const { data: au } = await admin.from("users").select("auth_user_id").eq("id", urow.id).single();
+          const auid = (au as any)?.auth_user_id as string | undefined;
+          if (auid) await admin.auth.admin.signOut(auid);
+        } catch {}
+        return false;
+      }
       await admin.from("login_devices").update({ last_seen: new Date().toISOString() }).eq("id", (prev as any).id);
       return false;
     }
