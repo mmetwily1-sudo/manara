@@ -15,6 +15,9 @@ export default function StaffPage() {
   const [bName, setBName] = useState("");
   const [form, setForm] = useState({ email: "", password: "", name: "", phone: "", role: "assistant", branch: "" });
   const [busy, setBusy] = useState(false);
+  type Contract = { id: string; user_id: string; name: string; salary_base: number; kind: string; kind_label: string; start_date: string; end_date: string | null };
+  const [contracts, setContracts] = useState<Contract[] | null>(null);
+  const [cform, setCform] = useState({ user_id: "", salary_base: "", kind: "monthly" });
 
   async function load() {
     try {
@@ -57,6 +60,37 @@ export default function StaffPage() {
       } else setErr(j?.error === "auth_failed" ? "البريد مسجل مسبقاً أو البيانات ناقصة." : "فشل الدعوة: " + (j?.error ?? ""));
     } catch { setErr("تعذر الاتصال."); }
     finally { setBusy(false); }
+  }
+
+  async function loadContracts() {
+    try {
+      const r = await fetch("/api/staff/contracts");
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) setContracts(j.contracts);
+    } catch {}
+  }
+  useEffect(() => { loadContracts(); }, []);
+
+  async function saveContract(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      const r = await fetch("/api/staff/contracts", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: cform.user_id, salary_base: Number(cform.salary_base), kind: cform.kind }),
+      });
+      if (r.ok) { setCform({ user_id: "", salary_base: "", kind: "monthly" }); loadContracts(); }
+      else setErr("تعذر حفظ العقد.");
+    } catch { setErr("تعذر الاتصال."); }
+  }
+
+  async function endContract(id: string) {
+    if (!confirm("إنهاء هذا العقد؟")) return;
+    try {
+      const r = await fetch("/api/staff/contracts", {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }),
+      });
+      if (r.ok) loadContracts();
+    } catch {}
   }
 
   async function remove(id: string, name: string) {
@@ -164,6 +198,39 @@ export default function StaffPage() {
             ))}
           </tbody>
         </table>
+      </section>
+      <section className="card space-y-3 p-5">
+        <h2 className="font-bold">عقود الموظفين 📄</h2>
+        <form onSubmit={saveContract} className="grid gap-2 sm:grid-cols-4">
+          <select value={cform.user_id} onChange={(e) => setCform({ ...cform, user_id: e.target.value })} required
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-small">
+            <option value="">اختر الموظف...</option>
+            {staff.filter((s) => !s.is_owner && s.role !== "teacher_admin").map((s) => (
+              <option key={s.id} value={s.id}>{s.name} — {s.role_label}</option>
+            ))}
+          </select>
+          <input value={cform.salary_base} onChange={(e) => setCform({ ...cform, salary_base: e.target.value })}
+            placeholder="الراتب الأساسي" required inputMode="decimal" dir="ltr"
+            className="rounded-xl border border-slate-200 px-4 py-2 text-small" />
+          <select value={cform.kind} onChange={(e) => setCform({ ...cform, kind: e.target.value })}
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-small">
+            <option value="monthly">شهري</option>
+            <option value="per_session">بالحصة</option>
+            <option value="commission">عمولة</option>
+          </select>
+          <button className="btn-primary !py-2 text-small">حفظ العقد</button>
+        </form>
+        {contracts === null ? <div className="text-xs text-slate-400">جاري التحميل...</div> :
+          contracts.length === 0 ? <div className="text-xs text-slate-400">لا عقود نشطة.</div> :
+          <ul className="divide-y divide-slate-100 text-small">
+            {contracts.map((c) => (
+              <li key={c.id} className="flex items-center justify-between gap-2 py-2">
+                <span className="font-bold">{c.name}</span>
+                <span className="text-slate-500">{c.salary_base} ج · {c.kind_label}</span>
+                <button onClick={() => endContract(c.id)} className="text-xs font-bold text-danger">إنهاء</button>
+              </li>
+            ))}
+          </ul>}
       </section>
     </div>
   );
