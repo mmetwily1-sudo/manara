@@ -68,6 +68,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   }
   const period = curPeriod();
+  const { featureOn } = await import("@/lib/features");
+  if (!(await featureOn(admin, tid, "bundles"))) {
+    return NextResponse.json({ ok: false, error: "feature_disabled" }, { status: 403 });
+  }
   const { data: bun } = await admin.from("bundles").select("id,price,active")
     .eq("id", b?.bundle_id).eq("tenant_id", tid).single();
   if (!bun || !(bun as any).active) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });

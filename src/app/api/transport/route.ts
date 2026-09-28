@@ -72,6 +72,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   }
   if (!isTeacher && b?.action === "subscribe") {
+    const { featureOn } = await import("@/lib/features");
+    if (!(await featureOn(admin, tid, "transport"))) {
+      return NextResponse.json({ ok: false, error: "feature_disabled" }, { status: 403 });
+    }
     const period = curPeriod();
     const { data: rt } = await admin.from("transport_routes").select("id,fee,active")
       .eq("id", b?.route_id).eq("tenant_id", tid).single();

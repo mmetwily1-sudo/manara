@@ -74,6 +74,10 @@ export async function POST(req: Request) {
   const { data: it } = await admin.from("library_items").select("id,price,active")
     .eq("id", b?.item_id).eq("tenant_id", tid).single();
   if (!it || !(it as any).active) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
+  const { featureOn } = await import("@/lib/features");
+  if (!(await featureOn(admin, tid, "library"))) {
+    return NextResponse.json({ ok: false, error: "feature_disabled" }, { status: 403 });
+  }
   const { data: dup } = await admin.from("library_purchases").select("id")
     .eq("tenant_id", tid).eq("item_id", (it as any).id).eq("student_id", urow.id).single();
   if (dup) return NextResponse.json({ ok: false, error: "already" }, { status: 400 });

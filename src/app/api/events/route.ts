@@ -70,6 +70,12 @@ export async function POST(req: Request) {
   const { data: ev } = await admin.from("events").select("id,fee,capacity,active")
     .eq("id", b?.event_id).eq("tenant_id", tid).single();
   if (!ev || !(ev as any).active) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
+  if (!isTeacher) {
+    const { featureOn } = await import("@/lib/features");
+    if (!(await featureOn(admin, tid, "events"))) {
+      return NextResponse.json({ ok: false, error: "feature_disabled" }, { status: 403 });
+    }
+  }
   const { data: dup } = await admin.from("event_regs").select("id")
     .eq("tenant_id", tid).eq("event_id", (ev as any).id).eq("student_id", urow.id).single();
   if (dup) return NextResponse.json({ ok: false, error: "already" }, { status: 400 });

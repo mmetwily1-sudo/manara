@@ -51,6 +51,10 @@ export async function POST(req: Request) {
   const m = await me();
   if (!m) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
   if (m.urow.role !== "student") return NextResponse.json({ ok: false, error: "students_only" }, { status: 403 });
+  const { featureOn } = await import("@/lib/features");
+  if (!(await featureOn(m.admin, m.urow.tenant_id, "shipments"))) {
+    return NextResponse.json({ ok: false, error: "feature_disabled" }, { status: 403 });
+  }
   const b = await req.json().catch(() => ({} as any));
   if (!String(b?.governorate ?? "").trim() || !String(b?.address ?? "").trim() || !String(b?.items ?? "").trim()) {
     return NextResponse.json({ ok: false, error: "bad_input" }, { status: 400 });
