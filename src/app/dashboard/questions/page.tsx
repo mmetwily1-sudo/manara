@@ -6,6 +6,54 @@ import LessonLinker from "@/components/LessonLinker";
 
 type Q = { id: string; subject: string; lesson: string | null; difficulty: number; qtype: string; body: string; marks: number };
 
+type PackQ = { id: string; subject: string; lesson: string; difficulty: number; qtype: string; body: string; options: any; marks: number };
+
+/** حزمة مراجعة ليلة الامتحان: عينة متوازنة + طباعة */
+function ReviewPack() {
+  const [subjects, setSubjects] = useState<string[]>([]);
+  const [subject, setSubject] = useState("");
+  const [count, setCount] = useState("20");
+  const [pack, setPack] = useState<PackQ[]>([]);
+  const [busy, setBusy] = useState(false);
+  async function gen() {
+    setBusy(true);
+    try {
+      const r = await fetch(`/api/questions/review-pack?subject=${encodeURIComponent(subject)}&count=${count}`, { cache: "no-store" });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) { setPack(j.pack ?? []); setSubjects(j.subjects ?? []); }
+    } catch {}
+    finally { setBusy(false); }
+  }
+  return (
+    <section className="card space-y-3 p-5">
+      <h2 className="font-bold">مراجعة ليلة الامتحان 🌙</h2>
+      <div className="flex flex-wrap gap-2">
+        <select value={subject} onChange={(e) => setSubject(e.target.value)}
+          className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-small">
+          <option value="">كل المواد</option>
+          {subjects.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <select value={count} onChange={(e) => setCount(e.target.value)}
+          className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-small">
+            {[10, 20, 30, 50].map((n) => <option key={n} value={n}>{n} سؤالاً</option>)}
+        </select>
+        <button onClick={gen} disabled={busy} className="btn-primary !py-2 text-small disabled:opacity-50">{busy ? "جاري..." : "توليد الحزمة"}</button>
+        {pack.length > 0 && <button onClick={() => window.print()} className="btn-secondary !py-2 text-small">طباعة 🖨️</button>}
+      </div>
+      {pack.length > 0 && (
+        <ol className="list-decimal space-y-2 pr-5 text-small">
+          {pack.map((q, i) => (
+            <li key={q.id} dir="auto">
+              {q.body}
+              <span className="text-xs text-slate-400"> ({q.marks}°)</span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
 export default function QuestionsPage() {
   const [qs, setQs] = useState<Q[] | null>(null);
   const [filter, setFilter] = useState({ subject: "", difficulty: "" });
@@ -595,6 +643,7 @@ export default function QuestionsPage() {
         ))}
       </ul>
       )}
+      <ReviewPack />
     </div>
   );
 }
