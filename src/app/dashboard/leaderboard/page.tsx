@@ -113,6 +113,65 @@ function HwContest() {
   );
 }
 
+/** تنافس الفروع الشهري بالنقاط + منح نقاط (مالك) */
+function BranchContest() {
+  const [rows, setRows] = useState<{ id: string; name: string; points: number }[] | null>(null);
+  const [isOwner, setIsOwner] = useState(false);
+  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [form, setForm] = useState({ branch_id: "", points: "", reason: "" });
+  async function load(m: string) {
+    try {
+      const r = await fetch(`/api/branches/contest?month=${m}`);
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) { setRows(j.rows); setIsOwner(!!j.isOwner); }
+    } catch {}
+  }
+  useEffect(() => { load(month); }, [month]);
+  async function award(e: React.FormEvent) {
+    e.preventDefault();
+    const r = await fetch("/api/branches/contest", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ branch_id: form.branch_id, month, points: Number(form.points), reason: form.reason }),
+    });
+    if (r.ok) { setForm({ branch_id: "", points: "", reason: "" }); load(month); }
+  }
+  if (!rows || !rows.length) return null;
+  const max = Math.max(1, ...rows.map((r) => r.points));
+  return (
+    <section className="card space-y-2 p-5">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="font-bold">تنافس الفروع 🏆</h2>
+        <input value={month} onChange={(e) => setMonth(e.target.value)} type="month"
+          className="rounded-xl border border-slate-200 px-3 py-1 text-xs" dir="ltr" />
+      </div>
+      {rows.map((r, i) => (
+        <div key={r.id} className="flex items-center gap-2 text-small">
+          <span className="w-8 text-center">{i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `#${i + 1}`}</span>
+          <span className="w-32 truncate font-bold">{r.name}</span>
+          <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100" dir="ltr">
+            <div className={`h-full rounded-full ${i === 0 ? "bg-warning" : "bg-primary"}`} style={{ width: `${Math.round((r.points / max) * 100)}%` }} />
+          </div>
+          <span className="text-xs font-bold">{r.points} نقطة</span>
+        </div>
+      ))}
+      {isOwner && rows && (
+        <form onSubmit={award} className="grid gap-2 rounded-xl bg-slate-50 p-3 sm:grid-cols-4">
+          <select value={form.branch_id} onChange={(e) => setForm({ ...form, branch_id: e.target.value })} required
+            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs">
+            <option value="">الفرع...</option>
+            {rows.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+          </select>
+          <input value={form.points} onChange={(e) => setForm({ ...form, points: e.target.value })} placeholder="النقاط" required inputMode="numeric" dir="ltr"
+            className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs" />
+          <input value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} placeholder="السبب" maxLength={200}
+            className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs" />
+          <button className="btn-primary !py-1.5 text-xs">منح 🏅</button>
+        </form>
+      )}
+    </section>
+  );
+}
+
 /** لوحة منافسة المجموعات — أسماء مخفاة تلقائياً */
 export default function LeaderboardPage() {
   const [groups, setGroups] = useState<{ id: string; name: string }[]>([]);
@@ -208,6 +267,7 @@ export default function LeaderboardPage() {
       <BattleSection groups={groups} />
       <OlympicsSection />
       <HwContest />
+      <BranchContest />
 
       <section className="card space-y-3 p-5">
         <div className="flex items-center justify-between">
