@@ -361,6 +361,81 @@ function ShipmentsSection() {
   );
 }
 
+type AuditRow = { id: string; title: string; system_qty: number; counted_qty: number; diff: number; applied: boolean; note: string };
+
+/** الجرد الدوري: عد فعلي + فرق عجز/فائض + تطبيق على المخزون (معلم) */
+function AuditSection() {
+  const [allowed, setAllowed] = useState(false);
+  const [products, setProducts] = useState<{ id: string; title: string; stock_qty: number }[]>([]);
+  const [rows, setRows] = useState<AuditRow[]>([]);
+  const [form, setForm] = useState({ product_id: "", counted: "", note: "" });
+  const [msg, setMsg] = useState("");
+
+  async function load() {
+    try {
+      const r = await fetch("/api/store/audit", { cache: "no-store" });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) { setAllowed(true); setProducts(j.products ?? []); setRows(j.rows ?? []); }
+    } catch {}
+  }
+  useEffect(() => { load(); }, []);
+
+  async function count(e: React.FormEvent) {
+    e.preventDefault();
+    const r = await fetch("/api/store/audit", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ product_id: form.product_id, counted_qty: Number(form.counted), note: form.note }),
+    });
+    const j = await r.json().catch(() => null);
+    if (r.ok && j?.ok) {
+      setMsg(j.diff === 0 ? "مطابق ✅" : j.diff > 0 ? `فائض ${j.diff} 📈` : `عجز ${-j.diff} 📉`);
+      setForm({ product_id: "", counted: "", note: "" }); load();
+    }
+  }
+
+  async function apply(id: string) {
+    if (!confirm("تطبيق العد على المخزون؟")) return;
+    const r = await fetch("/api/store/audit", {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }),
+    });
+    if (r.ok) load();
+  }
+
+  if (!allowed) return null;
+  return (
+    <section className="card space-y-3 p-5">
+      <h2 className="font-bold">الجرد الدوري 🧮</h2>
+      {msg && <div className="text-xs font-bold text-primary">{msg}</div>}
+      <form onSubmit={count} className="grid gap-2 sm:grid-cols-4">
+        <select value={form.product_id} onChange={(e) => setForm({ ...form, product_id: e.target.value })} required
+          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-small">
+          <option value="">الصنف...</option>
+          {products.map((p) => <option key={p.id} value={p.id}>{p.title} (نظام: {p.stock_qty ?? 0})</option>)}
+        </select>
+        <input value={form.counted} onChange={(e) => setForm({ ...form, counted: e.target.value })} placeholder="العد الفعلي" required inputMode="numeric" dir="ltr"
+          className="rounded-xl border border-slate-200 px-3 py-2 text-small" />
+        <input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="ملاحظة" maxLength={200}
+          className="rounded-xl border border-slate-200 px-3 py-2 text-small" />
+        <button className="btn-primary !py-2 text-small">تسجيل العد</button>
+      </form>
+      {rows.length > 0 && (
+        <ul className="divide-y divide-slate-100 text-small">
+          {rows.slice(0, 20).map((a) => (
+            <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5">
+              <span><b>{a.title}</b> — نظام {a.system_qty} · فعلي {a.counted_qty} ·
+                <span className={`font-bold ${a.diff === 0 ? "text-success" : a.diff > 0 ? "text-primary" : "text-danger"}`}>
+                  {a.diff === 0 ? " مطابق" : a.diff > 0 ? ` فائض ${a.diff}` : ` عجز ${-a.diff}`}
+                </span></span>
+              {a.applied ? <span className="text-xs text-slate-400">مطبق ✅</span> :
+                <button onClick={() => apply(a.id)} className="rounded-lg bg-warning px-3 py-1 text-xs font-bold text-white">تطبيق</button>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 export default function StorePage() {
   const [prods, setProds] = useState<Product[] | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -561,6 +636,7 @@ export default function StorePage() {
       <BundlesSection />
       <LibrarySection />
       <ShipmentsSection />
+      <AuditSection />
       {orders.length > 0 && (
         <section className="card space-y-2 p-5">
           <h2 className="font-bold">الطلبات ({orders.filter((o) => o.status === "pending").length} بانتظار التأكيد)</h2>
