@@ -21,6 +21,9 @@ export default function StudentsPage() {
   const [complaints, setComplaints] = useState<Complaint[] | null>(null);
   const [copen, setCopen] = useState(0);
   const [replies, setReplies] = useState<Record<string, string>>({});
+  type Alum = { id: string; name: string; grad_year: number; achievement: string; featured: boolean };
+  const [alums, setAlums] = useState<Alum[] | null>(null);
+  const [aform, setAform] = useState({ name: "", grad_year: String(new Date().getFullYear()), achievement: "", phone: "" });
 
   async function loadComplaints() {
     try {
@@ -38,6 +41,30 @@ export default function StudentsPage() {
       method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, reply }),
     });
     if (r.ok) { setReplies({ ...replies, [id]: "" }); loadComplaints(); }
+  }
+
+  async function loadAlums() {
+    try {
+      const r = await fetch("/api/alumni", { cache: "no-store" });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) setAlums(j.rows ?? []);
+    } catch {}
+  }
+  useEffect(() => { loadAlums(); }, []);
+
+  async function saveAlum(e: React.FormEvent) {
+    e.preventDefault();
+    const r = await fetch("/api/alumni", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(aform),
+    });
+    if (r.ok) { setAform({ name: "", grad_year: String(new Date().getFullYear()), achievement: "", phone: "" }); loadAlums(); }
+  }
+
+  async function featureAlum(id: string, featured: boolean) {
+    const r = await fetch("/api/alumni", {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, featured }),
+    });
+    if (r.ok) loadAlums();
   }
 
   async function onTransfer(id: string) {
@@ -254,6 +281,32 @@ export default function StudentsPage() {
                     <button onClick={() => resolveComplaint(c.id)} className="rounded-lg bg-success px-3 py-1.5 text-xs font-bold text-white">رد وإغلاق</button>
                   </div>
                 ) : c.reply ? <div dir="auto" className="mt-1 text-xs text-slate-500">ردك: {c.reply}</div> : null}
+              </li>
+            ))}
+          </ul>}
+      </section>
+      <section className="card space-y-3 p-5">
+        <h2 className="font-bold">الخريجون 🎓</h2>
+        <form onSubmit={saveAlum} className="grid gap-2 sm:grid-cols-4">
+          <input value={aform.name} onChange={(e) => setAform({ ...aform, name: e.target.value })} placeholder="الاسم" required maxLength={80}
+            className="rounded-xl border border-slate-200 px-4 py-2 text-small" />
+          <input value={aform.grad_year} onChange={(e) => setAform({ ...aform, grad_year: e.target.value })} placeholder="سنة التخرج" required inputMode="numeric" dir="ltr"
+            className="rounded-xl border border-slate-200 px-4 py-2 text-small" />
+          <input value={aform.achievement} onChange={(e) => setAform({ ...aform, achievement: e.target.value })} placeholder="الإنجاز (كلية/مجموع...)" maxLength={500}
+            className="rounded-xl border border-slate-200 px-4 py-2 text-small sm:col-span-2" />
+          <button className="btn-primary !py-2 text-small sm:col-span-4">تسجيل خريج</button>
+        </form>
+        {alums === null ? <div className="text-xs text-slate-400">جاري التحميل...</div> :
+          alums.length === 0 ? <div className="text-xs text-slate-400">لا خريجين مسجلين.</div> :
+          <ul className="divide-y divide-slate-100 text-small">
+            {alums.slice(0, 30).map((a) => (
+              <li key={a.id} className="flex items-center justify-between gap-2 py-1.5">
+                <span><b>{a.name}</b> <span className="text-xs text-slate-400">دفعة {a.grad_year}</span>
+                  {a.achievement && <span className="block text-xs text-slate-500" dir="auto">{a.achievement}</span>}</span>
+                <button onClick={() => featureAlum(a.id, !a.featured)}
+                  className={`text-xs font-bold ${a.featured ? "text-warning" : "text-slate-400"}`}>
+                  {a.featured ? "⭐ مميز" : "تمييز"}
+                </button>
               </li>
             ))}
           </ul>}
