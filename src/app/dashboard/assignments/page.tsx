@@ -46,6 +46,26 @@ export default function AssignmentsPage() {
     } catch { setErr("تعذر الاتصال."); }
     finally { setReminding(""); }
   }
+  const [remedialGroup, setRemedialGroup] = useState("");
+  const [remedialBusy, setRemedialBusy] = useState(false);
+
+  async function onRemedial() {
+    if (!remedialGroup) return;
+    setRemedialBusy(true);
+    try {
+      const r = await fetch("/api/assignments/auto-remedial", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ group_id: remedialGroup }),
+      });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) {
+        setOkMsg(j.created ? `خطة علاجية 🩹 لـ: ${(j.at_risk ?? []).join("، ")}` : "لا متعثرين في هذه المجموعة ✅");
+        load();
+      } else setErr("فشل التوليد.");
+    } catch { setErr("تعذر الاتصال."); }
+    finally { setRemedialBusy(false); }
+  }
+
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [okMsg, setOkMsg] = useState("");
@@ -131,6 +151,18 @@ export default function AssignmentsPage() {
 
       {err && <div className="card border-danger/20 bg-danger/5 p-4 text-small font-bold text-danger">{err}</div>}
       {okMsg && <div className="card border-success/30 bg-success/5 p-4 text-small font-bold text-success">{okMsg}</div>}
+
+      <div className="card flex flex-wrap items-center gap-2 p-4">
+        <span className="text-small font-bold">خطة علاجية تلقائية 🩹</span>
+        <select value={remedialGroup} onChange={(e) => setRemedialGroup(e.target.value)}
+          className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2 text-small">
+          <option value="">المجموعة...</option>
+          {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+        </select>
+        <button onClick={onRemedial} disabled={remedialBusy || !remedialGroup} className="btn-secondary text-small disabled:opacity-50">
+          {remedialBusy ? "جاري..." : "توليد للمتعثرين"}
+        </button>
+      </div>
 
       <form onSubmit={onCreate} className="card grid gap-3 p-5 sm:grid-cols-2">
         <select value={form.group_id} onChange={(e) => setForm({ ...form, group_id: e.target.value })} required
