@@ -5,6 +5,67 @@ import { useEffect, useState } from "react";
 type C = { id: string; org_name: string; contact: string; value: number; start_date: string | null; end_date: string | null; notes: string; status: string };
 
 /** عقود المدارس والشركات B2B — شريحة مؤسسية */
+type QB = { id: string; school_name: string; contact: string; subject: string; price: number; status: string; status_label: string; access_until: string | null };
+
+/** بيع بنك الأسئلة للمدارس: طلب + تفعيل حتى تاريخ */
+function QbOrders() {
+  const [rows, setRows] = useState<QB[]>([]);
+  const [form, setForm] = useState({ school_name: "", contact: "", subject: "", price: "" });
+  async function load() {
+    try {
+      const r = await fetch("/api/b2b/qb-orders", { cache: "no-store" });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) setRows(j.rows ?? []);
+    } catch {}
+  }
+  useEffect(() => { load(); }, []);
+  async function create(e: React.FormEvent) {
+    e.preventDefault();
+    const r = await fetch("/api/b2b/qb-orders", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...form, price: Number(form.price || 0) }),
+    });
+    if (r.ok) { setForm({ school_name: "", contact: "", subject: "", price: "" }); load(); }
+  }
+  async function setStatus(id: string, status: string) {
+    const r = await fetch("/api/b2b/qb-orders", {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, status }),
+    });
+    if (r.ok) load();
+  }
+  return (
+    <section className="card space-y-3 p-5">
+      <h2 className="font-bold">بيع بنك الأسئلة 🏫</h2>
+      <form onSubmit={create} className="grid gap-2 sm:grid-cols-5">
+        <input value={form.school_name} onChange={(e) => setForm({ ...form, school_name: e.target.value })} placeholder="المدرسة" required maxLength={150}
+          className="rounded-xl border border-slate-200 px-3 py-2 text-small" />
+        <input value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} placeholder="جهة التواصل" maxLength={100}
+          className="rounded-xl border border-slate-200 px-3 py-2 text-small" />
+        <input value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} placeholder="المادة" maxLength={80}
+          className="rounded-xl border border-slate-200 px-3 py-2 text-small" />
+        <input value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="السعر" inputMode="decimal" dir="ltr"
+          className="rounded-xl border border-slate-200 px-3 py-2 text-small" />
+        <button className="btn-primary !py-2 text-small">طلب جديد</button>
+      </form>
+      {rows.length > 0 && (
+        <ul className="divide-y divide-slate-100 text-small">
+          {rows.map((o) => (
+            <li key={o.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+              <span><b>{o.school_name}</b> {o.subject && <span className="text-xs text-slate-400">({o.subject})</span>} — {o.price} ج ·
+                <span className={`text-xs font-bold ${o.status === "active" ? "text-success" : o.status === "expired" ? "text-slate-400" : "text-warning"}`}> {o.status_label}</span>
+                {o.access_until && <span className="text-xs text-slate-400"> حتى {o.access_until}</span>}</span>
+              <span className="flex gap-2">
+                {o.status === "pending" && <button onClick={() => setStatus(o.id, "active")} className="text-xs font-bold text-success">تفعيل سنة ✅</button>}
+                {o.status === "active" && <button onClick={() => setStatus(o.id, "expired")} className="text-xs font-bold text-danger">إنهاء</button>}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 export default function B2bPage() {
   const [list, setList] = useState<C[] | null>(null);
   const [form, setForm] = useState({ org_name: "", contact: "", value: "", start_date: "", end_date: "", notes: "" });
@@ -89,6 +150,7 @@ export default function B2bPage() {
         ))}
         {(list ?? []).length === 0 && <div className="card p-8 text-center text-small text-slate-500">لا عقود بعد.</div>}
       </ul>
+      <QbOrders />
     </div>
   );
 }
