@@ -17,6 +17,28 @@ export default function StudentsPage() {
   const [importResult, setImportResult] = useState<{ imported: number; skipped: number; bad: string[] } | null>(null);
   const [transferFor, setTransferFor] = useState<string | null>(null);
   const [transferTo, setTransferTo] = useState("");
+  type Complaint = { id: string; student: string; kind: string; body: string; status: string; reply: string };
+  const [complaints, setComplaints] = useState<Complaint[] | null>(null);
+  const [copen, setCopen] = useState(0);
+  const [replies, setReplies] = useState<Record<string, string>>({});
+
+  async function loadComplaints() {
+    try {
+      const r = await fetch("/api/complaints", { cache: "no-store" });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok && j.isTeacher) { setComplaints(j.rows ?? []); setCopen(j.open ?? 0); }
+    } catch {}
+  }
+  useEffect(() => { loadComplaints(); }, []);
+
+  async function resolveComplaint(id: string) {
+    const reply = (replies[id] ?? "").trim();
+    if (reply.length < 2) return;
+    const r = await fetch("/api/complaints", {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, reply }),
+    });
+    if (r.ok) { setReplies({ ...replies, [id]: "" }); loadComplaints(); }
+  }
 
   async function onTransfer(id: string) {
     if (!transferTo) return;
@@ -209,6 +231,32 @@ export default function StudentsPage() {
             </tbody>
           </table>
         )}
+      </section>
+      <section className="card space-y-3 p-5">
+        <h2 className="font-bold">شكاوى ومقترحات 📮 {copen > 0 && <span className="rounded-full bg-danger px-2 py-0.5 text-[11px] text-white">{copen} مفتوحة</span>}</h2>
+        {complaints === null ? <div className="text-xs text-slate-400">جاري التحميل...</div> :
+          complaints.length === 0 ? <div className="text-xs text-slate-400">لا رسائل.</div> :
+          <ul className="space-y-2">
+            {complaints.slice(0, 20).map((c) => (
+              <li key={c.id} className="rounded-xl bg-slate-50 px-4 py-2.5 text-small">
+                <div className="flex justify-between gap-2">
+                  <span className="font-bold">{c.student || "—"} {c.kind === "suggestion" ? "💡" : "😟"}</span>
+                  <span className={`text-xs font-bold ${c.status === "resolved" ? "text-success" : "text-warning"}`}>
+                    {c.status === "resolved" ? "تم الرد" : "مفتوحة"}
+                  </span>
+                </div>
+                <div dir="auto" className="mt-1">{c.body}</div>
+                {c.status === "open" ? (
+                  <div className="mt-2 flex gap-2">
+                    <input value={replies[c.id] ?? ""} onChange={(e) => setReplies({ ...replies, [c.id]: e.target.value })}
+                      placeholder="اكتب الرد..." maxLength={1000}
+                      className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-small" />
+                    <button onClick={() => resolveComplaint(c.id)} className="rounded-lg bg-success px-3 py-1.5 text-xs font-bold text-white">رد وإغلاق</button>
+                  </div>
+                ) : c.reply ? <div dir="auto" className="mt-1 text-xs text-slate-500">ردك: {c.reply}</div> : null}
+              </li>
+            ))}
+          </ul>}
       </section>
     </div>
   );

@@ -371,6 +371,64 @@ function HomeworkSection() {
   );
 }
 
+/** الشكاوى والمقترحات: إرسال للطالب + متابعة الرد */
+function ComplaintsSection() {
+  type Row = { id: string; kind: string; body: string; status: string; reply: string };
+  const [rows, setRows] = useState<Row[]>([]);
+  const [kind, setKind] = useState("complaint");
+  const [body, setBody] = useState("");
+  const [msg, setMsg] = useState("");
+  async function load() {
+    try {
+      const r = await fetch("/api/complaints", { cache: "no-store" });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok && !j.isTeacher) setRows(j.rows ?? []);
+    } catch {}
+  }
+  useEffect(() => { load(); }, []);
+  async function send(e: React.FormEvent) {
+    e.preventDefault();
+    const r = await fetch("/api/complaints", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind, body }),
+    });
+    const j = await r.json().catch(() => null);
+    if (r.ok && j?.ok) { setBody(""); setMsg("وصلتنا رسالتك ✅"); load(); }
+    else setMsg(j?.error === "too_short" ? "اكتب تفاصيل أكثر." : "فشل الإرسال.");
+  }
+  return (
+    <section className="card space-y-3 p-5">
+      <h2 className="font-bold">شكاوى ومقترحات 📮</h2>
+      <form onSubmit={send} className="space-y-2">
+        <select value={kind} onChange={(e) => setKind(e.target.value)}
+          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-small">
+          <option value="complaint">شكوى 😟</option>
+          <option value="suggestion">اقتراح 💡</option>
+        </select>
+        <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={2} maxLength={1000}
+          placeholder="احكِ لنا..." className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-small" />
+        <button className="btn-primary !py-2 text-small">إرسال</button>
+      </form>
+      {msg && <div className="text-xs font-bold text-primary">{msg}</div>}
+      {rows.length > 0 && (
+        <ul className="space-y-2">
+          {rows.slice(0, 5).map((c) => (
+            <li key={c.id} className="rounded-xl bg-slate-50 px-4 py-2.5 text-small">
+              <div className="flex justify-between gap-2">
+                <span>{c.kind === "suggestion" ? "💡" : "😟"}</span>
+                <span className={`text-xs font-bold ${c.status === "resolved" ? "text-success" : "text-warning"}`}>
+                  {c.status === "resolved" ? "تم الرد" : "قيد المراجعة"}
+                </span>
+              </div>
+              <div dir="auto" className="mt-1">{c.body}</div>
+              {c.reply && <div dir="auto" className="mt-1 rounded-lg bg-success/10 px-3 py-1.5 text-xs">رد الإدارة: {c.reply}</div>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 export default function ProgressPage() {
   const [data, setData] = useState<Progress | null>(null);
   const [err, setErr] = useState("");
@@ -462,6 +520,7 @@ export default function ProgressPage() {
       <GamificationSection />
       <AnnouncementsFeed />
       <StoreCatalog />
+      <ComplaintsSection />
 
       <section className="card space-y-3 p-5">
         <h2 className="font-bold">نتائج الامتحانات 📝</h2>
