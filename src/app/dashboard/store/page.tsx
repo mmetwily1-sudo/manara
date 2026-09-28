@@ -284,6 +284,83 @@ function LibrarySection() {
   );
 }
 
+type Shipment = { id: string; student: string; governorate: string; address: string; items: string; fee: number; status: string; status_label: string };
+
+/** شحن المحافظات: طلب الطالب + شحن برسوم/فاتورة + تسليم */
+function ShipmentsSection() {
+  const [isTeacher, setIsTeacher] = useState(false);
+  const [rows, setRows] = useState<Shipment[]>([]);
+  const [form, setForm] = useState({ governorate: "", address: "", items: "" });
+  const [fees, setFees] = useState<Record<string, string>>({});
+  const [msg, setMsg] = useState("");
+
+  async function load() {
+    try {
+      const r = await fetch("/api/shipments", { cache: "no-store" });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) { setIsTeacher(!!j.isTeacher); setRows(j.rows ?? []); }
+    } catch {}
+  }
+  useEffect(() => { load(); }, []);
+
+  async function create(e: React.FormEvent) {
+    e.preventDefault();
+    const r = await fetch("/api/shipments", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form),
+    });
+    if (r.ok) { setForm({ governorate: "", address: "", items: "" }); setMsg("تم استلام طلبك ✅"); load(); }
+  }
+
+  async function act(id: string, action: string) {
+    const r = await fetch("/api/shipments", {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, action, fee: Number(fees[id] || 0) }),
+    });
+    if (r.ok) load();
+  }
+
+  return (
+    <section className="card space-y-3 p-5">
+      <h2 className="font-bold">شحن المحافظات 🚚</h2>
+      {msg && <div className="text-xs font-bold text-primary">{msg}</div>}
+      {!isTeacher && (
+        <form onSubmit={create} className="grid gap-2 sm:grid-cols-3">
+          <input value={form.governorate} onChange={(e) => setForm({ ...form, governorate: e.target.value })} placeholder="المحافظة" required maxLength={60}
+            className="rounded-xl border border-slate-200 px-3 py-2 text-small" />
+          <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="العنوان بالتفصيل" required maxLength={300}
+            className="rounded-xl border border-slate-200 px-3 py-2 text-small" />
+          <input value={form.items} onChange={(e) => setForm({ ...form, items: e.target.value })} placeholder="المطلوب شحنه (مذكرات...)" required maxLength={500}
+            className="rounded-xl border border-slate-200 px-3 py-2 text-small" />
+          <button className="btn-primary !py-2 text-small sm:col-span-3">طلب الشحن</button>
+        </form>
+      )}
+      {rows.length > 0 && (
+        <ul className="space-y-2">
+          {rows.slice(0, 30).map((s) => (
+            <li key={s.id} className="rounded-xl bg-slate-50 px-4 py-2.5 text-small">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span>{isTeacher && <b>{s.student} — </b>}{s.governorate} · <span dir="auto">{s.items}</span></span>
+                <span className={`text-xs font-bold ${s.status === "delivered" ? "text-success" : s.status === "shipped" ? "text-primary" : "text-warning"}`}>{s.status_label}</span>
+              </div>
+              <div dir="auto" className="mt-1 text-xs text-slate-500">{s.address} {s.fee > 0 && `· رسوم ${s.fee} ج`}</div>
+              {isTeacher && s.status === "pending" && (
+                <div className="mt-2 flex gap-2">
+                  <input value={fees[s.id] ?? ""} onChange={(e) => setFees({ ...fees, [s.id]: e.target.value })} placeholder="رسوم الشحن (0=مجاناً)" inputMode="decimal" dir="ltr"
+                    className="w-40 rounded-lg border border-slate-200 px-3 py-1.5 text-xs" />
+                  <button onClick={() => act(s.id, "ship")} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white">شحن 🚚</button>
+                </div>
+              )}
+              {isTeacher && s.status === "shipped" && (
+                <button onClick={() => act(s.id, "deliver")} className="mt-2 rounded-lg bg-success px-3 py-1.5 text-xs font-bold text-white">تأكيد الاستلام</button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 export default function StorePage() {
   const [prods, setProds] = useState<Product[] | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -483,6 +560,7 @@ export default function StorePage() {
       <PointsSection />
       <BundlesSection />
       <LibrarySection />
+      <ShipmentsSection />
       {orders.length > 0 && (
         <section className="card space-y-2 p-5">
           <h2 className="font-bold">الطلبات ({orders.filter((o) => o.status === "pending").length} بانتظار التأكيد)</h2>
