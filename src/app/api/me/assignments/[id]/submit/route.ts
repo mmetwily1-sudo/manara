@@ -21,7 +21,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const sid = (urow as any).id;
 
   const { data: a } = await admin
-    .from("assignments").select("id,group_id,due_at,allow_late")
+    .from("assignments").select("id,group_id,due_at,allow_late,answer_key,max_score")
     .eq("id", params.id).eq("tenant_id", tid).single();
   if (!a) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
 
@@ -41,11 +41,15 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   try { form = await req.formData(); } catch {
     return NextResponse.json({ ok: false, error: "bad_form" }, { status: 400 });
   }
+  const answerText = String(form.get("answer_text") ?? "").trim().slice(0, 2000);
+  // تصحيح ذاتي: مفتاح موجود + إجابة نصية مطابقة = درجة كاملة فوراً
+  const key = String((a as any).answer_key ?? "").trim();
+  const autoGrade = !!key && !!answerText && key.replace(/\s+/g, " ") === answerText.replace(/\s+/g, " ");
   const files = [...form.getAll("files")].filter(
     (f): f is File => f instanceof Blob && (f as File).size > 0
   );
-  if (!files.length) {
-    return NextResponse.json({ ok: false, error: "empty", message: "صوّر حل الواجب وأرفق الصور (حتى 5)." }, { status: 400 });
+  if (!files.length && !answerText) {
+    return NextResponse.json({ ok: false, error: "empty", message: "صوّر حل الواجب أو اكتب الإجابة النصية." }, { status: 400 });
   }
   if (files.length > MAX_FILES) {
     return NextResponse.json({ ok: false, error: "too_many", message: `حتى ${MAX_FILES} ملفات.` }, { status: 400 });
@@ -80,7 +84,11 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   }
   const row: Record<string, unknown> = {
     tenant_id: tid, assignment_id: params.id, student_id: sid,
-    file_urls: urls, status: late ? "late" : "submitted", submitted_at: new Date().toISOString(),
+    file_urls: urls, answer_text: answerText || null,
+    status: autoGrade ? "graded" : late ? "late" : "submitted",
+    score: autoGrade ? Number((a as any).max_score ?? 10) : null,
+    feedback_text: autoGrade ? "تصحيح ذاتي ✅" : null,
+    submitted_at: new Date().toISOString(),
   };
   const isFirst = !prev;
   let error = null;

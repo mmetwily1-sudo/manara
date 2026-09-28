@@ -293,6 +293,7 @@ type Hw = {
 function HomeworkSection() {
   const [items, setItems] = useState<Hw[] | null>(null);
   const [files, setFiles] = useState<Record<string, FileList | null>>({});
+  const [answers, setAnswers] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
 
@@ -307,16 +308,19 @@ function HomeworkSection() {
 
   async function submit(id: string) {
     const fl = files[id];
-    if (!fl?.length) { setMsg("اختر صور الحل أولاً."); return; }
+    const tx = (answers[id] ?? "").trim();
+    if (!fl?.length && !tx) { setMsg("اختر صور الحل أو اكتب الإجابة النصية أولاً."); return; }
     setBusy(id); setMsg("");
     try {
       const fd = new FormData();
-      Array.from(fl).slice(0, 5).forEach((f) => fd.append("files", f));
+      if (fl?.length) Array.from(fl).slice(0, 5).forEach((f) => fd.append("files", f));
+      if (tx) fd.append("answer_text", tx);
       const r = await fetch(`/api/me/assignments/${id}/submit`, { method: "POST", body: fd });
       const j = await r.json().catch(() => null);
       if (r.ok && j?.ok) {
         setMsg(j.late ? "تم التسليم (متأخر) ✅" : "تم التسليم ✅");
         setFiles((p) => ({ ...p, [id]: null }));
+        setAnswers((p) => ({ ...p, [id]: "" }));
         load();
       } else setMsg(j?.message ?? "فشل التسليم: " + (j?.error ?? ""));
     } catch { setMsg("تعذر الاتصال بالخادم."); }

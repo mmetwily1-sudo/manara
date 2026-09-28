@@ -86,6 +86,33 @@ function OlympicsSection() {
   );
 }
 
+/** سباق الواجبات الأسبوعي بين المجموعات (نسبة التسليم) */
+function HwContest() {
+  const [rows, setRows] = useState<{ id: string; name: string; members: number; submitted: number; rate: number }[] | null>(null);
+  useEffect(() => {
+    fetch("/api/homework/contest").then(async (r) => {
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) setRows(j.contest);
+    }).catch(() => {});
+  }, []);
+  if (!rows || !rows.length) return null;
+  return (
+    <section className="card space-y-2 p-5">
+      <h2 className="font-bold">سباق الواجبات الأسبوعي 📝 <span className="text-xs font-normal text-slate-400">نسبة التسليم لكل مجموعة</span></h2>
+      {rows.slice(0, 5).map((r, i) => (
+        <div key={r.id} className="flex items-center gap-2 text-small">
+          <span className="w-8 text-center">{i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `#${i + 1}`}</span>
+          <span className="w-32 truncate font-bold">{r.name}</span>
+          <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100" dir="ltr">
+            <div className={`h-full rounded-full ${i === 0 ? "bg-success" : "bg-primary"}`} style={{ width: `${r.rate}%` }} />
+          </div>
+          <span className="text-xs font-bold">{r.rate}% <span className="font-normal text-slate-400">({r.submitted}/{r.members})</span></span>
+        </div>
+      ))}
+    </section>
+  );
+}
+
 /** لوحة منافسة المجموعات — أسماء مخفاة تلقائياً */
 export default function LeaderboardPage() {
   const [groups, setGroups] = useState<{ id: string; name: string }[]>([]);
@@ -180,6 +207,7 @@ export default function LeaderboardPage() {
 
       <BattleSection groups={groups} />
       <OlympicsSection />
+      <HwContest />
 
       <section className="card space-y-3 p-5">
         <div className="flex items-center justify-between">

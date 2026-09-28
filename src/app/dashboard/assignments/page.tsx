@@ -33,7 +33,19 @@ function FileLink({ path, label }: { path: string; label: string }) {
 export default function AssignmentsPage() {
   const [list, setList] = useState<Assignment[] | null>(null);
   const [groups, setGroups] = useState<{ id: string; name: string }[]>([]);
-  const [form, setForm] = useState({ group_id: "", title: "", description: "", due_at: "", max_score: "10" });
+  const [form, setForm] = useState({ group_id: "", title: "", description: "", due_at: "", max_score: "10", answer_key: "" });
+  const [reminding, setReminding] = useState("");
+
+  async function onRemind(id: string) {
+    setReminding(id);
+    try {
+      const r = await fetch(`/api/assignments/${id}/remind`, { method: "POST" });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) setOkMsg(`تم تذكير ${j.pending} طالب (وصل ${j.pushed}) 🔔`);
+      else setErr("فشل التذكير.");
+    } catch { setErr("تعذر الاتصال."); }
+    finally { setReminding(""); }
+  }
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [okMsg, setOkMsg] = useState("");
@@ -66,7 +78,7 @@ export default function AssignmentsPage() {
       const j = await r.json().catch(() => null);
       if (r.ok && j?.ok) {
         setOkMsg("تم إنشاء الواجب ✅");
-        setForm({ group_id: "", title: "", description: "", due_at: "", max_score: "10" });
+        setForm({ group_id: "", title: "", description: "", due_at: "", max_score: "10", answer_key: "" });
         load();
       } else setErr(j?.message ?? "فشل الإنشاء: " + (j?.error ?? ""));
     } catch { setErr("تعذر الاتصال بالخادم."); }
@@ -128,6 +140,8 @@ export default function AssignmentsPage() {
         </select>
         <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required
           placeholder="عنوان الواجب (مثال: تمارين الدرس الثالث)" className="rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:border-primary" />
+        <input value={form.answer_key} onChange={(e) => setForm({ ...form, answer_key: e.target.value })} maxLength={2000}
+          placeholder="مفتاح التصحيح الذاتي (اختياري — إجابة نصية تُصحح فوراً عند التطابق)" className="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:border-primary" />
         <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2}
           placeholder="تعليمات (اختياري)" className="rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:border-primary sm:col-span-2" />
         <input type="datetime-local" value={form.due_at} onChange={(e) => setForm({ ...form, due_at: e.target.value })}
@@ -159,6 +173,9 @@ export default function AssignmentsPage() {
                 <div className="flex gap-2">
                   <button onClick={() => toggle(a.id)} className="rounded-lg bg-primary-light px-3 py-1 text-xs font-bold text-primary">
                     {open === a.id ? "إخفاء التسليمات" : "التسليمات"}
+                  </button>
+                  <button onClick={() => onRemind(a.id)} disabled={reminding === a.id} className="rounded-lg bg-warning/10 px-3 py-1 text-xs font-bold text-warning disabled:opacity-50">
+                    {reminding === a.id ? "..." : "تذكير 🔔"}
                   </button>
                   <button onClick={() => onDelete(a.id)} className="rounded-lg px-3 py-1 text-xs font-bold text-danger hover:bg-danger/10">حذف</button>
                 </div>

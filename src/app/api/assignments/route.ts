@@ -72,6 +72,7 @@ export async function POST(req: Request) {
     description: String(body.description ?? "").trim().slice(0, 2000) || null,
     due_at: dueAt && !isNaN(dueAt.getTime()) ? dueAt.toISOString() : null,
     max_score: maxScore,
+    answer_key: String(body.answer_key ?? "").trim().slice(0, 2000),
   }).select("id").single();
   if (error) return dbFail("assignment-create", error);
   return NextResponse.json({ ok: true, id: (data as any).id });
