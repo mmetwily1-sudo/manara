@@ -61,15 +61,21 @@ function FinanceTools({ onDone }: { onDone: () => void }) {
     finally { setBusy(false); }
   }
 
-  async function decideRefund(id: string, status: string) {
+  async function decideRefund(id: string, status: string, totp?: string) {
     try {
       const r = await fetch("/api/refunds", {
-        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, status }),
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, status, totp }),
       });
+      const j = await r.json().catch(() => null);
       if (r.ok) {
         const jr = await fetch("/api/refunds").then((x) => x.json()).catch(() => null);
         if (jr?.ok) setRefunds(jr.refunds);
         onDone();
+      } else if (j?.error === "needs_second") {
+        setMsg("طالب الاسترداد لا يعتمده — لازم معتمد ثانٍ.");
+      } else if (j?.error === "totp_required") {
+        const code = prompt("أنت طالب الاسترداد — أدخل كود التحقق بخطوتين للاعتماد:") ?? "";
+        if (/^\d{6}$/.test(code)) decideRefund(id, status, code);
       }
     } catch {}
   }

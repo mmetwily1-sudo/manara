@@ -45,10 +45,20 @@ export async function PATCH(req: Request) {
   if (!["approved", "rejected"].includes(b?.status)) {
     return NextResponse.json({ ok: false, error: "bad_status" }, { status: 400 });
   }
-  const { data: rf } = await sb.from("refunds").select("id,payment_id,student_id,amount")
+  const { data: rf } = await sb.from("refunds").select("id,payment_id,student_id,amount,requested_by")
     .eq("id", b.id).eq("tenant_id", tid).eq("status", "pending").single();
   if (!rf) return NextResponse.json({ ok: false, error: "not_pending" }, { status: 400 });
   if (b.status === "approved") {
+    // فصل مالي: المعتمد لا يكون هو الطالب — وإن كان هو، يلزم كود التحقق بخطوتين
+    if ((rf as any).requested_by === res.ctx.userRow.id) {
+      const { totpRequired, totpOk } = await import("@/lib/totp");
+      if (!(await totpRequired(sb, res.ctx.userRow.id))) {
+        return NextResponse.json({ ok: false, error: "needs_second", message: "طالب الاسترداد لا يعتمده — اطلب من المالك أو فعّل التحقق بخطوتين." }, { status: 403 });
+      }
+      if (!(await totpOk(sb, res.ctx.userRow.id, b?.totp))) {
+        return NextResponse.json({ ok: false, error: "totp_required" }, { status: 403 });
+      }
+    }
     await sb.from("payments").update({ status: "rejected", note: "مستردة بموافقة المالك" })
       .eq("id", (rf as any).payment_id).eq("tenant_id", tid);
   }
