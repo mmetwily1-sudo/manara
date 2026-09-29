@@ -212,7 +212,8 @@ export default function StaffPage() {
       </section>
 
       <section className="card overflow-hidden">
-        <table className="w-full text-right text-small">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[620px] text-right text-small">
           <thead className="bg-slate-50 text-xs text-slate-500">
             <tr>{["الاسم", "الدور", "الفرع", "الهاتف", ""].map((h) => <th key={h} className="px-4 py-3 font-semibold">{h}</th>)}</tr>
           </thead>
@@ -256,6 +257,7 @@ export default function StaffPage() {
             ))}
           </tbody>
         </table>
+        </div>
       </section>
       <section className="card space-y-3 p-5">
         <h2 className="font-bold">عقود الموظفين 📄</h2>

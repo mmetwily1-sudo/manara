@@ -407,7 +407,8 @@ export default function InvoicesPage() {
         ) : invs.length === 0 ? (
           <div className="p-8 text-center text-small text-slate-500">لا فواتير بعد — أصدر فواتير الشهر بالزر بالأعلى.</div>
         ) : (
-          <table className="w-full text-right text-small">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] text-right text-small">
             <thead className="bg-slate-50 text-xs text-slate-500">
               <tr>{["الطالب", "الفترة", "المبلغ", "المدفوع", "الحالة"].map((h) => <th key={h} className="px-4 py-3 font-semibold">{h}</th>)}</tr>
             </thead>
@@ -426,6 +427,7 @@ export default function InvoicesPage() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </section>
     </div>

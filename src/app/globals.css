@@ -12,6 +12,17 @@
   html {
     scroll-behavior: smooth;
   }
+  /* منع أي تمرير أفقي على مستوى الصفحة (شبكة أمان للجوال/التابلت) */
+  html, body {
+    overflow-x: clip;
+    max-width: 100%;
+  }
+  img, video, canvas, svg {
+    max-width: 100%;
+  }
+  input, select, textarea {
+    max-width: 100%;
+  }
   /* العربية لا تحتمل letter-spacing السالب — يكسر اتصالات الحروف */
   body {
     letter-spacing: 0;

@@ -226,7 +226,8 @@ export default function StudentsPage() {
             <p className="mt-1 text-xs text-slate-400">أضف أول طالب بالزر بالأعلى، أو انسخ رابط التسجيل وأرسله لطلابك على واتساب.</p>
           </div>
         ) : (
-          <table className="w-full text-right text-small">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] text-right text-small">
             <thead className="bg-slate-50 text-xs text-slate-500">
               <tr>{["الطالب", "المجموعات", "الهاتف", "تقرير", "تذكير"].map((h) => (
                 <th key={h} className="px-4 py-3 font-semibold">{h}</th>
@@ -269,6 +270,7 @@ export default function StudentsPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </section>
       <section className="card space-y-3 p-5">

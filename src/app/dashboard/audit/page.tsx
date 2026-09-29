@@ -43,7 +43,8 @@ export default function AuditPage() {
         <button className="btn-secondary text-small">بحث 🔍</button>
       </form>
       <section className="card overflow-hidden">
-        <table className="w-full text-right text-small">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[640px] text-right text-small">
           <thead className="bg-slate-50 text-xs text-slate-500">
             <tr>{["الوقت", "الفاعل", "الفعل", "الكيان", "التفاصيل"].map((h) => <th key={h} className="px-4 py-3 font-semibold">{h}</th>)}</tr>
           </thead>
@@ -60,6 +61,7 @@ export default function AuditPage() {
             {rows.length === 0 && <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400">لا سجلات.</td></tr>}
           </tbody>
         </table>
+        </div>
       </section>
     </div>
   );

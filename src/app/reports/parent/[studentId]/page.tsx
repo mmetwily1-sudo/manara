@@ -59,7 +59,8 @@ export default function ParentReportPage({ params }: { params: { studentId: stri
         {rep.exams.list.length > 0 && (
           <section>
             <h2 className="mb-2 font-bold">نتائج الامتحانات</h2>
-            <table className="w-full text-small">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[480px] text-small">
               <thead><tr className="border-b text-slate-500"><th className="py-2 text-right">الامتحان</th><th>الدرجة</th><th>التاريخ</th></tr></thead>
               <tbody>
                 {rep.exams.list.map((e, i) => (
@@ -67,6 +68,7 @@ export default function ParentReportPage({ params }: { params: { studentId: stri
                 ))}
               </tbody>
             </table>
+            </div>
           </section>
         )}
 

@@ -83,7 +83,8 @@ export default function ReferralsPage() {
           </section>
 
           <section className="card overflow-hidden">
-            <table className="w-full text-right text-small">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[520px] text-right text-small">
               <thead className="bg-slate-50 text-xs text-slate-500">
                 <tr>{["الزميل", "الحالة", "المكافأة", "التاريخ"].map((h) => <th key={h} className="px-4 py-3 font-semibold">{h}</th>)}</tr>
               </thead>
@@ -103,6 +104,7 @@ export default function ReferralsPage() {
                 })}
               </tbody>
             </table>
+            </div>
           </section>
 
           {funnel && funnel.length > 0 && (

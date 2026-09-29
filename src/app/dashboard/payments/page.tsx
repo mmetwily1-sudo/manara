@@ -240,7 +240,8 @@ export default function PaymentsPage() {
         ) : history.length === 0 ? (
           <div className="p-8 text-center text-small text-slate-500">لا توجد دفعات مسجلة بعد — سجّل أول دفعة بالزر بالأعلى.</div>
         ) : (
-          <table className="w-full text-right text-small">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[600px] text-right text-small">
             <thead className="bg-slate-50 text-xs text-slate-500">
               <tr>{["الطالب", "المبلغ", "الطريقة", "إيصال", "ملاحظة", "الوقت", ""].map((h) => <th key={h} className="px-4 py-3 font-semibold">{h}</th>)}</tr>
             </thead>
@@ -278,6 +279,7 @@ export default function PaymentsPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </section>
     </div>

@@ -17,7 +17,8 @@ export default async function AdminTenantsPage() {
       <h1 className="text-h1">السناتر</h1>
       <WinbackPanel />
       <div className="card overflow-hidden">
-        <table className="w-full text-right text-small">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[600px] text-right text-small">
           <thead className="bg-slate-900 text-xs text-slate-300">
             <tr>{["الاسم", "الـslug", "الباقة", "الحالة", "تاريخ الإنشاء"].map((h) => <th key={h} className="px-4 py-3 font-semibold">{h}</th>)}</tr>
           </thead>
@@ -35,6 +36,7 @@ export default async function AdminTenantsPage() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

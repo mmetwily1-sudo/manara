@@ -201,7 +201,8 @@ export default function ReportsPage() {
 
       <section className="card overflow-hidden">
         <h2 className="p-5 pb-2 font-bold">المجموعات 📚</h2>
-        <table className="w-full text-right text-small">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[680px] text-right text-small">
           <thead className="bg-slate-50 text-xs text-slate-500">
             <tr>{["المجموعة", "الفرع", "المدرس", "طلاب", "متوقع", "محصّل", "متبقي", "نسبة"].map((h) => <th key={h} className="px-4 py-3 font-semibold">{h}</th>)}</tr>
           </thead>
@@ -220,6 +221,7 @@ export default function ReportsPage() {
             ))}
           </tbody>
         </table>
+        </div>
       </section>
     </div>
   );
