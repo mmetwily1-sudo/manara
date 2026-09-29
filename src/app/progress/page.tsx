@@ -1,6 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  StudentPoints, StudentBundles, StudentLibrary, StudentShipments,
+  StudentTransport, StudentProjects, StudentForum, StudentNotes,
+} from "@/components/StudentServices";
 import { PushSubscribeButton } from "@/components/PushSubscribeButton";
 
 type Progress = {
@@ -353,12 +357,17 @@ function HomeworkSection() {
             )}
             {(!a.submission || a.submission.status !== "graded") && (
               <label className="mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 px-3 py-2 text-xs font-bold text-slate-500 hover:border-primary hover:text-primary">
-                {files[a.id]?.length ? `📎 ${files[a.id]!.length} صور` : "صوّر الحل وارفع الصور"}
+                {files[a.id]?.length ? `تم ${files[a.id]!.length} ملف` : "صوّر الحل وارفع الصور"}
                 <input type="file" accept="image/*,.pdf" multiple className="hidden"
                   onChange={(e) => setFiles((p) => ({ ...p, [a.id]: e.target.files }))} />
               </label>
             )}
-            {files[a.id]?.length ? (
+            {(!a.submission || a.submission.status !== "graded") && (
+              <textarea value={answers[a.id] ?? ""} onChange={(e) => setAnswers((p) => ({ ...p, [a.id]: e.target.value }))}
+                placeholder="أو اكتب إجابتك النصية هنا..." rows={2} maxLength={2000}
+                className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-small" />
+            )}
+            {(files[a.id]?.length || (answers[a.id] ?? "").trim()) ? (
               <button onClick={() => submit(a.id)} disabled={busy === a.id}
                 className="btn-primary mt-2 w-full !py-2 text-small" >
                 {busy === a.id ? "جاري الرفع..." : "تسليم الواجب"}
@@ -603,6 +612,14 @@ export default function ProgressPage() {
       <ComplaintsSection />
       <EventsSection />
       <MyDataSection />
+      <StudentPoints />
+      <StudentBundles />
+      <StudentLibrary />
+      <StudentShipments />
+      <StudentTransport />
+      <StudentProjects />
+      <StudentForum />
+      <StudentNotes />
 
       <section className="card space-y-3 p-5">
         <h2 className="font-bold">نتائج الامتحانات 📝</h2>

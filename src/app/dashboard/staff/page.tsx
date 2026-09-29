@@ -70,7 +70,7 @@ export default function StaffPage() {
     try {
       const r = await fetch("/api/staff", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, branch_id: form.branch || undefined }),
+        body: JSON.stringify({ email: form.email, password: form.password, full_name: form.name, phone: form.phone, role: form.role, branch_id: form.branch || undefined }),
       });
       const j = await r.json().catch(() => null);
       if (r.ok && j?.ok) {

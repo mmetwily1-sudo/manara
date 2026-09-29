@@ -18,7 +18,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   const { data: th } = await c.admin.from("threads").select("id,group_id,locked,pinned,category")
     .eq("id", params.id).eq("tenant_id", c.urow.tenant_id).eq("ttype", "discussion").single();
   if (!th) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
-  const { data: msgs } = await c.admin.from("messages").select("id,body,sender_id,created_at,users(full_name)")
+  const { data: msgs } = await c.admin.from("messages").select("id,body,sender_id,created_at,users!messages_sender_id_fkey(full_name)")
     .eq("thread_id", params.id).is("deleted_at", null).order("created_at", { ascending: true }).limit(200);
   return NextResponse.json({
     ok: true, locked: !!(th as any).locked, pinned: !!(th as any).pinned, category: (th as any).category ?? "general",

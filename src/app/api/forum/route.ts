@@ -38,7 +38,7 @@ export async function GET(req: Request) {
     .order("pinned", { ascending: false }).order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
 
-  if (category) q = q.eq("category", category);
+  if (category && category !== "all") q = q.eq("category", category);
   if (search) q = q.or(`title.ilike.%${search}%,body.ilike.%${search}%`);
   if (!isTeacher && gids) {
     q = gids.length ? q.or(`group_id.is.null,group_id.in.(${gids.join(",")})`) : q.is("group_id", null);

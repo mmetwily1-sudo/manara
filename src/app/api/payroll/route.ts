@@ -70,7 +70,10 @@ export async function POST(req: Request) {
   });
   const { error: ie } = await admin.from("payroll_items").insert(rows);
   if (ie) return dbFail("payroll-items", ie);
-  const usedIds = Object.values(advByUser).flatMap((e) => e.ids);
+  const contracted = new Set((contracts as any[]).map((c) => c.user_id));
+  const usedIds = Object.entries(advByUser)
+    .filter(([uid]) => contracted.has(uid))
+    .flatMap(([, e]) => (e as { ids: string[] }).ids);
   if (usedIds.length) {
     await admin.from("staff_advances").update({ status: "deducted" }).in("id", usedIds).eq("tenant_id", tid);
   }

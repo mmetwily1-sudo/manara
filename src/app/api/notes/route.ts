@@ -18,9 +18,9 @@ export async function GET(req: Request) {
     const { data: enr } = await admin.from("enrollments").select("group_id")
       .eq("tenant_id", tid).eq("student_id", res.ctx.userRow.id).eq("status", "active");
     const gids = ((enr ?? []) as any[]).map((e) => e.group_id);
-    q = q.or(`visibility.eq.public,group_id.in.(${gids.join(",")})`);
-  } else {
-    q = q.or(`visibility.eq.public,visibility.eq.group`);
+    q = gids.length
+      ? q.or(`visibility.eq.public,group_id.in.(${gids.join(",")})`)
+      : q.eq("visibility", "public");
   }
 
   const { data } = await q;
