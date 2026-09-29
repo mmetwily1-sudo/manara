@@ -1,3 +1,11 @@
+export const FEATURES: { key: string; label: string }[] = [
+  { key: "transport", label: "المواصلات 🚌" },
+  { key: "events", label: "الفعاليات 🎪" },
+  { key: "bundles", label: "الباقات 📦" },
+  { key: "library", label: "المكتبة 📚" },
+  { key: "shipments", label: "الشحن 🚚" },
+];
+
 /** هل الميزة مفعلة؟ (الغائب = مفعل — opt-out) */
 export async function featureOn(admin: any, tenantId: string, key: string): Promise<boolean> {
   try {

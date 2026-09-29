@@ -1,13 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireTeacher } from "@/lib/server-auth";
-
-export const FEATURES: { key: string; label: string }[] = [
-  { key: "transport", label: "المواصلات 🚌" },
-  { key: "events", label: "الفعاليات 🎪" },
-  { key: "bundles", label: "الباقات 📦" },
-  { key: "library", label: "المكتبة 📚" },
-  { key: "shipments", label: "الشحن 🚚" },
-];
+import { FEATURES } from "@/lib/features";
 
 /** GET /api/features — حالة المزايا (مالك) */
 export async function GET() {
