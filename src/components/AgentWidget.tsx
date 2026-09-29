@@ -104,12 +104,12 @@ export function AgentWidget() {
     <>
       {!open && (
         <button onClick={() => setOpen(true)} aria-label="مساعد منارة"
-          className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-2xl text-white shadow-lg transition hover:scale-105 active:scale-95">
+          className="fixed bottom-[4.75rem] right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-2xl text-white shadow-lg transition hover:scale-105 active:scale-95 lg:bottom-6 lg:right-6">
           🤖
         </button>
       )}
       {open && (
-        <div className="fixed bottom-4 right-4 z-50 flex h-[min(560px,80vh)] w-[min(390px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+        <div className="fixed bottom-[4.75rem] right-2 left-2 z-50 flex h-[min(560px,80vh)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl sm:left-auto sm:w-[390px] lg:bottom-4 lg:right-4">
           <div className="flex items-center justify-between bg-primary px-4 py-2.5 text-white">
             <span className="text-small font-bold">مساعد منارة 🤖</span>
             <button onClick={() => setOpen(false)} aria-label="إغلاق" className="rounded-full px-2 py-0.5 text-lg transition hover:bg-white/20">−</button>

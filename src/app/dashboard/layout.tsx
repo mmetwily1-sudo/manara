@@ -4,6 +4,7 @@ import { getTenantInfoDB } from "@/lib/data";
 import { getSessionUser, adminClient } from "@/lib/server-auth";
 import { AuthGate, SignOutButton } from "@/components/AuthGate";
 import { AgentWidget } from "@/components/AgentWidget";
+import { MobileBottomNav } from "@/components/MobileNav";
 
 const nav = [
   { href: "/dashboard", label: "الرئيسية", key: "01" },
@@ -90,15 +91,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <main className="px-4 pb-24 pt-6 md:px-8 lg:pb-10">{children}</main>
         </div>
 
-        <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-slate-200 bg-white lg:hidden">
-          {nav.map((item) => (
-            <Link key={item.label} href={item.href}
-              className="flex flex-col items-center gap-1 py-2.5 text-[11px] font-semibold text-slate-500 transition active:bg-slate-50">
-              <span aria-hidden className="text-base leading-none">·</span>
-              {item.label}
-            </Link>
-          ))}
-        </nav>
+        <MobileBottomNav
+          main={nav}
+          more={[...navMore].filter((item: any) => !item.roles || !viewerRole || item.roles.includes(viewerRole) || viewerRole === "teacher_admin")}
+        />
         <AgentWidget />
       </div>
     </AuthGate>
