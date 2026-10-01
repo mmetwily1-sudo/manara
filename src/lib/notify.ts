@@ -74,6 +74,18 @@ export async function notifyStudent(
     } catch {}
     return { sent: false, reason: "disabled_by_rule" };
   }
+  // كتم مؤقت: لا إرسال حتى انتهاء المدة (يعود تلقائياً)
+  const snoozedUntil = (settings.notify_snooze as any)?.[event.kind] as string | undefined;
+  if (snoozedUntil && new Date(snoozedUntil).getTime() > Date.now()) {
+    try {
+      await admin.from("notification_log").insert({
+        tenant_id: tenantId, user_id: studentId, event: event.kind, channel: "whatsapp",
+        payload: { reason: "snoozed_until", until: snoozedUntil }, status: "skipped",
+        dedupe_key: dedupeKey, sent_at: null,
+      });
+    } catch {}
+    return { sent: false, reason: "snoozed" };
+  }
 
   // تجاوز قالب السنتر المخصص (قوالب الجولة 21) — {placeholders}
   const TPL_KEY: Record<NotifyEvent["kind"], string> = {

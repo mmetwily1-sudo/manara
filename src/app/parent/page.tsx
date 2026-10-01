@@ -47,17 +47,46 @@ export default function ParentPortal() {
     } catch { setErr(t.loading); }
   }
 
-  async function pay(invoiceId: string) {
+  async function pay(invoiceId: string, method: string = payMethod) {
     try {
       const r = await fetch("/api/parent/pay", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ invoice_id: invoiceId, method: "card" }),
+        body: JSON.stringify({ invoice_id: invoiceId, method }),
         credentials: "include",
       });
       const j = await r.json().catch(() => null);
       if (r.ok && j?.ok) window.location.href = j.iframe_url;
       else alert(j?.error ?? t.loading);
     } catch { alert(t.loading); }
+  }
+
+  const [payMethod, setPayMethod] = useState("card");
+  const [payAll, setPayAll] = useState<{ period: string; url?: string; error?: string }[] | null>(null);
+  const [payingAll, setPayingAll] = useState(false);
+
+  /** الدفع الموحد: ملخص + طريقة واحدة + روابط دفع لكل الفواتير */
+  async function payAllDues() {
+    const open = (data?.dues ?? []).filter((d) => d.due > 0);
+    if (!open.length) return;
+    setPayingAll(true);
+    setPayAll([]);
+    const out: { period: string; url?: string; error?: string }[] = [];
+    for (const d of open) {
+      try {
+        const r = await fetch("/api/parent/pay", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ invoice_id: d.id, method: payMethod }),
+          credentials: "include",
+        });
+        const j = await r.json().catch(() => null);
+        out.push(r.ok && j?.ok ? { period: d.period, url: j.iframe_url } : { period: d.period, error: j?.error ?? "error" });
+        setPayAll([...out]);
+      } catch {
+        out.push({ period: d.period, error: "conn" });
+        setPayAll([...out]);
+      }
+    }
+    setPayingAll(false);
   }
 
   useEffect(() => {
@@ -119,6 +148,35 @@ export default function ParentPortal() {
         )}
       </section>
 
+      <section id="checkout" className="card space-y-3 border-primary/25 bg-gradient-to-l from-primary-light/60 to-transparent p-4">
+        <h2 className="font-bold">الدفع الموحد ⚡</h2>
+        <div className="flex gap-2">
+          {(["card", "wallet"] as const).map((m) => (
+            <button key={m} onClick={() => setPayMethod(m)}
+              className={`flex-1 rounded-xl border-2 px-4 py-2.5 text-small font-bold transition ${payMethod === m ? "border-primary bg-primary-light text-primary" : "border-slate-200 text-slate-500"}`}>
+              {m === "card" ? "💳 بطاقة بنكية" : "📱 محفظة إلكترونية"}
+            </button>
+          ))}
+        </div>
+        <button onClick={payAllDues} disabled={payingAll || !data.dues.some((d) => d.due > 0)} className="btn-primary w-full !py-3 text-base disabled:opacity-50">
+          {payingAll ? t.paying : `ادفع الكل (${data.dues.filter((d) => d.due > 0).length} فواتير) ✅`}
+        </button>
+        {payAll !== null && payAll.length > 0 && (
+          <ul className="space-y-2">
+            {payAll.map((p, i) => (
+              <li key={i} className="flex items-center justify-between gap-2 rounded-xl bg-white px-4 py-2.5 text-small">
+                <span className="font-bold" dir="ltr">{p.period}</span>
+                {p.url ? (
+                  <a href={p.url} target="_blank" rel="noreferrer" className="rounded-lg bg-success px-4 py-2 text-xs font-bold text-white">إتمام الدفع 🔗</a>
+                ) : (
+                  <span className="text-xs font-bold text-danger">تعذر — حاول لاحقاً</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
       <section className="card space-y-2 p-4">
         <h2 className="font-bold">{t.dues}</h2>
         {data.dues.length === 0 ? (
@@ -153,9 +211,9 @@ export default function ParentPortal() {
               <div className="mx-auto flex max-w-md items-center justify-between gap-3">
                 <span className="text-small">المستحق: <b className="text-danger">{total.toLocaleString(lang === "ar" ? "ar-EG" : "en-US")} {t.egp}</b></span>
                 {data.online_payment.enabled && (
-                  <button onClick={() => pay(open[0].id)} disabled={paying} className="btn-primary flex-1 !py-2 text-small disabled:opacity-50">
-                    {paying ? t.paying : `${t.pay} 💳`}
-                  </button>
+                  <a href="#checkout" className="btn-primary flex-1 !py-2 text-center text-small">
+                    {t.pay} 💳
+                  </a>
                 )}
               </div>
             </div>

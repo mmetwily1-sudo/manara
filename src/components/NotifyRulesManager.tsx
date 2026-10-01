@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-type Ev = { kind: string; label: string; enabled: boolean };
+type Ev = { kind: string; label: string; enabled: boolean; snoozed_until: string | null };
 
 /** قواعد الإشعارات: تفعيل/إيقاف كل نوع (مالك) */
 export function NotifyRulesManager() {
@@ -24,21 +24,40 @@ export function NotifyRulesManager() {
     if (r.ok) load();
   }
 
+  async function snooze(kind: string) {
+    const r = await fetch("/api/tenant/notify-rules", {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind, snooze_days: 7 }),
+    });
+    if (r.ok) load();
+  }
+
   if (events === null) return null;
   return (
     <div>
       <h2 className="font-bold">قواعد الإشعارات 🔕</h2>
       <p className="mt-1 text-xs leading-relaxed text-slate-500">تحكم في كل نوع — الموقوف لا يُرسل ولا يُسجل.</p>
       <div className="mt-3 space-y-2">
-        {events.map((e) => (
-          <div key={e.kind} className="flex items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 py-2 text-small">
-            <span className="font-bold">{e.label}</span>
-            <button onClick={() => toggle(e.kind, !e.enabled)}
-              className={`rounded-full px-4 py-1 text-xs font-bold text-white ${e.enabled ? "bg-success" : "bg-slate-300"}`}>
-              {e.enabled ? "مفعلة" : "موقوفة"}
-            </button>
-          </div>
-        ))}
+        {events.map((e) => {
+          const snoozed = !!e.snoozed_until && new Date(e.snoozed_until).getTime() > Date.now();
+          return (
+            <div key={e.kind} className="rounded-xl bg-slate-50 px-3 py-2 text-small">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-bold">{e.label}</span>
+                <button onClick={() => toggle(e.kind, !e.enabled)}
+                  className={`rounded-full px-4 py-1 text-xs font-bold text-white ${e.enabled ? "bg-success" : "bg-slate-300"}`}>
+                  {e.enabled ? "مفعلة" : "موقوفة"}
+                </button>
+              </div>
+              {snoozed ? (
+                <div className="mt-1 text-xs text-warning">🔕 مكتومة حتى {new Date(e.snoozed_until as string).toLocaleDateString("ar-EG")}</div>
+              ) : (
+                <button onClick={() => snooze(e.kind)} className="mt-1 text-xs font-bold text-slate-400 hover:text-primary">
+                  كتم أسبوع ⏸️
+                </button>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

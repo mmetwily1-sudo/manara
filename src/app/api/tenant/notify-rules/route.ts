@@ -16,9 +16,10 @@ export async function GET() {
   if ("error" in res) return res.error;
   const { data: t } = await adminClient().from("tenants").select("settings").eq("id", res.ctx.tenantId).single();
   const rules = ((t as any)?.settings?.notify_rules ?? {}) as Record<string, boolean>;
+  const snooze = ((t as any)?.settings?.notify_snooze ?? {}) as Record<string, string>;
   return NextResponse.json({
     ok: true,
-    events: EVENTS.map((e) => ({ ...e, enabled: rules[e.kind] !== false })),
+    events: EVENTS.map((e) => ({ ...e, enabled: rules[e.kind] !== false, snoozed_until: snooze[e.kind] ?? null })),
   });
 }
 
@@ -28,13 +29,25 @@ export async function PATCH(req: Request) {
   if ("error" in res) return res.error;
   const admin = adminClient();
   const b = await req.json().catch(() => ({} as any));
-  if (!EVENTS.some((e) => e.kind === b?.kind) || typeof b?.enabled !== "boolean") {
+  if (!EVENTS.some((e) => e.kind === b?.kind)) {
     return NextResponse.json({ ok: false, error: "bad_rule" }, { status: 400 });
   }
   const { data: t } = await admin.from("tenants").select("settings").eq("id", res.ctx.tenantId).single();
   const settings = { ...((t as any)?.settings ?? {}) };
-  settings.notify_rules = { ...(settings.notify_rules ?? {}), [b.kind]: b.enabled };
+  if (typeof b?.snooze_days === "number" && b.snooze_days >= 1 && b.snooze_days <= 30) {
+    // كتم مؤقت: يعود تلقائياً بعد المدة
+    const until = new Date(Date.now() + b.snooze_days * 864e5).toISOString();
+    settings.notify_snooze = { ...(settings.notify_snooze ?? {}), [b.kind]: until };
+  } else if (typeof b?.enabled === "boolean") {
+    settings.notify_rules = { ...(settings.notify_rules ?? {}), [b.kind]: b.enabled };
+    if (b.enabled && settings.notify_snooze) {
+      const { [b.kind]: _, ...rest } = settings.notify_snooze;
+      settings.notify_snooze = rest;
+    }
+  } else {
+    return NextResponse.json({ ok: false, error: "bad_input" }, { status: 400 });
+  }
   const { error } = await admin.from("tenants").update({ settings }).eq("id", res.ctx.tenantId);
   if (error) return NextResponse.json({ ok: false, error: "db" }, { status: 500 });
-  return NextResponse.json({ ok: true, kind: b.kind, enabled: b.enabled });
+  return NextResponse.json({ ok: true, kind: b.kind });
 }

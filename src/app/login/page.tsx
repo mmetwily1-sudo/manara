@@ -78,6 +78,19 @@ export default function LoginPage() {
     window.location.href = "/dashboard";
   }
 
+  async function handleGoogle() {
+    setBusy(true); setErr("");
+    try {
+      const sb = createClient();
+      const { error } = await sb.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: `${window.location.origin}/dashboard` },
+      });
+      if (error) setErr("دخول جوجل غير مفعل بعد — فعّله المالك من إعدادات Supabase.");
+    } catch { setErr("تعذر الاتصال."); }
+    finally { setBusy(false); }
+  }
+
   async function handleSetup(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true); setErr("");
@@ -138,6 +151,9 @@ export default function LoginPage() {
           <span className="h-px flex-1 bg-slate-200" />
         </div>
         <PasskeyLoginButton email={email} />
+        <button onClick={handleGoogle} disabled={busy} className="btn-secondary mt-3 w-full disabled:opacity-50">
+          <span aria-hidden className="text-lg font-extrabold">G</span> دخول بجوجل بلمسة واحدة
+        </button>
 
         <details className="mt-4">
           <summary className="cursor-pointer text-center text-small font-bold text-primary">دخول برقم الموبايل 📱</summary>
