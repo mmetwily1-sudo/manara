@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { waTo } from "@/lib/wa";
+import { SkeletonTable, SkeletonList, EmptyState } from "@/components/Loading";
 
 type Student = { id: string; name: string; phone: string | null; groups: { id: string; name: string }[] };
 type Group = { id: string; name: string };
@@ -219,11 +220,16 @@ export default function StudentsPage() {
 
       <section className="card overflow-hidden">
         {students === null ? (
-          <div className="p-8 text-center text-slate-400">جاري تحميل الطلاب...</div>
+          <SkeletonTable cols={4} rows={5} />
         ) : visible.length === 0 ? (
-          <div className="p-8 text-center">
-            <p className="text-small text-slate-500">لا يوجد طلاب بعد</p>
-            <p className="mt-1 text-xs text-slate-400">أضف أول طالب بالزر بالأعلى، أو انسخ رابط التسجيل وأرسله لطلابك على واتساب.</p>
+          <div className="p-4">
+            <EmptyState
+              icon="🎓"
+              title="لا يوجد طلاب بعد"
+              desc="أضف أول طالب بالزر بالأعلى، أو انسخ رابط التسجيل وأرسله لطلابك على واتساب."
+              actionLabel="➕ أضف طالب"
+              onAction={() => setShowAdd(true)}
+            />
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -294,7 +300,7 @@ export default function StudentsPage() {
           </select>
           <button onClick={loadComplaints} className="btn-secondary !px-3 !py-1.5 text-xs">تصفية</button>
         </div>
-        {complaints === null ? <div className="text-xs text-slate-400">جاري التحميل...</div> :
+        {complaints === null ? <SkeletonList rows={2} /> :
           complaints.length === 0 ? <div className="text-xs text-slate-400">لا رسائل.</div> :
           <ul className="space-y-2">
             {complaints.slice(0, 20).map((c) => (
@@ -336,7 +342,7 @@ export default function StudentsPage() {
             className="rounded-xl border border-slate-200 px-4 py-2 text-small sm:col-span-2" />
           <button className="btn-primary !py-2 text-small sm:col-span-4">تسجيل خريج</button>
         </form>
-        {alums === null ? <div className="text-xs text-slate-400">جاري التحميل...</div> :
+        {alums === null ? <SkeletonList rows={2} /> :
           alums.length === 0 ? <div className="text-xs text-slate-400">لا خريجين مسجلين.</div> :
           <ul className="divide-y divide-slate-100 text-small">
             {alums.slice(0, 30).map((a) => (

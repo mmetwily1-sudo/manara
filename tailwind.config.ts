@@ -21,7 +21,7 @@ const config: Config = {
           DEFAULT: "#F59E0B",
           light: "#FEF3C7",
         },
-        success: "#16A34A",
+        success: "#059669",
         warning: "#D97706",
         danger: "#DC2626",
         surface: "#FFFFFF",

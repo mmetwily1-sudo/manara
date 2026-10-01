@@ -128,7 +128,7 @@ export default function GroupsPage() {
                 {(g.schedule ?? []).length > 0 && (
                   <div className="mt-1 text-xs text-primary">
                     {(g.schedule ?? []).map((s: any, i: number) => (
-                      <span key={i} className="ml-2 rounded-full bg-primary-light px-2 py-0.5 font-bold">
+                      <span key={i} className="me-2 rounded-full bg-primary-light px-2 py-0.5 font-bold">
                         {WEEKDAYS[Number(s.weekday)] ?? ""} {s.start}–{s.end}
                       </span>
                     ))}

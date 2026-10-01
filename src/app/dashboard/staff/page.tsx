@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { SkeletonList } from "@/components/Loading";
 
 type Branch = { id: string; name: string; address: string | null; lat: number | null; lng: number | null };
 type Member = { id: string; name: string; phone: string; role: string; role_label: string; branch: string; branch_id: string | null; is_owner: boolean };
@@ -280,7 +281,7 @@ export default function StaffPage() {
           </select>
           <button className="btn-primary !py-2 text-small">حفظ العقد</button>
         </form>
-        {contracts === null ? <div className="text-xs text-slate-400">جاري التحميل...</div> :
+        {contracts === null ? <SkeletonList rows={2} /> :
           contracts.length === 0 ? <div className="text-xs text-slate-400">لا عقود نشطة.</div> :
           <ul className="divide-y divide-slate-100 text-small">
             {contracts.map((c) => (
@@ -316,7 +317,7 @@ export default function StaffPage() {
             className="rounded-xl border border-slate-200 px-4 py-2 text-small" />
           <button className="btn-primary !py-2 text-small">حفظ التقييم</button>
         </form>
-        {reviews === null ? <div className="text-xs text-slate-400">جاري التحميل...</div> :
+        {reviews === null ? <SkeletonList rows={2} /> :
           reviews.length === 0 ? <div className="text-xs text-slate-400">لا تقييمات هذا الشهر.</div> :
           <ul className="divide-y divide-slate-100 text-small">
             {reviews.map((v) => (

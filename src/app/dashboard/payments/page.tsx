@@ -197,7 +197,7 @@ export default function PaymentsPage() {
               return (
                 <li key={o.student_id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-danger/5 px-4 py-3 text-small">
                   <div>
-                    {i < 3 && <span className="ml-2 rounded-full bg-danger px-2 py-0.5 text-[11px] font-bold text-white">⚠️ أولوية {i + 1}</span>}
+                    {i < 3 && <span className="me-2 rounded-full bg-danger px-2 py-0.5 text-[11px] font-bold text-white">⚠️ أولوية {i + 1}</span>}
                     <span className="font-bold">{o.name}</span>
                     <span className="mx-2 font-extrabold text-danger">{fmt(o.due)}</span>
                     <span className="text-xs text-slate-500">{o.periods.join("، ")}</span>

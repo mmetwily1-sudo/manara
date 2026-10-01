@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { waTo } from "@/lib/wa";
+import { SkeletonList, SkeletonTable } from "@/components/Loading";
 
 type Inv = { id: string; student: string; period: string; amount: number; paid: number; status: string; receipt_no: number | null };
 type Od = { student_id: string; name: string; phone: string | null; due: number; periods: string[]; score?: number };
@@ -288,7 +289,7 @@ export default function InvoicesPage() {
             className="rounded-xl border border-slate-200 px-4 py-2 text-small" />
           <button className="btn-primary !py-2 text-small">حفظ المنحة</button>
         </form>
-        {schs === null ? <div className="text-xs text-slate-400">جاري التحميل...</div> :
+        {schs === null ? <SkeletonList rows={2} /> :
           schs.length === 0 ? <div className="text-xs text-slate-400">لا منح بعد.</div> :
           <ul className="divide-y divide-slate-100 text-small">
             {schs.map((s) => (
@@ -313,7 +314,7 @@ export default function InvoicesPage() {
             className="rounded-xl border border-slate-200 px-4 py-2 text-small" />
           <button className="btn-primary !py-2 text-small">إضافة حركة</button>
         </form>
-        {stmts === null ? <div className="text-xs text-slate-400">جاري التحميل...</div> :
+        {stmts === null ? <SkeletonList rows={2} /> :
           stmts.length === 0 ? <div className="text-xs text-slate-400">لا حركات بعد.</div> :
           <ul className="divide-y divide-slate-100 text-small">
             {stmts.slice(0, 30).map((s) => (
@@ -403,7 +404,7 @@ export default function InvoicesPage() {
 
       <section className="card overflow-hidden">
         {invs === null ? (
-          <div className="p-8 text-center text-slate-400">جاري التحميل...</div>
+          <SkeletonTable cols={5} rows={4} />
         ) : invs.length === 0 ? (
           <div className="p-8 text-center text-small text-slate-500">لا فواتير بعد — أصدر فواتير الشهر بالزر بالأعلى.</div>
         ) : (

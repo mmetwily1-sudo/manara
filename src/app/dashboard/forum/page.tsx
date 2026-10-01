@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { SkeletonList, EmptyState } from "@/components/Loading";
 
 type Thread = {
   id: string;
@@ -107,13 +108,13 @@ export default function ForumPage() {
   }
 
   function renderThreadList() {
-    if (threads === null) return <div className="card p-6 text-center text-slate-400">جاري التحميل...</div>;
-    if (threads.length === 0) return <div className="card p-6 text-center text-small text-slate-500">لا مواضيع بعد — ابدأ الأول.</div>;
+    if (threads === null) return <SkeletonList rows={4} />;
+    if (threads.length === 0) return <EmptyState icon="💬" title="لا مواضيع بعد" desc="ابدأ أول نقاش — اسأل سؤالك وسيرد المعلمون." />;
     return threads.map((t) => renderThreadItem(t));
   }
 
   function renderMessages() {
-    if (msgs === null) return <div className="card p-6 text-center text-slate-400">جاري التحميل...</div>;
+    if (msgs === null) return <SkeletonList rows={3} />;
     if (msgs.length === 0) return <div className="card p-6 text-center text-small text-slate-500">لا ردود بعد.</div>;
     return (
       <div className="card space-y-3 p-5">

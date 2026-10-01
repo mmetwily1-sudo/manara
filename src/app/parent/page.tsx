@@ -140,6 +140,27 @@ export default function ParentPortal() {
         )}
       </section>
 
+      {(() => {
+        const open = data.dues.filter((d) => d.due > 0);
+        if (!open.length) return null;
+        const total = open.reduce((s, d) => s + d.due, 0);
+        return (
+          <>
+            <div className="h-16 sm:hidden" aria-hidden />
+            <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:hidden" style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}>
+              <div className="mx-auto flex max-w-md items-center justify-between gap-3">
+                <span className="text-small">المستحق: <b className="text-danger">{total.toLocaleString(lang === "ar" ? "ar-EG" : "en-US")} {t.egp}</b></span>
+                {data.online_payment.enabled && (
+                  <button onClick={() => pay(open[0].id)} disabled={paying} className="btn-primary flex-1 !py-2 text-small disabled:opacity-50">
+                    {paying ? t.paying : `${t.pay} 💳`}
+                  </button>
+                )}
+              </div>
+            </div>
+          </>
+        );
+      })()}
+
       <section className="card p-4">
         <h2 className="font-bold">{t.settings}</h2>
         <p className="mt-2 text-sm text-slate-500">{t.ePay}: {data.online_payment.enabled ? t.on : t.off}</p>

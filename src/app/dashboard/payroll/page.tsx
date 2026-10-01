@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { SkeletonList, SkeletonCards } from "@/components/Loading";
 
 type Item = { user_id: string; name: string; base: number; bonus: number; deduction: number; net: number; note: string };
 type Run = { id: string; month: string; status: string; total: number; items: Item[] };
@@ -109,7 +110,7 @@ export default function PayrollPage() {
             className="rounded-xl border border-slate-200 px-4 py-2 text-small" />
           <button className="btn-primary !py-2 text-small">تسجيل سلفة</button>
         </form>
-        {advs === null ? <div className="text-xs text-slate-400">جاري التحميل...</div> :
+        {advs === null ? <SkeletonList rows={2} /> :
           advs.length === 0 ? <div className="text-xs text-slate-400">لا سلف معلقة.</div> :
           <ul className="divide-y divide-slate-100 text-small">
             {advs.map((a) => (
@@ -120,7 +121,7 @@ export default function PayrollPage() {
             ))}
           </ul>}
       </section>
-      {runs === null ? <div className="card p-6 text-center text-slate-400">جاري التحميل...</div> :
+      {runs === null ? <SkeletonCards n={2} /> :
         runs.length === 0 ? <div className="card p-6 text-center text-small text-slate-500">لا مسيرات بعد.</div> :
         runs.map((run) => (
           <section key={run.id} className="card space-y-2 p-5">

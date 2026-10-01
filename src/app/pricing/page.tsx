@@ -124,6 +124,13 @@ export default function PricingPage({ searchParams }: { searchParams?: { plan?: 
           })}
         </div>
 
+        <div className="h-20 sm:hidden" aria-hidden />
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:hidden" style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}>
+          <Link href="/join" className="btn-primary w-full">
+            ابدأ مجاناً — 14 يوم 🚀
+          </Link>
+        </div>
+
         <div className="card mx-auto mt-10 max-w-3xl bg-surface p-6">
           <h2 className="mb-4 text-center text-h2">ضماناتنا المكتوبة</h2>
           <div className="grid gap-4 sm:grid-cols-3 text-center text-small">

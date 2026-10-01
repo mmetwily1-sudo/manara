@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { SkeletonList } from "@/components/Loading";
 
 type Ann = { id: string; group_name: string; body: string; sender: string; created_at: string | null };
 
@@ -84,7 +85,7 @@ export default function AnnouncementsPage() {
         </label>
         <button className="btn-primary" disabled={busy}>{busy ? "جاري..." : form.publish_at ? "جدولة الإعلان ⏰" : "نشر الإعلان"}</button>
       </form>
-      {list === null ? <div className="card p-8 text-center text-slate-400">جاري التحميل...</div> : (
+      {list === null ? <SkeletonList rows={3} /> : (
         <ul className="space-y-3">
           {list.length === 0 && <li className="card p-6 text-center text-small text-slate-500">لا إعلانات بعد.</li>}
           {list.map((a) => (

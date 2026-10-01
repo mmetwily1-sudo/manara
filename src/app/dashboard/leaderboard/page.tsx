@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { SkeletonList } from "@/components/Loading";
 
 type L = { rank: number; medal: string | null; name: string; points: number };
 
@@ -245,7 +246,7 @@ export default function LeaderboardPage() {
       </header>
       <div className="card p-5">
         {busy || leaders === null ? (
-          <div className="p-6 text-center text-slate-400">جاري التحميل...</div>
+          <SkeletonList rows={5} />
         ) : leaders.length === 0 ? (
           <div className="p-6 text-center text-small text-slate-500">لا نقاط بعد — تُمنح النقاط على الحضور والواجبات والامتحانات.</div>
         ) : (

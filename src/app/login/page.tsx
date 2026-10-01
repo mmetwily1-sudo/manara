@@ -4,6 +4,31 @@ import Link from "next/link";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { PasskeyLoginButton } from "@/components/PasskeyLoginButton";
+import { PhoneLoginForm } from "@/components/PhoneLoginForm";
+
+/** بوابة دخول الطلاب برقم الموبايل: رابط السنتر + النموذج */
+function PhoneSlugGate() {
+  const [slug, setSlug] = useState("");
+  const [go, setGo] = useState(false);
+  return (
+    <div className="mt-3">
+      {!go ? (
+        <form
+          onSubmit={(e) => { e.preventDefault(); if (slug.trim()) setGo(true); }}
+          className="flex gap-2"
+        >
+          <input
+            value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="رابط سنترك (مثال: elnour)" dir="ltr"
+            className="flex-1 rounded-xl border-2 border-slate-200 px-4 py-2.5 text-center outline-none focus:border-primary"
+          />
+          <button className="btn-secondary whitespace-nowrap !py-2 text-small">متابعة</button>
+        </form>
+      ) : (
+        <PhoneLoginForm slug={slug.trim().toLowerCase()} />
+      )}
+    </div>
+  );
+}
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -113,6 +138,11 @@ export default function LoginPage() {
           <span className="h-px flex-1 bg-slate-200" />
         </div>
         <PasskeyLoginButton email={email} />
+
+        <details className="mt-4">
+          <summary className="cursor-pointer text-center text-small font-bold text-primary">دخول برقم الموبايل 📱</summary>
+          <PhoneSlugGate />
+        </details>
 
         {needsSetup && (
           <form onSubmit={handleSetup} className="mt-6 space-y-4 rounded-xl border-2 border-primary/20 bg-primary-light/40 p-5">

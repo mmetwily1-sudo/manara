@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { SkeletonList, EmptyState } from "@/components/Loading";
 
 type Note = { id: string; title: string; subject: string; lesson: string; content: string; visibility: string; custom: boolean; updated_at: string };
 
@@ -124,8 +125,8 @@ export default function NotesPage() {
       {/* قائمة المذكرات */}
       <section className="card p-4">
         <ul className="space-y-3">
-          {notes === null ? <div className="card p-6 text-center text-slate-400">جاري التحميل...</div> :
-            notes.length === 0 ? <div className="card p-6 text-center text-small text-slate-500">لا مذكرات بعد — أضف أول مذكرة.</div> :
+          {notes === null ? <SkeletonList rows={4} /> :
+            notes.length === 0 ? <EmptyState icon="📝" title="لا مذكرات بعد" desc="أضف أول مذكرة من النموذج بالأعلى." /> :
             notes.map(n => (
               <li key={n.id} className="card p-4 space-y-2">
                 <div className="flex items-start justify-between gap-2">
