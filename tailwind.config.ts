@@ -9,7 +9,17 @@ const config: Config = {
         primary: {
           DEFAULT: "#1A73E8",
           dark: "#1557B0",
+          deep: "#0F3D91",
           light: "#E8F0FE",
+          soft: "#F2F7FE",
+        },
+        accent: {
+          DEFAULT: "#7C3AED",
+          light: "#EDE9FE",
+        },
+        gold: {
+          DEFAULT: "#F59E0B",
+          light: "#FEF3C7",
         },
         success: "#16A34A",
         warning: "#D97706",
@@ -30,6 +40,12 @@ const config: Config = {
       },
       borderRadius: {
         xl: "1rem",
+        "2xl": "1.25rem",
+      },
+      boxShadow: {
+        card: "0 1px 3px rgba(15, 23, 42, 0.05), 0 12px 32px -16px rgba(15, 23, 42, 0.12)",
+        pop: "0 8px 30px -6px rgba(26, 115, 232, 0.35)",
+        glow: "0 0 0 4px rgba(26, 115, 232, 0.12)",
       },
     },
   },

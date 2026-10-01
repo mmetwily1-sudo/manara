@@ -17,25 +17,51 @@
     overflow-x: clip;
     max-width: 100%;
   }
+  body {
+    @apply bg-bg text-slate-800 antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: rgba(26, 115, 232, 0.18);
+  }
   img, video, canvas, svg {
     max-width: 100%;
   }
   input, select, textarea {
     max-width: 100%;
   }
-  /* العربية لا تحتمل letter-spacing السالب — يكسر اتصالات الحروف */
-  body {
-    letter-spacing: 0;
+  /* حقول موحدة: ارتفاع لمس مريح + تركيز واضح */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="month"]):not([type="file"]),
+  select, textarea {
+    @apply min-h-[44px] rounded-xl border-slate-200 bg-white text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-primary focus:ring-4 focus:ring-primary/10;
   }
+  :focus-visible {
+    outline: 2px solid rgba(26, 115, 232, 0.55);
+    outline-offset: 2px;
+  }
+  /* سكرول بار نحيف أنيق */
+  ::-webkit-scrollbar { width: 10px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
+  ::-webkit-scrollbar-thumb:hover { background: #94a3b8; border: 2px solid transparent; background-clip: content-box; }
 }
 
 @layer components {
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 font-bold text-white transition hover:bg-primary-dark active:scale-[0.98] min-h-[44px];
-    box-shadow: 0 1px 2px rgba(26, 115, 232, 0.25);
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-primary to-primary-dark px-6 py-3 font-bold text-white transition hover:brightness-105 focus-visible:ring-4 focus-visible:ring-primary/30 active:scale-[0.98] min-h-[44px];
+    box-shadow: 0 1px 2px rgba(26, 115, 232, 0.3), 0 8px 20px -8px rgba(26, 115, 232, 0.5);
+  }
+  .btn-primary:hover {
+    box-shadow: 0 8px 30px -6px rgba(26, 115, 232, 0.45);
   }
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-3 font-bold text-slate-700 transition hover:border-primary/40 hover:text-primary active:scale-[0.98] min-h-[44px];
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-3 font-bold text-slate-700 transition hover:border-primary/50 hover:text-primary focus-visible:ring-4 focus-visible:ring-primary/20 active:scale-[0.98] min-h-[44px];
+  }
+  .btn-secondary:hover {
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05), 0 12px 32px -16px rgba(15, 23, 42, 0.12);
+  }
+  .btn-danger-soft {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-danger/10 px-4 py-2 font-bold text-danger transition hover:bg-danger hover:text-white active:scale-[0.98] min-h-[44px];
   }
   .section-title {
     @apply mb-4 text-center text-h1 md:text-display;
@@ -43,9 +69,35 @@
   .section-sub {
     @apply mx-auto mb-14 max-w-xl text-center text-body leading-relaxed text-slate-600;
   }
+  .eyebrow {
+    @apply inline-flex items-center gap-1.5 rounded-full bg-primary-light px-4 py-1.5 text-xs font-extrabold text-primary;
+  }
+  .grad-text {
+    background-image: linear-gradient(to left, #1A73E8, #1557B0, #7C3AED);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
   .card {
-    @apply rounded-xl border border-slate-200/70 bg-surface;
-    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04), 0 8px 24px -12px rgba(15, 23, 42, 0.06);
+    @apply rounded-2xl border border-slate-200/70 bg-surface;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05), 0 12px 32px -16px rgba(15, 23, 42, 0.12);
+  }
+  .card-hover {
+    @apply transition duration-300 hover:-translate-y-1;
+  }
+  .card-hover:hover {
+    box-shadow: 0 8px 30px -6px rgba(26, 115, 232, 0.25);
+  }
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold;
+  }
+  .badge-success { @apply badge bg-success/10 text-success; }
+  .badge-warning { @apply badge bg-warning/10 text-warning; }
+  .badge-danger { @apply badge bg-danger/10 text-danger; }
+  .badge-info { @apply badge bg-primary-light text-primary; }
+  .badge-gold { @apply badge bg-gold-light text-gold; }
+  .input {
+    @apply w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 outline-none transition placeholder:text-slate-400 focus:border-primary focus:ring-4 focus:ring-primary/10;
   }
 
   /* Double-bezel — هيكل متداخل يدي إحساس الجهاز المصقول (soft-skill) */

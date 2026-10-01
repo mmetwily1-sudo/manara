@@ -75,9 +75,16 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4 py-16">
-      <div className="card w-full max-w-sm p-8">
-        <Link href="/" className="text-h2 font-extrabold text-primary">منارة</Link>
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-16">
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
+        <div className="absolute -top-24 right-1/4 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
+        <div className="absolute bottom-0 left-1/4 h-72 w-72 rounded-full bg-accent/10 blur-3xl" />
+      </div>
+      <div className="card w-full max-w-sm p-8 shadow-[0_8px_30px_-6px_rgba(26,115,232,0.25)]">
+        <div className="flex items-center gap-3">
+          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-b from-primary to-primary-dark text-xl font-extrabold text-white shadow-[0_8px_30px_-6px_rgba(26,115,232,0.35)]">ن</span>
+          <Link href="/" className="text-h2 font-extrabold text-primary">منارة</Link>
+        </div>
         <h1 className="mt-4 text-h1">أهلاً بعودتك 👋</h1>
 
         <form className="mt-6 space-y-4" onSubmit={handleSubmit}>

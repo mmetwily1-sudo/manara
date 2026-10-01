@@ -5,6 +5,7 @@ import { getSessionUser, adminClient } from "@/lib/server-auth";
 import { AuthGate, SignOutButton } from "@/components/AuthGate";
 import { AgentWidget } from "@/components/AgentWidget";
 import { MobileBottomNav } from "@/components/MobileNav";
+import { SideNav } from "@/components/SideNav";
 
 const nav = [
   { href: "/dashboard", label: "الرئيسية", key: "01" },
@@ -64,15 +65,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
               </div>
             </div>
           </div>
-          <nav className="flex-1 space-y-1 overflow-y-auto p-4">
-            {[...nav, ...navMore].filter((item: any) => !item.roles || !viewerRole || item.roles.includes(viewerRole) || viewerRole === "teacher_admin").map((item) => (
-              <Link key={item.label} href={item.href}
-                className="group flex items-center justify-between rounded-lg px-3 py-2.5 text-small font-semibold text-slate-600 transition hover:bg-primary-light/50 hover:text-primary">
-                <span>{item.label}</span>
-                <span className="font-mono text-[11px] text-slate-300 transition group-hover:text-primary">{item.key}</span>
-              </Link>
-            ))}
-          </nav>
+          <SideNav
+            items={[...nav, ...navMore].filter((item: any) => !item.roles || !viewerRole || item.roles.includes(viewerRole) || viewerRole === "teacher_admin")}
+          />
           <div className="space-y-2 border-t border-slate-100 p-4">
             <a href="#" className="block rounded-lg bg-slate-50 px-3 py-2.5 text-center text-small font-bold text-slate-600 transition hover:bg-slate-100">الدعم الفني على واتساب</a>
             <SignOutButton className="block w-full text-center text-xs font-semibold text-slate-400 transition hover:text-danger" />

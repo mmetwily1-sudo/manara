@@ -98,23 +98,28 @@ export default async function HomePage() {
       </header>
 
       {/* Hero — split غير متناظر (RTL: النص يمين، المنتج شمال) */}
-      <section className="overflow-hidden px-4 pb-20 pt-14 md:pt-24">
+      <section className="relative overflow-hidden px-4 pb-20 pt-14 md:pt-24">
+        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
+          <div className="absolute -top-32 left-1/4 h-96 w-96 rounded-full bg-primary/10 blur-3xl" />
+          <div className="absolute top-40 right-1/4 h-72 w-72 rounded-full bg-accent/10 blur-3xl" />
+        </div>
         <div className="mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-[1.1fr_1fr]">
           <div>
-            <h1 className="rise rise-1 max-w-xl text-h1 leading-snug md:text-display md:leading-tight">
+            <span className="eyebrow rise rise-1">✨ أكثر من 100 ميزة — تجربة 14 يوم مجاناً</span>
+            <h1 className="rise rise-1 mt-4 max-w-xl text-h1 leading-snug md:text-display md:leading-tight">
               سيب تشغيل سنترك علينا.
-              <span className="block mt-2 text-primary">حضّر، حصّل، وامتحن — باسمك أنت.</span>
+              <span className="grad-text mt-2 block">حضّر، حصّل، وامتحن — باسمك أنت.</span>
             </h1>
             <p className="rise rise-2 mt-6 max-w-lg text-body leading-relaxed text-slate-600">
               منصة كاملة بهوية سنترك: تحضير بالـQR، إشعارات أولياء الأمور لحظياً،
               وامتحانات بتتصحح لوحدها.
             </p>
-            <div className="rise rise-3 mt-8 flex flex-wrap items-center gap-4">
-              <Link href="/join" className="btn-primary">ابدأ مجاناً</Link>
-              <Link href="/pricing" className="btn-secondary">شوف الأسعار</Link>
+            <div className="rise rise-3 mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
+              <Link href="/join" className="btn-primary w-full text-lg sm:w-auto">ابدأ مجاناً 🚀</Link>
+              <Link href="/pricing" className="btn-secondary w-full sm:w-auto">شوف الأسعار</Link>
             </div>
             <p className="rise rise-4 mt-5 text-small text-slate-400">
-              14 يوم تجربة كاملة · بدون بطاقة ائتمان
+              ✅ 14 يوم تجربة كاملة · ✅ بدون بطاقة ائتمان · ✅ إلغاء بضغطة
             </p>
           </div>
 

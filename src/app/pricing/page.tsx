@@ -70,9 +70,13 @@ export default function PricingPage({ searchParams }: { searchParams?: { plan?: 
   const picked = ["starter", "pro", "scale"].includes(want) ? want : null;
   const isReturn = searchParams?.expired === "1";
   return (
-    <main className="px-4 py-16">
+    <main className="relative overflow-hidden px-4 py-16">
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
+        <div className="absolute -top-24 left-1/3 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
+      </div>
       <div className="mx-auto max-w-6xl">
-        <h1 className="text-h1">أسعار واضحة — من غير مفاجآت</h1>
+        <span className="eyebrow">💰 صفر عمولة على تحصيلك</span>
+        <h1 className="mt-4 text-h1 md:text-display">أسعار واضحة — <span className="grad-text">من غير مفاجآت</span></h1>
         <p className="section-sub">
           جرّب 14 يوم مجاناً بدون بطاقة. والاشتراك السنوي فيه شهرين مجاناً.
           <strong> وسعرك ثابت ما دمت مشترك</strong> — مهما زادت أسعارنا بعدين، حسابك مش هيتمسّ.
@@ -90,10 +94,10 @@ export default function PricingPage({ searchParams }: { searchParams?: { plan?: 
             return (
             <div
               key={p.name}
-              className={`card relative flex flex-col ${hot ? "border-2 border-primary shadow-lg" : ""}`}
+              className={`card card-hover relative flex flex-col p-7 ${hot ? "border-2 border-primary shadow-[0_8px_30px_-6px_rgba(26,115,232,0.35)] lg:-translate-y-2" : ""}`}
             >
               {hot && (
-                <span className="absolute -top-3 right-6 rounded-full bg-primary px-4 py-1 text-xs font-bold text-white">
+                <span className="absolute -top-3 right-6 rounded-full bg-gradient-to-l from-primary to-primary-dark px-4 py-1 text-xs font-bold text-white shadow-[0_8px_30px_-6px_rgba(26,115,232,0.35)]">
                   {picked ? "مختارة لعودتك ✅" : "الأكثر اختياراً ⭐"}
                 </span>
               )}
@@ -108,7 +112,7 @@ export default function PricingPage({ searchParams }: { searchParams?: { plan?: 
               </div>
               <ul className="mb-8 flex-1 space-y-2.5 text-small">
                 {p.features.map((f) => (
-                  <li key={f} className="flex gap-2">✓ <span>{f}</span></li>
+                  <li key={f} className="flex gap-2"><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-success/10 text-xs font-bold text-success">✓</span><span>{f}</span></li>
                 ))}
               </ul>
               <Link href="/join" className={p.highlight ? "btn-primary w-full" : "btn-secondary w-full"}>
@@ -120,7 +124,7 @@ export default function PricingPage({ searchParams }: { searchParams?: { plan?: 
           })}
         </div>
 
-        <div className="card mx-auto mt-10 max-w-3xl bg-surface">
+        <div className="card mx-auto mt-10 max-w-3xl bg-surface p-6">
           <h2 className="mb-4 text-center text-h2">ضماناتنا المكتوبة</h2>
           <div className="grid gap-4 sm:grid-cols-3 text-center text-small">
             <div><div className="text-3xl">🛡️</div><b>ضمان استرداد 30 يوم</b><p className="mt-1 text-slate-600">مش عاجبك؟ فلوسك ترجعلك كاملة بدون أسئلة.</p></div>
