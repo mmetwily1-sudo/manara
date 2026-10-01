@@ -251,6 +251,7 @@ export default function StudentsPage() {
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap items-center gap-1">
                       <a href={`/reports/parent/${s.id}`} className="text-xs font-bold text-primary hover:underline">تقرير 📄</a>
+                      <a href={`/card/${s.id}`} target="_blank" rel="noreferrer" className="text-xs font-bold text-slate-500 hover:underline">بطاقة 🪪</a>
                       {transferFor === s.id ? (
                         <>
                           <select value={transferTo} onChange={(e) => setTransferTo(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px]">
@@ -283,12 +284,14 @@ export default function StudentsPage() {
               <li key={s.id} className="rounded-2xl border border-slate-200/70 bg-white p-4">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-bold">{s.name}</span>
-                  <a href={`/reports/parent/${s.id}`} className="rounded-lg bg-primary-light px-3 py-1.5 text-xs font-bold text-primary">تقرير 📄</a>
+                  <a href={`/card/${s.id}`} target="_blank" rel="noreferrer" className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">بطاقة 🪪</a>
                 </div>
                 <div className="mt-1 text-xs text-slate-500">
                   {s.groups.length ? s.groups.map((g) => g.name).join("، ") : "—"} · <span dir="ltr">{s.phone ?? ""}</span>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2">
+                  <a href={`/reports/parent/${s.id}`} className="rounded-xl bg-primary-light px-3 py-2 text-center text-xs font-bold text-primary">تقرير 📄</a>
+                  <a href={`/card/${s.id}`} target="_blank" rel="noreferrer" className="rounded-xl bg-slate-100 px-3 py-2 text-center text-xs font-bold text-slate-600">طباعة البطاقة 🖨️</a>
                   {transferFor === s.id ? (
                     <>
                       <select value={transferTo} onChange={(e) => setTransferTo(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-small">

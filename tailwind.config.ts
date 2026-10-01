@@ -22,7 +22,7 @@ const config: Config = {
           light: "#FEF3C7",
         },
         success: "#059669",
-        warning: "#D97706",
+        warning: "#B45309",
         danger: "#DC2626",
         surface: "#FFFFFF",
         bg: "#F8FAFC",

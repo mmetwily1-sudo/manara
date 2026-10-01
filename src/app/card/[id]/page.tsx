@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { PrintButton } from "@/components/PrintButton";
 
 /** بطاقة الطالب الرقمية — تُعرض عند الدخول + QR لرابطها */
 export default async function StudentCardPage({ params }: { params: { id: string } }) {
@@ -35,19 +36,25 @@ export default async function StudentCardPage({ params }: { params: { id: string
 
   const cardUrl = `${appUrl}/card/${params.id}`;
   const qr = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(cardUrl)}`;
+  // رمز دائم للتحضير: يحمله المعلم ماسحاً من لوحته (بطاقة الطالب الدائمة)
+  const scanPayload = `manara:student:${params.id}`;
+  const qrScan = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(scanPayload)}`;
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-gradient-to-b from-primary-light/40 to-bg p-4">
-      <div className="card w-full max-w-sm space-y-4 p-8 text-center">
+      <div className="print-card card w-full max-w-sm space-y-4 p-8 text-center">
         <div className="text-xs font-bold text-slate-400">{center} · بطاقة طالب 🪪</div>
         <div className="text-h1 font-extrabold">{st.full_name}</div>
         {groups.length > 0 && <div className="text-small text-slate-500">{groups.join(" · ")}</div>}
         <div className="inline-block rounded-full bg-primary-light px-4 py-1.5 text-small font-bold text-primary">⭐ {Number(st.points ?? 0)} نقطة</div>
         <div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={qr} alt="QR البطاقة" width={180} height={180} className="mx-auto rounded-xl border border-slate-100" />
+          <img src={qrScan} alt="QR التحضير" width={220} height={220} className="mx-auto rounded-xl border border-slate-100" />
         </div>
-        <p className="text-xs text-slate-400">اعرضها عند الدخول لتحضير سريع — رقمك التعريفي محفوظ بالرمز</p>
+        <p className="text-xs text-slate-400">اعرضها عند الدخول ليحضّرك المعلم بالمسح — أو امسح رمز الجلسة بنفسك</p>
+        <div className="no-print">
+          <PrintButton />
+        </div>
       </div>
     </main>
   );

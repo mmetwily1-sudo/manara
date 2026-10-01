@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AttendanceGrid } from "@/components/AttendanceGrid";
 import SessionQr from "@/components/SessionQr";
+import QrScanCheckin from "@/components/QrScanCheckin";
 
 /** تعيين بديل للحصة (مالك + مشرف) */
 function SwapBlock({ sessionId }: { sessionId: string | null }) {
@@ -220,6 +221,7 @@ export default function AttendancePage() {
       ) : (
         <>
           <SessionQr sessionId={sessionId} />
+          <QrScanCheckin sessionId={sessionId} />
           <SwapBlock sessionId={sessionId} />
           <AttendanceGrid students={students} sessionId={sessionId} />
           <ExcusesBlock students={students} />

@@ -147,3 +147,11 @@ html.dark .divide-slate-100 > * + * { border-color: #334155 !important; }
 @keyframes rise-in {
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* طباعة بطاقات QR: إظهار البطاقة فقط */
+@media print {
+  body * { visibility: hidden; }
+  .print-card, .print-card * { visibility: visible; }
+  .print-card { position: absolute; inset: 0; margin: 0 auto; box-shadow: none !important; }
+  .no-print { display: none !important; }
+}
