@@ -232,7 +232,8 @@ export default function StudentsPage() {
             />
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          <div className="hidden overflow-x-auto md:block">
           <table className="w-full min-w-[640px] text-right text-small">
             <thead className="bg-slate-50 text-xs text-slate-500">
               <tr>{["الطالب", "المجموعات", "الهاتف", "تقرير", "تذكير"].map((h) => (
@@ -277,6 +278,39 @@ export default function StudentsPage() {
             </tbody>
           </table>
           </div>
+          <ul className="space-y-2 p-3 md:hidden">
+            {visible.map((s) => (
+              <li key={s.id} className="rounded-2xl border border-slate-200/70 bg-white p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-bold">{s.name}</span>
+                  <a href={`/reports/parent/${s.id}`} className="rounded-lg bg-primary-light px-3 py-1.5 text-xs font-bold text-primary">تقرير 📄</a>
+                </div>
+                <div className="mt-1 text-xs text-slate-500">
+                  {s.groups.length ? s.groups.map((g) => g.name).join("، ") : "—"} · <span dir="ltr">{s.phone ?? ""}</span>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {transferFor === s.id ? (
+                    <>
+                      <select value={transferTo} onChange={(e) => setTransferTo(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-small">
+                        <option value="">إلى مجموعة…</option>
+                        {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                      </select>
+                      <button onClick={() => onTransfer(s.id)} disabled={!transferTo} className="btn-primary !py-2 text-small disabled:opacity-50">نقل ✅</button>
+                    </>
+                  ) : (
+                    <button onClick={() => { setTransferFor(s.id); setTransferTo(""); }} className="btn-secondary !py-2 text-small">نقل 🔀</button>
+                  )}
+                  {(() => {
+                    const link = waTo(s.phone, `السلام عليكم 👋 تذكير من سنترنا: برجاء متابعة المصروفات الشهرية الخاصة بالطالب ${s.name} — للاستفسار تواصل معنا.`);
+                    return link
+                      ? <a href={link} target="_blank" rel="noreferrer" className="btn-secondary !border-success/30 !py-2 text-small !text-success">واتساب 💬</a>
+                      : <span />;
+                  })()}
+                </div>
+              </li>
+            ))}
+          </ul>
+          </>
         )}
       </section>
       <section className="card space-y-3 p-5">

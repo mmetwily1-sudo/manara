@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { SkeletonList, SkeletonCards } from "@/components/Loading";
+import { num } from "@/lib/format";
 
 type Item = { user_id: string; name: string; base: number; bonus: number; deduction: number; net: number; note: string };
 type Run = { id: string; month: string; status: string; total: number; items: Item[] };
@@ -135,7 +136,7 @@ export default function PayrollPage() {
               {run.items.map((i) => (
                 <li key={i.user_id} className="flex flex-wrap items-center justify-between gap-2 py-2">
                   <span className="font-bold">{i.name}</span>
-                  <span className="text-slate-500">أساسي {i.base} + إضافي {i.bonus} − خصم {i.deduction} = <b>{i.net}</b></span>
+                  <span className="text-slate-500">أساسي {num(i.base)} + إضافي {num(i.bonus)} − خصم {num(i.deduction)} = <b>{num(i.net)}</b></span>
                   {run.status === "draft" && (
                     <button onClick={() => setEdit({ run: run.id, user: i.user_id, bonus: String(i.bonus), deduction: String(i.deduction), note: i.note })}
                       className="text-xs font-bold text-primary">تعديل</button>
@@ -144,7 +145,7 @@ export default function PayrollPage() {
               ))}
             </ul>
             <div className="flex items-center justify-between border-t border-slate-100 pt-2 text-small">
-              <span className="font-bold">الإجمالي: {run.total} ج</span>
+              <span className="font-bold">الإجمالي: {num(run.total)} ج</span>
               {run.status === "draft" && <button onClick={() => approve(run.id)} className="btn-primary !px-4 !py-1.5 text-xs">اعتماد ✅</button>}
             </div>
             {edit.run === run.id && (

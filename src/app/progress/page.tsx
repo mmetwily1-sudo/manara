@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Onboarding } from "@/components/Onboarding";
 import {
   StudentPoints, StudentBundles, StudentLibrary, StudentShipments,
   StudentTransport, StudentProjects, StudentForum, StudentNotes,
@@ -570,6 +571,8 @@ export default function ProgressPage() {
         <h1 className="text-h1">تقدمي الدراسي 🎯</h1>
         <p className="mt-1 text-small text-slate-500">أهلاً {data.student.name} — كل نتائجك وشهاداتك في مكان واحد</p>
       </header>
+
+      <Onboarding role="student" />
 
       <section className="card p-4">
         <PushSubscribeButton />

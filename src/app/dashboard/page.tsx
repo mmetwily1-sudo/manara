@@ -4,6 +4,7 @@ import ReferralCard from "@/components/ReferralCard";
 import ReferralPromo from "@/components/ReferralPromo";
 import NpsBanner from "@/components/NpsBanner";
 import OnboardingChecklist from "@/components/OnboardingChecklist";
+import { Onboarding } from "@/components/Onboarding";
 import TrialBanner from "@/components/TrialBanner";
 import FeedbackWidget from "@/components/FeedbackWidget";
 import HealthScore from "@/components/HealthScore";
@@ -51,6 +52,7 @@ export default async function DashboardHome() {
       </section>
 
       <TrialBanner />
+      <Onboarding role="teacher" />
       <SourceSurvey />
       <HealthScore />
       <OnboardingChecklist />

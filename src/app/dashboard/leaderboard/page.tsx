@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { num } from "@/lib/format";
 import { SkeletonList } from "@/components/Loading";
 
 type L = { rank: number; medal: string | null; name: string; points: number };
@@ -107,7 +108,7 @@ function HwContest() {
           <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100" dir="ltr">
             <div className={`h-full rounded-full ${i === 0 ? "bg-success" : "bg-primary"}`} style={{ width: `${r.rate}%` }} />
           </div>
-          <span className="text-xs font-bold">{r.rate}% <span className="font-normal text-slate-400">({r.submitted}/{r.members})</span></span>
+          <span className="text-xs font-bold">{num(r.rate)}% <span className="font-normal text-slate-400">({num(r.submitted)}/{num(r.members)})</span></span>
         </div>
       ))}
     </section>
@@ -152,7 +153,7 @@ function BranchContest() {
           <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100" dir="ltr">
             <div className={`h-full rounded-full ${i === 0 ? "bg-warning" : "bg-primary"}`} style={{ width: `${Math.round((r.points / max) * 100)}%` }} />
           </div>
-          <span className="text-xs font-bold">{r.points} نقطة</span>
+          <span className="text-xs font-bold">{num(r.points)} نقطة</span>
         </div>
       ))}
       {isOwner && rows && (
@@ -257,7 +258,7 @@ export default function LeaderboardPage() {
                   <span className="w-10 text-center text-xl">{l.medal ?? `#${l.rank}`}</span>
                   <span className="font-bold">{l.name}</span>
                 </div>
-                <span className="rounded-full bg-primary-light px-3 py-1 text-xs font-bold text-primary">{l.points} نقطة</span>
+                <span className="rounded-full bg-primary-light px-3 py-1 text-xs font-bold text-primary">{num(l.points)} نقطة</span>
               </li>
             ))}
           </ul>

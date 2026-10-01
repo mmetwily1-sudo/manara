@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { FloatingWhatsApp } from "@/components/FloatingWhatsApp";
 import { PushBootstrap } from "@/components/PushBootstrap";
+import { OnlineStatus } from "@/components/OnlineStatus";
+import { ToastHost } from "@/components/Toast";
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://manara-mmetwily.vercel.app").replace(/\/$/, "");
 
@@ -70,7 +72,9 @@ export default function RootLayout({
         />
       </head>
       <body className="bg-bg font-sans text-slate-900 antialiased">
+        <OnlineStatus />
         {children}
+        <ToastHost />
         <FloatingWhatsApp />
         <PushBootstrap />
       </body>

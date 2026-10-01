@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { SkeletonList } from "@/components/Loading";
+import { Sheet } from "@/components/Sheet";
+import { toast } from "@/components/Toast";
 
 type Branch = { id: string; name: string; address: string | null; lat: number | null; lng: number | null };
 type Member = { id: string; name: string; phone: string; role: string; role_label: string; branch: string; branch_id: string | null; is_owner: boolean };
@@ -134,13 +136,17 @@ export default function StaffPage() {
     } catch { setErr("تعذر الاتصال."); }
   }
 
-  async function remove(id: string, name: string) {
-    if (!confirm(`إزالة ${name} من الطاقم؟`)) return;
+  const [removing, setRemoving] = useState<{ id: string; name: string } | null>(null);
+  const [removingBusy, setRemovingBusy] = useState(false);
+
+  async function remove(id: string) {
+    setRemovingBusy(true);
     try {
       const r = await fetch(`/api/staff?id=${id}`, { method: "DELETE" });
-      if (r.ok) load();
+      if (r.ok) { setRemoving(null); load(); toast("تمت الإزالة ✅", "success"); }
       else setErr("فشل الإزالة.");
     } catch { setErr("تعذر الاتصال."); }
+    finally { setRemovingBusy(false); }
   }
 
   async function move(id: string, patch: { branch_id?: string | null; role?: string }) {
@@ -251,7 +257,7 @@ export default function StaffPage() {
                     رابط عام 🔗
                   </button>
                   {!s.is_owner && s.role !== "teacher_admin" && (
-                    <button onClick={() => remove(s.id, s.name)} className="text-xs font-bold text-danger">إزالة</button>
+                    <button onClick={() => setRemoving({ id: s.id, name: s.name })} className="text-xs font-bold text-danger">إزالة</button>
                   )}
                 </div></td>
               </tr>
@@ -329,6 +335,16 @@ export default function StaffPage() {
             ))}
           </ul>}
       </section>
+      <Sheet
+        open={!!removing}
+        title={`إزالة ${removing?.name ?? ""} من الطاقم؟`}
+        desc="سيُحذف حسابه ولن يستطيع الدخول — لا يمكن التراجع."
+        confirmLabel="نعم، إزالة ⛔"
+        danger
+        busy={removingBusy}
+        onClose={() => setRemoving(null)}
+        onConfirm={() => removing && remove(removing.id)}
+      />
     </div>
   );
 }

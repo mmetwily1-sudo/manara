@@ -408,7 +408,8 @@ export default function InvoicesPage() {
         ) : invs.length === 0 ? (
           <div className="p-8 text-center text-small text-slate-500">لا فواتير بعد — أصدر فواتير الشهر بالزر بالأعلى.</div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          <div className="hidden overflow-x-auto md:block">
           <table className="w-full min-w-[640px] text-right text-small">
             <thead className="bg-slate-50 text-xs text-slate-500">
               <tr>{["الطالب", "الفترة", "المبلغ", "المدفوع", "الحالة"].map((h) => <th key={h} className="px-4 py-3 font-semibold">{h}</th>)}</tr>
@@ -429,6 +430,26 @@ export default function InvoicesPage() {
             </tbody>
           </table>
           </div>
+          <ul className="space-y-2 p-3 md:hidden">
+            {invs.slice(0, 100).map((x) => {
+              const [label, tone] = ST[x.status] ?? [x.status, "bg-slate-100"];
+              const rest = Number(x.amount) - Number(x.paid);
+              return (
+                <li key={x.id} className="rounded-2xl border border-slate-200/70 bg-white p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-bold">{x.student}</span>
+                    <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${tone}`}>{label}</span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between text-small">
+                    <span className="text-slate-500" dir="ltr">{x.period}</span>
+                    <span>الإجمالي <b>{Number(x.amount).toLocaleString("ar-EG")} ج</b> · مدفوع <b className="text-success">{Number(x.paid).toLocaleString("ar-EG")}</b></span>
+                  </div>
+                  {rest > 0 && <div className="mt-1 text-small font-bold text-danger">المتبقي: {rest.toLocaleString("ar-EG")} ج</div>}
+                </li>
+              );
+            })}
+          </ul>
+          </>
         )}
       </section>
     </div>

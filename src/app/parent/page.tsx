@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Onboarding } from "@/components/Onboarding";
 
 type Data = {
   branding: { name: string; logo_url: string | null; primary_color: string };
@@ -76,6 +77,7 @@ export default function ParentPortal() {
 
   return (
     <main className="mx-auto max-w-md p-4 space-y-4" dir={lang === "ar" ? "rtl" : "ltr"}>
+      <Onboarding role="parent" />
       <div className="flex justify-end">
         <button onClick={() => switchLang(lang === "ar" ? "en" : "ar")}
           className="rounded-full bg-slate-100 px-4 py-1.5 text-xs font-bold">
@@ -130,7 +132,7 @@ export default function ParentPortal() {
                   <span className="font-extrabold text-danger">{d.due.toLocaleString(lang === "ar" ? "ar-EG" : "en-US")} {t.egp}</span>
                 </div>
                 {data.online_payment.enabled && d.due > 0 && (
-                  <button onClick={() => pay(d.id)} disabled={paying} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50">
+                  <button onClick={() => pay(d.id)} disabled={paying} className="btn-primary mt-2 w-full !py-3 text-base disabled:opacity-50 sm:w-auto">
                     {paying ? t.paying : `${t.pay} ${d.due.toLocaleString(lang === "ar" ? "ar-EG" : "en-US")} ${t.egp} 💳`}
                   </button>
                 )}
