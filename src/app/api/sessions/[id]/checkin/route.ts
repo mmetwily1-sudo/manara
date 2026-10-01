@@ -32,7 +32,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   await admin.from("attendance").upsert({
     tenant_id: tid, session_id: params.id, student_id: hit.student_id,
-    status: "present", method: "qr_self",
+    status: "present", method: "qr",
   }, { onConflict: "session_id,student_id" });
   try {
     const { awardPoints, POINTS } = await import("@/lib/gamification");

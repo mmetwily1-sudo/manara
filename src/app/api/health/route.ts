@@ -6,5 +6,6 @@ export async function GET() {
     hasAnon: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     hasService: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
     hasRootDomain: !!process.env.NEXT_PUBLIC_ROOT_DOMAIN,
+    sha: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "local",
   });
 }
