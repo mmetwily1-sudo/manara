@@ -27,7 +27,7 @@
     },
     {
       "path": "/api/sms/process",
-      "schedule": "*/10 * * * *"
+      "schedule": "45 8 * * *"
     }
   ]
 }
