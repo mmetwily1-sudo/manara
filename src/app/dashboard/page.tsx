@@ -18,15 +18,22 @@ export default async function DashboardHome() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-8">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-h1">يومك في شاشة واحدة</h1>
-          <p className="mt-1 text-small text-slate-500">{todayStr} — {groups.length} {groups.length === 1 ? "جلسة" : "جلسات"} النهاردة</p>
+      <header className="relative overflow-hidden rounded-3xl bg-gradient-to-l from-primary-deep via-primary to-primary-dark p-6 text-white shadow-[0_8px_30px_-6px_rgba(26,115,232,0.45)] md:p-8">
+        <div aria-hidden className="pointer-events-none absolute inset-0">
+          <div className="absolute -left-16 -top-24 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
+          <div className="absolute -bottom-28 right-1/3 h-56 w-56 rounded-full bg-accent/20 blur-3xl" />
         </div>
-        <div className="flex gap-2">
-          <DarkToggle />
-          <InstallPwa />
-          <Link href="/dashboard/attendance" className="btn-primary text-small">ابدأ التحضير</Link>
+        <div className="relative flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-bold text-white/70">{todayStr}</p>
+            <h1 className="mt-1 text-h1 text-white">يومك في شاشة واحدة ✨</h1>
+            <p className="mt-1 text-small text-white/80">{groups.length} {groups.length === 1 ? "جلسة" : "جلسات"} النهاردة — بالتوفيق يا بطل</p>
+          </div>
+          <div className="flex gap-2">
+            <DarkToggle />
+            <InstallPwa />
+            <Link href="/dashboard/attendance" className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-white px-6 py-3 font-bold text-primary transition hover:brightness-95 active:scale-[0.98] text-small">ابدأ التحضير ⚡</Link>
+          </div>
         </div>
       </header>
 
@@ -38,7 +45,7 @@ export default async function DashboardHome() {
           ["محصّل الشهر ده", `${kpis.collectedMonth.toLocaleString("ar-EG")} ج`, "primary"],
           ["متأخرات", `${kpis.outstanding.toLocaleString("ar-EG")} ج`, "warning"],
         ].map(([label, value, tone]) => (
-          <div key={label as string} className="card p-5">
+          <div key={label as string} className="card card-hover p-5">
             <div
               className={`text-3xl font-extrabold ${
                 tone === "success" ? "text-success" : tone === "danger" ? "text-danger" : tone === "warning" ? "text-warning" : "text-primary"

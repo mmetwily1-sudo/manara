@@ -21,8 +21,29 @@ export async function POST(req: Request) {
   }
 
   const merchantOrder: string = String(obj.order?.merchant_order_id ?? obj.merchant_order_id ?? "");
-  const invId = merchantOrder.split(":").pop() ?? "";
   const success = obj.success === true || obj.success === "true";
+  // فواتير أولياء الأمور: parent-{tid8}-{ts}:{invoiceId} → تحديث المدفوع والحالة
+  if (merchantOrder.startsWith("parent-")) {
+    const invId = merchantOrder.split(":").pop() ?? "";
+    if (!invId) return NextResponse.json({ ok: false, error: "bad_order" }, { status: 400 });
+    try {
+      const { data: inv } = await admin.from("invoices").select("id,tenant_id,amount,paid,status").eq("id", invId).single();
+      if (!inv) return NextResponse.json({ ok: false, error: "unknown_invoice" }, { status: 404 });
+      if ((inv as any).status === "paid") return NextResponse.json({ ok: true, duplicate: true });
+      if (!success) return NextResponse.json({ ok: true, failed: true });
+      const got = Math.max(0, Math.round(Number(obj.amount_cents ?? 0) / 100));
+      const total = Number((inv as any).amount ?? 0);
+      const paid = Math.min(total, Number((inv as any).paid ?? 0) + got);
+      const { error } = await admin.from("invoices").update({
+        paid, status: paid >= total ? "paid" : "partial", paid_at: new Date().toISOString(),
+      }).eq("id", invId);
+      if (error) return NextResponse.json({ ok: false, error: "server_error" }, { status: 500 });
+      return NextResponse.json({ ok: true, paid });
+    } catch {
+      return NextResponse.json({ ok: false, error: "server_error" }, { status: 500 });
+    }
+  }
+  const invId = merchantOrder.split(":").pop() ?? "";
   try {
     const { data: inv } = await admin.from("platform_payments").select("id,tenant_id,plan,months,status").eq("id", invId).single();
     if (!inv) return NextResponse.json({ ok: false, error: "unknown_invoice" }, { status: 404 });
