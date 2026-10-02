@@ -15,11 +15,31 @@ export async function POST(req: Request) {
     cookies: { getAll() { return store.getAll(); }, setAll(cs: any[]) { cs.forEach(({ name, value, options }: any) => store.set(name, value, options)); } },
   });
   const { data: { user } } = await sbUser.auth.getUser();
-  if (!user) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
+  let tenantId: string | null = null;
+  let userId: string | null = null;
+  if (user) {
+    const admin0 = createClient(SUPA_URL, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
+    const { data: urow0 } = await admin0.from("users").select("id,tenant_id").eq("auth_user_id", user.id).single();
+    if (!urow0) return NextResponse.json({ ok: false, error: "no_profile" }, { status: 403 });
+    tenantId = (urow0 as any).tenant_id;
+    userId = (urow0 as any).id;
+  } else {
+    // ولي الأمر بالرابط السحري (بلا حساب): كوكيز البوابة → طالب
+    const { createHash } = await import("node:crypto");
+    const ptoken = (req.headers.get("x-parent-token") ?? store.get("manara_parent_token")?.value) ?? "";
+    if (!ptoken) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
+    const admin0 = createClient(SUPA_URL, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
+    const th = createHash("sha256").update("parent:" + ptoken).digest("hex");
+    const { data: sess } = await admin0.from("parent_portal_sessions").select("student_id,tenant_id,expires_at")
+      .eq("token_hash", th).limit(1).single();
+    if (!sess || new Date((sess as any).expires_at).getTime() < Date.now()) {
+      return NextResponse.json({ ok: false, error: "expired" }, { status: 401 });
+    }
+    tenantId = (sess as any).tenant_id;
+    userId = (sess as any).student_id;
+  }
 
   const admin = createClient(SUPA_URL, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
-  const { data: urow } = await admin.from("users").select("id,tenant_id").eq("auth_user_id", user.id).single();
-  if (!urow) return NextResponse.json({ ok: false, error: "no_profile" }, { status: 403 });
 
   const body = await req.json().catch(() => ({} as any));
   const sub = body?.subscription ?? {};
@@ -32,7 +52,7 @@ export async function POST(req: Request) {
 
   // endpoint فريد عالمياً: إعادة الاشتراك تُحدّث المالك بدل التكرار
   const { error } = await admin.from("push_subscriptions").upsert({
-    tenant_id: (urow as any).tenant_id, user_id: (urow as any).id,
+    tenant_id: tenantId, user_id: userId,
     endpoint, p256dh, auth, last_seen_at: new Date().toISOString(),
   }, { onConflict: "endpoint" });
   if (error) return dbFail("push-subscribe", error);
@@ -47,13 +67,29 @@ export async function DELETE(req: Request) {
     cookies: { getAll() { return store.getAll(); }, setAll(cs: any[]) { cs.forEach(({ name, value, options }: any) => store.set(name, value, options)); } },
   });
   const { data: { user } } = await sbUser.auth.getUser();
-  if (!user) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
+  let delUserId: string | null = null;
+  if (user) {
+    const admin0 = createClient(SUPA_URL, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
+    const { data: urow0 } = await admin0.from("users").select("id").eq("auth_user_id", user.id).single();
+    if (!urow0) return NextResponse.json({ ok: false, error: "no_profile" }, { status: 403 });
+    delUserId = (urow0 as any).id;
+  } else {
+    const { createHash } = await import("node:crypto");
+    const ptoken = (req.headers.get("x-parent-token") ?? store.get("manara_parent_token")?.value) ?? "";
+    if (!ptoken) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
+    const admin0 = createClient(SUPA_URL, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
+    const th = createHash("sha256").update("parent:" + ptoken).digest("hex");
+    const { data: sess } = await admin0.from("parent_portal_sessions").select("student_id,expires_at")
+      .eq("token_hash", th).limit(1).single();
+    if (!sess || new Date((sess as any).expires_at).getTime() < Date.now()) {
+      return NextResponse.json({ ok: false, error: "expired" }, { status: 401 });
+    }
+    delUserId = (sess as any).student_id;
+  }
   const admin = createClient(SUPA_URL, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
-  const { data: urow } = await admin.from("users").select("id").eq("auth_user_id", user.id).single();
-  if (!urow) return NextResponse.json({ ok: false, error: "no_profile" }, { status: 403 });
   const body = await req.json().catch(() => ({} as any));
   const endpoint = String(body?.endpoint ?? "");
-  let q = admin.from("push_subscriptions").delete().eq("user_id", (urow as any).id);
+  let q = admin.from("push_subscriptions").delete().eq("user_id", delUserId);
   if (endpoint) q = q.eq("endpoint", endpoint);
   await q;
   return NextResponse.json({ ok: true });

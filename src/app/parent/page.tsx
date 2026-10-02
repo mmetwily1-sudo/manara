@@ -5,6 +5,7 @@ import { Onboarding } from "@/components/Onboarding";
 import { PushSubscribeButton } from "@/components/PushSubscribeButton";
 import { PushAutoPrompt } from "@/components/PushAutoPrompt";
 import { NotificationsInbox } from "@/components/NotificationsInbox";
+import { ParentOnboarding } from "@/components/ParentOnboarding";
 
 type Data = {
   branding: { name: string; logo_url: string | null; primary_color: string };
@@ -65,6 +66,25 @@ export default function ParentPortal() {
   }
 
   const [payMethod, setPayMethod] = useState("card");
+  const [onboarded, setOnboarded] = useState(true);
+
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem("manara_parent_onboarded")) setOnboarded(false);
+    } catch { setOnboarded(false); }
+  }, []);
+
+  async function checkTelegramLinked(): Promise<boolean> {
+    try {
+      const r = await fetch("/api/parent/portal", { credentials: "include" });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) {
+        setData(j);
+        return !!j.telegram?.linked;
+      }
+    } catch {}
+    return false;
+  }
   const [payAll, setPayAll] = useState<{ period: string; url?: string; error?: string }[] | null>(null);
   const [payingAll, setPayingAll] = useState(false);
 
@@ -107,6 +127,18 @@ export default function ParentPortal() {
   }
 
   if (!data) return <div className="mx-auto max-w-md p-8 text-center text-slate-400">{err || t.loading}</div>;
+
+  if (!onboarded) {
+    return (
+      <ParentOnboarding
+        studentName={data.student.name}
+        centerName={data.branding?.name || t.portal}
+        telegram={data.telegram ?? { on: false }}
+        onCheckTelegram={checkTelegramLinked}
+        onDone={() => setOnboarded(true)}
+      />
+    );
+  }
 
   return (
     <main className="mx-auto max-w-md p-4 space-y-4" dir={lang === "ar" ? "rtl" : "ltr"}>
