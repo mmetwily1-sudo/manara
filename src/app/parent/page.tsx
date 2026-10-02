@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Onboarding } from "@/components/Onboarding";
 import { PushSubscribeButton } from "@/components/PushSubscribeButton";
 import { PushAutoPrompt } from "@/components/PushAutoPrompt";
+import { NotificationsInbox } from "@/components/NotificationsInbox";
 
 type Data = {
   branding: { name: string; logo_url: string | null; primary_color: string };
@@ -127,6 +128,8 @@ export default function ParentPortal() {
       </header>
 
       <PushAutoPrompt />
+
+      <NotificationsInbox source="parent" />
 
       <section className="card p-4">
         <PushSubscribeButton />

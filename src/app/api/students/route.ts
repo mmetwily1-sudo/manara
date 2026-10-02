@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { dbFail } from "@/lib/api-error";
 import { requireTeacher } from "@/lib/server-auth";
 import { R, staffScope } from "@/lib/permissions";
+import { randomBytes, createHash } from "node:crypto";
 
 /** GET /api/students?groupId= — طلاب السنتر مع مجموعاتهم (طاقم الفرع يرى طلاب فرعه) */
 export async function GET(req: Request) {
@@ -51,7 +52,8 @@ export async function POST(req: Request) {
 
   const body = await req.json().catch(() => null as any);
   const name = (body?.name ?? "").trim();
-  const phone = (body?.phone ?? "").replace(/[^\d+]/g, "");
+  const { toAsciiDigits } = await import("@/lib/whatsapp");
+  const phone = toAsciiDigits(body?.phone ?? "").replace(/[^\d+]/g, "");
   const groupId = (body?.groupId ?? "").trim() || null;
 
   if (!name || name.length < 2) {
@@ -103,7 +105,23 @@ export async function POST(req: Request) {
     await fireWebhooks(ctx.admin, ctx.tenantId, "student_registered", {
       student_id: (row as any).id, name, group_id: groupId,
     });
-  } catch {}
+  } catch {} // eslint-disable-line no-empty
 
-  return NextResponse.json({ ok: true, id: row.id });
+  // رابط ولي الأمر السحري — يتولد لحظة الإنشاء (سنة كاملة، بلا حساب ولا باسورد)
+  let parentUrl: string | null = null;
+  try {
+    const token = randomBytes(24).toString("base64url");
+    const tokenHash = createHash("sha256").update("parent:" + token).digest("hex");
+    const expires = new Date(Date.now() + 365 * 864e5).toISOString();
+    const { error: pErr } = await ctx.admin.from("parent_portal_sessions").insert({
+      tenant_id: ctx.tenantId, parent_id: ctx.userRow.id, student_id: (row as any).id,
+      token_hash: tokenHash, expires_at: expires,
+    });
+    if (!pErr) {
+      const origin = new URL(req.url).origin;
+      parentUrl = `${origin}/parent/enter?token=${token}`;
+    }
+  } catch {} // eslint-disable-line no-empty
+
+  return NextResponse.json({ ok: true, id: row.id, parent_url: parentUrl });
 }

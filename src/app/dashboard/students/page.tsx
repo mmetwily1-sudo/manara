@@ -12,6 +12,8 @@ export default function StudentsPage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [filterGroup, setFilterGroup] = useState("");
   const [err, setErr] = useState("");
+  const [parentLink, setParentLink] = useState<{ name: string; url: string } | null>(null);
+  const [copiedParent, setCopiedParent] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [importText, setImportText] = useState("");
@@ -111,7 +113,7 @@ export default function StudentsPage() {
 
   async function onAdd(e: React.FormEvent) {
     e.preventDefault();
-    setBusy(true); setErr("");
+    setBusy(true); setErr(""); setParentLink(null);
     try {
       const r = await fetch("/api/students", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -119,8 +121,10 @@ export default function StudentsPage() {
       });
       const j = await r.json().catch(() => null);
       if (r.ok && j?.ok) {
+        const addedName = form.name;
         setForm({ name: "", phone: "", groupId: "" });
         setShowAdd(false);
+        if (j.parent_url) setParentLink({ name: addedName, url: j.parent_url });
         load();
       } else {
         setErr(j?.error === "phone_exists" ? "هذا الرقم مسجل لطالب آخر في سنترك." : "فشل الإضافة: " + (j?.error ?? "خطأ غير معروف"));
@@ -161,6 +165,29 @@ export default function StudentsPage() {
       </header>
 
       {err && <div className="card border-danger/20 bg-danger/5 p-4 text-small font-bold text-danger">{err}</div>}
+
+      {parentLink && (
+        <div className="card space-y-2 border-success/30 bg-success/5 p-5">
+          <p className="text-small font-bold text-success">✅ تمت إضافة {parentLink.name} — رابط ولي الأمر جاهز</p>
+          <p className="text-xs text-slate-600">ابعت الرابط لولي الأمر (واتساب/ورقة) — يدخل مباشرة بلا حساب ولا باسورد.</p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => { navigator.clipboard?.writeText(parentLink.url).then(() => { setCopiedParent(true); setTimeout(() => setCopiedParent(false), 2000); }).catch(() => {}); }}
+              className="btn-secondary !px-4 !py-2 text-small"
+            >
+              {copiedParent ? "✓ تم النسخ" : "نسخ رابط الولي"}
+            </button>
+            <a
+              href={`https://wa.me/?text=${encodeURIComponent(`رابط متابعة ${parentLink.name} الدراسية (حضور ودرجات ومصروفات): ${parentLink.url}`)}`}
+              target="_blank" rel="noopener noreferrer"
+              className="btn-primary !px-4 !py-2 text-small"
+            >
+              مشاركة واتساب 📤
+            </a>
+            <button onClick={() => setParentLink(null)} className="btn-secondary !px-4 !py-2 text-small">إغلاق</button>
+          </div>
+        </div>
+      )}
 
       {showAdd && (
         <form onSubmit={onAdd} className="card grid gap-3 p-5 sm:grid-cols-2">
