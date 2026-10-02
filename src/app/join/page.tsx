@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { TrialForm } from "@/components/TrialForm";
+import { InAppGuard } from "@/components/InAppGuard";
 
 export const metadata: Metadata = {
   title: "ابدأ تجربتك المجانية — منارة",
@@ -18,6 +19,7 @@ export default function JoinPage() {
         </p>
 
         <TrialForm />
+        <div className="mt-4"><InAppGuard /></div>
 
         <p className="mt-4 text-center text-small text-slate-500">
           عندك حساب؟{" "}

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { PasskeyLoginButton } from "@/components/PasskeyLoginButton";
 import { PhoneLoginForm } from "@/components/PhoneLoginForm";
+import { InAppGuard } from "@/components/InAppGuard";
 import { supabaseAuthError, arError } from "@/lib/auth-errors";
 
 /** بوابة دخول الطلاب برقم الموبايل: رابط السنتر + النموذج */
@@ -47,6 +48,11 @@ export default function LoginPage() {
     try {
       const last = localStorage.getItem("manara_last_email");
       if (last) setEmail(last);
+    } catch {}
+    try {
+      const q0 = new URLSearchParams(window.location.search);
+      const oerr = q0.get("oauth_err");
+      if (oerr) setErr(oerr);
     } catch {}
     let stop = false;
     (async () => {
@@ -111,7 +117,7 @@ export default function LoginPage() {
       const sb = createClient();
       const { error } = await sb.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: `${window.location.origin}/login?oauth=1` },
+        options: { redirectTo: `${window.location.origin}/auth/callback` },
       });
       if (error) setErr("دخول جوجل غير مفعل بعد — فعّله المالك من إعدادات Supabase.");
     } catch { setErr("تعذر الاتصال."); }
@@ -151,6 +157,8 @@ export default function LoginPage() {
           <Link href="/" className="text-h2 font-extrabold text-primary">منارة</Link>
         </div>
         <h1 className="mt-4 text-h1">أهلاً بعودتك 👋</h1>
+
+        <div className="mt-4"><InAppGuard /></div>
 
         <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
           <div>

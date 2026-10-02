@@ -40,7 +40,7 @@ export function TrialForm() {
       const sb = createClient();
       const { error } = await sb.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: `${window.location.origin}/login?oauth=1` },
+        options: { redirectTo: `${window.location.origin}/auth/callback` },
       });
       if (error) setFormError("دخول جوجل غير مفعل بعد — سجّل بالبريد.");
     } catch { setFormError("تعذر الاتصال بالخادم."); }
