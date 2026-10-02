@@ -7,6 +7,7 @@ import {
   StudentTransport, StudentProjects, StudentForum, StudentNotes,
 } from "@/components/StudentServices";
 import { PushSubscribeButton } from "@/components/PushSubscribeButton";
+import { PushAutoPrompt } from "@/components/PushAutoPrompt";
 
 type Progress = {
   ok: boolean;
@@ -602,6 +603,7 @@ export default function ProgressPage() {
       <section className="card p-4">
         <PushSubscribeButton />
       </section>
+      <PushAutoPrompt />
 
       <div className="grid grid-cols-3 gap-3">
         {[

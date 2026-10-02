@@ -3,10 +3,12 @@
 import { useEffect, useState } from "react";
 import { Onboarding } from "@/components/Onboarding";
 import { PushSubscribeButton } from "@/components/PushSubscribeButton";
+import { PushAutoPrompt } from "@/components/PushAutoPrompt";
 
 type Data = {
   branding: { name: string; logo_url: string | null; primary_color: string };
   student: { name: string; phone: string | null };
+  telegram?: { on: boolean; linked?: boolean; url?: string | null };
   attendance: { present: number; absent: number; total: number };
   grades: { exam: string; score: number; total: number | null; at: string }[];
   dues: { id: string; period: string; amount: number; paid: number; due: number; status: string; receipt: number | null }[];
@@ -124,9 +126,27 @@ export default function ParentPortal() {
         <p className="mt-2 text-sm text-slate-500">{t.follow} <b>{data.student.name}</b> {t.live}</p>
       </header>
 
+      <PushAutoPrompt />
+
       <section className="card p-4">
         <PushSubscribeButton />
       </section>
+
+      {data.telegram?.on && (
+        <section className="card space-y-2 p-4">
+          <p className="text-small font-bold">📨 تنبيهات تليجرام المجانية</p>
+          {data.telegram.linked ? (
+            <p className="text-xs font-bold text-success">✅ تليجرام مربوط — ستصلك التنبيهات هنا مجاناً.</p>
+          ) : data.telegram.url ? (
+            <>
+              <p className="text-xs text-slate-600">اضغط الزر، ثم اضغط START في تليجرام — ويتم الربط تلقائياً.</p>
+              <a href={data.telegram.url} target="_blank" rel="noopener noreferrer" className="btn-primary block w-full !py-2 text-center text-small">
+                اربط تليجرام الآن 📨
+              </a>
+            </>
+          ) : null}
+        </section>
+      )}
 
       <section className="card space-y-3 p-4">
         <h2 className="font-bold">{t.attendance}</h2>

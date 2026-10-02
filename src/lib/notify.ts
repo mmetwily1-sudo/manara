@@ -36,6 +36,30 @@ function renderBody(e: NotifyEvent): string {
   }
 }
 
+function titlesFallback(kind: NotifyEvent["kind"]): string {
+  return {
+    attendance_absent: "تنبيه غياب 📋",
+    exam_graded: "نتيجة امتحان 📝",
+    payment_received: "تم استلام دفعة ✅",
+    payment_reminder: "تذكير بالمصروفات 🔔",
+    homework_submitted: "واجب جديد 📝",
+    homework_graded: "تصحيح واجب 📝",
+  }[kind];
+}
+
+/** عداد واتساب الشهري للسنتر (للفوترة لاحقاً — 1000 مجاناً/شهر للمنصة) */
+async function bumpWaUsage(admin: any, tenantId: string): Promise<void> {
+  try {
+    const month = new Date().toISOString().slice(0, 7);
+    const { data: cur } = await admin.from("wa_usage").select("count").eq("tenant_id", tenantId).eq("month", month).single();
+    if ((cur as any)?.count != null) {
+      await admin.from("wa_usage").update({ count: ((cur as any).count ?? 0) + 1 }).eq("tenant_id", tenantId).eq("month", month);
+    } else {
+      await admin.from("wa_usage").insert({ tenant_id: tenantId, month, count: 1 });
+    }
+  } catch {}
+}
+
 export async function notifyStudent(
   admin: any,
   opts: {
@@ -130,6 +154,7 @@ export async function notifyStudent(
       status = "sent";
       sentAt = new Date().toISOString();
       sent = true;
+      await bumpWaUsage(admin, tenantId);
     } else {
       status = "failed";
       reason = r.reason;
@@ -172,7 +197,52 @@ export async function notifyStudent(
         dedupe_key: dedupeKey + ":push", sent_at: r.sent > 0 ? new Date().toISOString() : null,
       });
     }
-  } catch {}
+  } catch {} // eslint-disable-line no-empty
+
+  // تليجرام المنصة (مجاني غير محدود): رابط chat_id المخزن لنفس الطالب
+  let tgSent = false;
+  try {
+    const { sendTelegram, isTelegramLive } = await import("./telegram");
+    if (isTelegramLive()) {
+      const { data: link } = await admin.from("telegram_links").select("chat_id")
+        .eq("tenant_id", tenantId).eq("user_id", studentId).limit(1).single();
+      const chatId = (link as any)?.chat_id as number | undefined;
+      if (chatId) {
+        const tr = await sendTelegram(chatId, `${titlesFallback(event.kind)}\n${body.slice(0, 300)}`);
+        tgSent = tr.ok;
+        if (tr.ok === false && tr.reason === "blocked") {
+          await admin.from("telegram_links").delete().eq("tenant_id", tenantId).eq("user_id", studentId);
+        }
+        await admin.from("notification_log").insert({
+          tenant_id: tenantId, user_id: studentId, event: event.kind, channel: "telegram",
+          payload: { ok: tr.ok, reason: tr.ok ? undefined : tr.reason }, status: tr.ok ? "sent" : "failed",
+          dedupe_key: dedupeKey + ":tg", sent_at: tr.ok ? new Date().toISOString() : null,
+        });
+      }
+    }
+  } catch {} // eslint-disable-line no-empty
+
+  // بريد المنصة (Resend — مجاني حتى 3000/شهر): يُحل بريد الطالب من auth عند الإمكان
+  try {
+    const { sendMail, isMailLive } = await import("./mail");
+    if (isMailLive()) {
+      const { data: urow2 } = await admin.from("users").select("auth_user_id").eq("id", studentId).limit(1).single();
+      const auid = (urow2 as any)?.auth_user_id as string | undefined;
+      if (auid) {
+        const { data: au } = await admin.auth.admin.getUserById(auid);
+        const email = au?.user?.email as string | undefined;
+        if (email) {
+          const mr = await sendMail(email, titlesFallback(event.kind), body.slice(0, 1000));
+          if (mr.ok) {
+            await admin.from("notification_log").insert({
+              tenant_id: tenantId, user_id: studentId, event: event.kind, channel: "email",
+              payload: {}, status: "sent", dedupe_key: dedupeKey + ":mail", sent_at: new Date().toISOString(),
+            });
+          }
+        }
+      }
+    }
+  } catch {} // eslint-disable-line no-empty
 
   // SMS احتياطي: تنبيه حرج لم يصل push → طابور (يُعالج عبر /api/sms/process)
   const CRITICAL: NotifyEvent["kind"][] = ["attendance_absent", "exam_graded"];

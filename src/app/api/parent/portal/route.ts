@@ -34,6 +34,20 @@ export async function POST(req: Request) {
 }
 
 /** GET /api/parent/portal — بيانات الطالب للموقع العام (بالتوكين في الكوكيز/الهيدر) */
+/** حالة ربط تليجرام للطالب: رابط عميق + هل مربوط — بلا أسرار */
+async function telegramState(admin: any, tenantId: string, studentId: string) {
+  try {
+    const { telegramLinkFor, botUsername } = await import("@/lib/telegram");
+    const bot = botUsername();
+    if (!bot) return { on: false };
+    const { data: link } = await admin.from("telegram_links").select("chat_id")
+      .eq("tenant_id", tenantId).eq("user_id", studentId).limit(1).single();
+    return { on: true, linked: !!(link as any)?.chat_id, url: telegramLinkFor(studentId) };
+  } catch {
+    return { on: false };
+  }
+}
+
 export async function GET(req: Request) {
   const cookieStore = cookies();
   const token = req.headers.get("x-parent-token") ?? cookieStore.get("manara_parent_token")?.value;
@@ -62,6 +76,7 @@ export async function GET(req: Request) {
     ok: true,
     branding: { name: (brand as any)?.name ?? "", logo_url: (brand as any)?.logo_url ?? null, primary_color: (brand as any)?.primary_color ?? "#1A73E8" },
     student: { name: (st as any).full_name, phone: (st as any).phone },
+    telegram: await telegramState(admin, (sess as any).tenant_id, sid),
     attendance: { present, absent, total: present + absent },
     grades: (grades ?? []).map((g) => ({ exam: (g.exams as any)?.title, score: g.score, total: (g.exams as any)?.total_marks, at: g.submitted_at })),
     dues: (inv ?? []).map((x) => ({ period: x.period, amount: x.amount, paid: x.paid, due: Number(x.amount) - Number(x.paid), status: x.status, receipt: x.receipt_no })),
