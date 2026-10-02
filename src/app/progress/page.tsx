@@ -480,6 +480,31 @@ function EventsSection() {
   );
 }
 
+/** جلسات اللايف القادمة: دخول الغرفة */
+function LiveSection() {
+  type S = { id: string; title: string; starts_at: string };
+  const [sessions, setSessions] = useState<S[]>([]);
+  useEffect(() => {
+    fetch("/api/live", { cache: "no-store" }).then(async (r) => {
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok && !j.isTeacher) setSessions(j.sessions ?? []);
+    }).catch(() => {});
+  }, []);
+  if (!sessions.length) return null;
+  return (
+    <section className="card space-y-2 border-danger/25 p-5">
+      <h2 className="font-bold">حصص لايف قادمة 🔴</h2>
+      {sessions.slice(0, 3).map((s) => (
+        <a key={s.id} href={`/live/${s.id}`}
+          className="flex items-center justify-between gap-2 rounded-xl bg-danger/5 px-4 py-2.5 text-small transition hover:bg-danger/10">
+          <span><b dir="auto">{s.title}</b> <span className="text-xs text-slate-400">{new Date(s.starts_at).toLocaleString("ar-EG")}</span></span>
+          <span className="rounded-lg bg-danger px-3 py-1 text-xs font-bold text-white">انضم 🔴</span>
+        </a>
+      ))}
+    </section>
+  );
+}
+
 /** بياناتي: تنزيل نسخة + حذف الحساب (بشرط لا ديون) */
 function MyDataSection() {
   const [msg, setMsg] = useState("");
@@ -614,6 +639,7 @@ export default function ProgressPage() {
       <StoreCatalog />
       <ComplaintsSection />
       <EventsSection />
+      <LiveSection />
       <MyDataSection />
       <StudentPoints />
       <StudentBundles />
