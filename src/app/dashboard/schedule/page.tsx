@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { nextWeekday, addMinutes, googleCalendarTemplate, slotMinutes } from "@/lib/calendar-link";
 
 type Slot = { group: string; weekday: number; start: string; end: string; branch: string; teacher: string };
 const DAYS = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
@@ -15,6 +16,39 @@ export default function SchedulePage() {
   const [notice, setNotice] = useState("");
   const [holidays, setHolidays] = useState<{ id: string; holiday_date: string; title: string }[]>([]);
   const [hol, setHol] = useState({ date: "", title: "" });
+  const [syncBusy, setSyncBusy] = useState(false);
+  const [syncMsg, setSyncMsg] = useState("");
+
+  /** مزامنة حصص الأسبوع القادم مع تقويم جوجل (تحتاج ربطاً من الإعدادات) */
+  async function syncWeek() {
+    setSyncBusy(true); setSyncMsg("");
+    try {
+      const items: { title: string; start: string; end: string; description: string; location: string }[] = [];
+      for (const [day, slots] of Object.entries(byDay)) {
+        for (const s of (slots as Slot[])) {
+          const st = nextWeekday(Number(day), s.start);
+          const en = addMinutes(st, slotMinutes(s.start, s.end));
+          items.push({
+            title: `حصة ${s.group}`,
+            start: st.toISOString(),
+            end: en.toISOString(),
+            description: `المدرس: ${s.teacher}`,
+            location: s.branch,
+          });
+          if (items.length >= 20) break;
+        }
+        if (items.length >= 20) break;
+      }
+      if (!items.length) { setSyncMsg("لا حصص للمزامنة"); setSyncBusy(false); return; }
+      const r = await fetch("/api/integrations/google/calendar-sync", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items }),
+      });
+      const j = await r.json().catch(() => null);
+      setSyncMsg(j?.ok ? `تمت إضافة ${j.created} حصة لتقويمك ✅` : (j?.message ?? "تعذر — اربط جوجل من الإعدادات أولاً"));
+    } catch { setSyncMsg("تعذر الاتصال"); }
+    setSyncBusy(false);
+  }
 
   async function loadHolidays() {
     try {
@@ -77,6 +111,12 @@ export default function SchedulePage() {
       <header>
         <h1 className="text-h1">جدول الحصص 🗓️</h1>
         <p className="mt-1 text-small text-slate-500">مواعيد كل المجموعات — والتعارضات تُكشف تلقائياً</p>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <button onClick={syncWeek} disabled={syncBusy} className="btn-secondary !px-4 !py-2 text-small disabled:opacity-50">
+            {syncBusy ? "جاري المزامنة..." : "🟢 زامن حصص الأسبوع مع تقويم جوجل"}
+          </button>
+          {syncMsg && <span className="text-xs font-bold text-primary">{syncMsg}</span>}
+        </div>
       </header>
 
       {conflicts.length > 0 && (
@@ -96,6 +136,19 @@ export default function SchedulePage() {
                   <div className="font-bold text-primary" dir="ltr">{s.start}–{s.end}</div>
                   <div className="font-bold">{s.group}</div>
                   <div className="text-slate-500">{s.teacher} · {s.branch}</div>
+                  <a
+                    href={googleCalendarTemplate({
+                      title: `حصة ${s.group}`,
+                      start: nextWeekday(i, s.start),
+                      end: addMinutes(nextWeekday(i, s.start), slotMinutes(s.start, s.end)),
+                      details: `المدرس: ${s.teacher}`,
+                      location: s.branch,
+                    })}
+                    target="_blank" rel="noopener noreferrer"
+                    className="mt-1 inline-block font-bold text-primary"
+                  >
+                    📅 أضف لتقويمك
+                  </a>
                 </div>
               ))}
               {((byDay as any)[i] ?? []).length === 0 && <div className="text-[11px] text-slate-300">—</div>}

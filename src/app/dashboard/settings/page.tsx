@@ -1,4 +1,5 @@
 import { PasskeyManager } from "@/components/PasskeyManager";
+import { GoogleConnect } from "@/components/GoogleConnect";
 import { TotpManager } from "@/components/TotpManager";
 import { DevicesManager } from "@/components/DevicesManager";
 import { SecurityAlerts } from "@/components/SecurityAlerts";
@@ -107,6 +108,10 @@ export default async function SettingsPage() {
 
       <section className="card space-y-4 p-6">
         <NotifyRulesManager />
+      </section>
+
+      <section className="card space-y-4 p-6">
+        <GoogleConnect />
       </section>
 
       <section className="card space-y-4 p-6">

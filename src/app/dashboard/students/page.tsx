@@ -16,6 +16,22 @@ export default function StudentsPage() {
   const [showImport, setShowImport] = useState(false);
   const [importText, setImportText] = useState("");
   const [importResult, setImportResult] = useState<{ imported: number; skipped: number; bad: string[] } | null>(null);
+  const [sheetsBusy, setSheetsBusy] = useState(false);
+
+  /** تصدير الكشف لشيت جوجل في درايف المعلم (يحتاج ربطاً من الإعدادات) */
+  async function exportSheets() {
+    setSheetsBusy(true); setErr("");
+    try {
+      const r = await fetch("/api/integrations/google/sheets-export", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "students" }),
+      });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok && j.url) window.open(j.url, "_blank");
+      else setErr(j?.message ?? "تعذر — اربط جوجل من الإعدادات ← تكاملات جوجل أولاً");
+    } catch { setErr("تعذر الاتصال"); }
+    setSheetsBusy(false);
+  }
   const [transferFor, setTransferFor] = useState<string | null>(null);
   const [transferTo, setTransferTo] = useState("");
   type Complaint = { id: string; student: string; kind: string; body: string; status: string; reply: string; category: string; priority: string };
@@ -155,6 +171,9 @@ export default function StudentsPage() {
             {copied ? "✓ تم النسخ" : "نسخ رابط التسجيل"}
           </button>
           <a href="/api/export?scope=students" className="btn-secondary text-small">تصدير CSV ⬇️</a>
+          <button onClick={exportSheets} disabled={sheetsBusy} className="btn-secondary text-small disabled:opacity-50">
+            {sheetsBusy ? "جاري..." : "📊 تصدير لشيت جوجل"}
+          </button>
           <button onClick={() => setShowAdd((v) => !v)} className="btn-primary text-small">طالب جديد</button>
           <button onClick={() => { setShowImport((v) => !v); setShowAdd(false); }} className="btn-secondary text-small">استيراد 📥</button>
         </div>
@@ -196,7 +215,7 @@ export default function StudentsPage() {
           }}
           className="card space-y-3 p-5"
         >
-          <h3 className="font-bold">استيراد طلاب 📥 <span className="text-xs font-normal text-slate-400">سطر لكل طالب: الاسم، الهاتف (للمجموعة المختارة بالأسفل إن وُجدت)</span></h3>
+          <h3 className="font-bold">استيراد طلاب 📥 <span className="text-xs font-normal text-slate-400">سطر لكل طالب: الاسم، الهاتف — انسخ عمودين مباشرة من شيت جوجل والصقهما هنا</span></h3>
           <textarea value={importText} onChange={(e) => setImportText(e.target.value)} rows={6} dir="auto"
             placeholder={"أحمد محمد، 01001234567\nمنى علي، 01007654321"} className="input w-full font-mono" />
           {importResult && (
