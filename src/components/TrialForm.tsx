@@ -30,6 +30,26 @@ export function TrialForm() {
   const [formError, setFormError] = useState("");
   const [captchaToken, setCaptchaToken] = useState("");
   const [refCode, setRefCode] = useState<string | null>(null);
+  const [showPw, setShowPw] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(false);
+
+  // تسجيل بجوجل بضغطة: بدون اختراع كلمة سر — إكمال البيانات يتم بعد العودة
+  async function signupWithGoogle() {
+    setGoogleBusy(true); setFormError("");
+    try {
+      const sb = createClient();
+      const { error } = await sb.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: `${window.location.origin}/login?oauth=1` },
+      });
+      if (error) setFormError("دخول جوجل غير مفعل بعد — سجّل بالبريد.");
+    } catch { setFormError("تعذر الاتصال بالخادم."); }
+    setGoogleBusy(false);
+  }
+
+  const pwLen = password.length >= 8;
+  const pwLetter = /[A-Za-z\u0600-\u06FF]/.test(password);
+  const pwDigit = /\d/.test(password);
 
   // كود الإحالة من الرابط (?ref=CODE)
   useEffect(() => {
@@ -213,6 +233,16 @@ export function TrialForm() {
 
   return (
     <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
+      <button type="button" onClick={signupWithGoogle} disabled={googleBusy}
+        className="btn-secondary flex w-full items-center justify-center gap-2 !py-3 text-small disabled:opacity-50">
+        <span aria-hidden className="text-lg font-extrabold">G</span>
+        {googleBusy ? "جاري التحويل لجوجل..." : "سجّل بجوجل بضغطة — بدون كلمة سر"}
+      </button>
+      <div className="flex items-center gap-3 text-xs text-slate-400">
+        <span className="h-px flex-1 bg-slate-200" />
+        أو بالبريد
+        <span className="h-px flex-1 bg-slate-200" />
+      </div>
       {refCode && phase !== "done-live" && (
         <div className="rounded-xl border border-success/30 bg-success/5 px-4 py-2.5 text-small font-bold text-success">
           🎁 مسجّل بدعوة — كود الإحالة <span className="font-mono" dir="ltr">{refCode}</span>
@@ -266,16 +296,28 @@ export function TrialForm() {
         <label htmlFor="password" className="mb-1 block text-small font-bold">
           كلمة السر
         </label>
-        <input
-          id="password"
-          type="password"
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="••••••••"
-          className="w-full rounded-xl border-2 border-slate-200 px-4 py-3 outline-none transition focus:border-primary"
-        />
-        <p className="mt-1 text-xs text-slate-400">8 أحرف على الأقل — مع حرف ورقم</p>
+        <div className="relative">
+          <input
+            id="password"
+            type={showPw ? "text" : "password"}
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            className="w-full rounded-xl border-2 border-slate-200 px-4 py-3 pl-12 outline-none transition focus:border-primary"
+          />
+          <button type="button" onClick={() => setShowPw(!showPw)} aria-label={showPw ? "إخفاء" : "إظهار"}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-lg text-slate-400">
+            {showPw ? "🙈" : "👁️"}
+          </button>
+        </div>
+        {password.length > 0 && (
+          <ul className="mt-1.5 space-y-0.5 text-xs">
+            <li className={pwLen ? "text-success" : "text-slate-400"}>{pwLen ? "✅" : "○"} 8 أحرف على الأقل</li>
+            <li className={pwLetter ? "text-success" : "text-slate-400"}>{pwLetter ? "✅" : "○"} تحتوي حرفاً</li>
+            <li className={pwDigit ? "text-success" : "text-slate-400"}>{pwDigit ? "✅" : "○"} تحتوي رقماً</li>
+          </ul>
+        )}
       </div>
       <Turnstile onToken={setCaptchaToken} />
       {formError && (

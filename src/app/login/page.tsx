@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { PasskeyLoginButton } from "@/components/PasskeyLoginButton";
 import { PhoneLoginForm } from "@/components/PhoneLoginForm";
@@ -39,6 +39,36 @@ export default function LoginPage() {
   const [needsSetup, setNeedsSetup] = useState(false);
   const [setupName, setSetupName] = useState("");
   const [setupPhone, setSetupPhone] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const [oauthBusy, setOauthBusy] = useState(false);
+
+  // بريد محفوظ + استكمال عودة جوجل (?oauth=1): مزامنة تلقائية بدل وقوف العميل حائراً
+  useEffect(() => {
+    try {
+      const last = localStorage.getItem("manara_last_email");
+      if (last) setEmail(last);
+    } catch {}
+    let stop = false;
+    (async () => {
+      try {
+        const q = new URLSearchParams(window.location.search);
+        if (!q.has("oauth")) return;
+        setOauthBusy(true);
+        const sb = createClient();
+        const { data } = await sb.auth.getSession();
+        if (stop || !data.session) { setOauthBusy(false); return; }
+        try { localStorage.setItem("manara_last_email", (data.session.user.email ?? "").toLowerCase()); } catch {}
+        const r = await fetch("/api/auth/sync");
+        const j = await r.json().catch(() => null);
+        if (stop) return;
+        if (r.ok && j?.ok) { window.location.href = "/dashboard"; return; }
+        if (j?.error === "no_tenant") { setNeedsSetup(true); setOauthBusy(false); return; }
+        setErr(arError(j?.error, j?.message));
+        setOauthBusy(false);
+      } catch { if (!stop) { setErr("تعذر الاتصال بالخادم — حاول تاني"); setOauthBusy(false); } }
+    })();
+    return () => { stop = true; };
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -81,7 +111,7 @@ export default function LoginPage() {
       const sb = createClient();
       const { error } = await sb.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: `${window.location.origin}/dashboard` },
+        options: { redirectTo: `${window.location.origin}/login?oauth=1` },
       });
       if (error) setErr("دخول جوجل غير مفعل بعد — فعّله المالك من إعدادات Supabase.");
     } catch { setErr("تعذر الاتصال."); }
@@ -132,10 +162,20 @@ export default function LoginPage() {
           </div>
           <div>
             <label htmlFor="password" className="mb-1 block text-small font-bold">كلمة السر</label>
-            <input id="password" type="password" required value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-xl border-2 border-slate-200 px-4 py-3 outline-none focus:border-primary" />
+            <div className="relative">
+              <input id="password" type={showPw ? "text" : "password"} required value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full rounded-xl border-2 border-slate-200 px-4 py-3 pl-12 outline-none focus:border-primary" />
+              <button type="button" onClick={() => setShowPw(!showPw)} aria-label={showPw ? "إخفاء كلمة السر" : "إظهار كلمة السر"}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-lg text-slate-400">
+                {showPw ? "🙈" : "👁️"}
+              </button>
+            </div>
+            <div className="mt-1 text-left">
+              <Link href="/forgot" className="text-xs font-bold text-primary">نسيت كلمة السر؟</Link>
+            </div>
           </div>
+          {oauthBusy && <p className="rounded-lg bg-primary-light px-3 py-2 text-xs font-semibold text-primary">⏳ جاري تجهيز حسابك...</p>}
           {err && <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs font-semibold text-danger">{err}</p>}
           <button type="submit" disabled={busy} className="btn-primary w-full">
             {busy ? "جاري الدخول..." : "دخول"}
