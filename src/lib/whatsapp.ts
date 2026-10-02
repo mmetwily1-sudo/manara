@@ -7,9 +7,22 @@
 const TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
 const PHONE_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
 
-/** تطبيع رقم مصري: 01xxxxxxxxx → 201xxxxxxxxx (واتساب يحتاج الصيغة الدولية) */
-export function normalizePhone(raw: string): string | null {
-  const d = String(raw ?? "").replace(/\D/g, "");
+/** تطبيع رقم مصري: 01xxxxxxxxx → 201xxxxxxxxx (واتساب يحتاج الصيغة الدولية)
+ * يقبل الأرقام العربية المشرقية (٠١٢٣) والفارسية (۰۱۲۳) والمسافات والشرطات و+20 و0020 */
+const AR_DIGITS = "٠١٢٣٤٥٦٧٨٩";
+const FA_DIGITS = "۰۱۲۳۴۵۶۷۸۹";
+/** تحويل الأرقام العربية المشرقية/الفارسية لأرقام لاتينية قبل أي تنظيف */
+export function toAsciiDigits(raw: string): string {
+  let s = String(raw ?? "");
+  s = s.replace(/[٠-٩]/g, (d) => String(AR_DIGITS.indexOf(d)));
+  s = s.replace(/[۰-۹]/g, (d) => String(FA_DIGITS.indexOf(d)));
+  return s;
+}
+export function normalizePhone(raw: string): string | null {  let s = String(raw ?? "");
+  s = s.replace(/[٠-٩]/g, (d) => String(AR_DIGITS.indexOf(d)));
+  s = s.replace(/[۰-۹]/g, (d) => String(FA_DIGITS.indexOf(d)));
+  let d = s.replace(/[^\d]/g, "");
+  if (d.startsWith("0020")) d = d.slice(2);
   if (/^201[0-9]{9}$/.test(d)) return d;
   if (/^01[0-9]{9}$/.test(d)) return `2${d}`;
   if (/^1[0-9]{9}$/.test(d)) return `20${d}`;

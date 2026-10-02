@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionUser, adminClient } from "@/lib/server-auth";
+import { arError } from "@/lib/auth-errors";
 
 /**
  * GET /api/auth/sync — مزامنة/شفاء حساب المستخدم بعد الدخول
@@ -9,13 +10,13 @@ import { getSessionUser, adminClient } from "@/lib/server-auth";
  */
 export async function GET() {
   const user = await getSessionUser();
-  if (!user) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
+  if (!user) return NextResponse.json({ ok: false, error: "unauth", message: arError("unauth") }, { status: 401 });
 
   let admin;
   try {
     admin = adminClient();
   } catch {
-    return NextResponse.json({ ok: false, error: "not_configured" }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "not_configured", message: arError("not_configured") }, { status: 500 });
   }
 
   const { data: urow } = await admin
@@ -43,7 +44,7 @@ export async function GET() {
     .single();
 
   if (!owned) {
-    return NextResponse.json({ ok: false, error: "no_tenant" }, { status: 404 });
+    return NextResponse.json({ ok: false, error: "no_tenant", message: arError("no_tenant") }, { status: 404 });
   }
 
   const meta = (user.user_metadata ?? {}) as any;
@@ -56,7 +57,7 @@ export async function GET() {
   }).select("id").single();
 
   if (cErr || !created) {
-    return NextResponse.json({ ok: false, error: "heal_failed", details: cErr?.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "heal_failed", message: arError("heal_failed") }, { status: 500 });
   }
 
   await admin.from("tenants").update({ owner_user_id: created.id }).eq("id", owned.id);

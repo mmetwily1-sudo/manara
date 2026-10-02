@@ -1,6 +1,12 @@
 ﻿import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { isRateLimited } from "@/lib/rate-limit";
+import { arError } from "@/lib/auth-errors";
+
+/** رد خطأ موحد: كود للآلة + رسالة عربية للإنسان — لا إنجليزية أبداً */
+function fail(error: string, status: number, message?: string) {
+  return NextResponse.json({ ok: false, error, message: message ?? arError(error) }, { status });
+}
 
 /**
  * POST /api/trial â€” ØªØ³Ø¬ÙŠÙ„ ØªØ¬Ø±Ø¨Ø© Ù…Ø¬Ø§Ù†ÙŠØ© Ø­Ù‚ÙŠÙ‚ÙŠØ©
@@ -41,7 +47,7 @@ async function completeSetupForExistingAuth(
   const existing = existingRow as { id: string; tenant_id: string } | null;
   if (existing?.tenant_id) {
     await admin.from("tenants").delete().eq("id", tenantId);
-    return NextResponse.json({ ok: false, error: "already_have_account" }, { status: 400 });
+    return NextResponse.json({ ok: false, error: "already_have_account", message: arError("already_have_account") }, { status: 400 });
   }
 
   const { data: userRow, error: uErr } = await admin.from("users").insert({
@@ -55,7 +61,7 @@ async function completeSetupForExistingAuth(
     await admin.from("tenants").delete().eq("id", tenantId);
     const isPhoneDup = uErr?.message?.includes("users_phone_key") || uErr?.message?.includes("duplicate key");
     return NextResponse.json(
-      { ok: false, error: isPhoneDup ? "phone_exists" : "profile_failed", details: uErr?.message },
+      { ok: false, error: isPhoneDup ? "phone_exists" : "profile_failed", message: arError(isPhoneDup ? "phone_exists" : "profile_failed") },
       { status: 400 }
     );
   }
@@ -136,17 +142,17 @@ async function seedDemo(admin: any, tenantId: string): Promise<{ questions: numb
 export async function POST(req: Request) {
   let preBody: any = null;
   try { preBody = await req.json(); } catch {
-    return NextResponse.json({ ok: false, error: "bad_json" }, { status: 400 });
+    return fail("bad_json", 400);
   }
   const body = preBody;
   // الجولة الفورية: حد مستقل 3/ساعة لكل IP (حسابات مؤقتة بأسماء عشوائية)
   const isDemo = body.demo === true;
   if (isDemo && isRateLimited(req, "trial-demo", 3)) {
-    return NextResponse.json({ ok: false, error: "too_many_attempts", message: "جولات كثيرة — انتظر ساعة." }, { status: 429 });
+    return fail("too_many_attempts", 429, "جولات كثيرة — انتظر ساعة.");
   }
   // حد: 5 محاولات/ساعة لكل IP ضد إغراق إنشاء السناتر
   if (!isDemo && isRateLimited(req, "trial", 5)) {
-    return NextResponse.json({ ok: false, error: "too_many_attempts" }, { status: 429 });
+    return fail("too_many_attempts", 429);
   }
 
   // تحقق بشري (Cloudflare Turnstile) — يُفعَّل بإضافة المفاتيح في البيئة
@@ -160,26 +166,21 @@ export async function POST(req: Request) {
   }
 
   const centerName = (body.centerName ?? "").trim();
-  const phone = (body.phone ?? "").replace(/[^\d+]/g, "");
+  const { toAsciiDigits } = await import("@/lib/whatsapp");
+  const phone = toAsciiDigits(body.phone ?? "").replace(/[^\d+]/g, "");
   const emailInput = (body.email ?? "").trim().toLowerCase();
   const passwordInput = (body.password ?? "").trim();
 
   if (centerName.length < 2 || phone.length < 8) {
-    return NextResponse.json(
-      { ok: false, error: "invalid_input" },
-      { status: 400 }
-    );
+    return fail("invalid_input", 400);
   }
   if (!emailInput || !emailInput.includes("@")) {
-    return NextResponse.json(
-      { ok: false, error: "invalid_credentials" },
-      { status: 400 }
-    );
+    return fail("invalid_credentials", 400);
   }
   const { checkPassword, WEAK_PASSWORD } = await import("@/lib/password");
   const pwErr = checkPassword(passwordInput);
   if (pwErr) {
-    return NextResponse.json({ ok: false, error: WEAK_PASSWORD, message: pwErr }, { status: 400 });
+    return fail(WEAK_PASSWORD, 400, pwErr);
   }
 
   // ÙˆØ¶Ø¹ Ø§Ù„Ù…Ø¹Ø§ÙŠÙ†Ø©/Ø§Ù„Ø§Ø³ØªØ¶Ø§ÙØ© Ø§Ù„Ø«Ø§Ø¨ØªØ© â€” Ø¨Ø¯ÙˆÙ† Ù…ÙØ§ØªÙŠØ­
@@ -224,19 +225,16 @@ export async function POST(req: Request) {
             const owned = await completeSetupForExistingAuth(admin, loginEmail, password, data.id, data.slug, centerName, phone);
             if (owned) return owned;
             await admin.from("tenants").delete().eq("id", data.id);
-            return NextResponse.json({ ok: false, error: "email_exists" }, { status: 400 });
+            return fail("email_exists", 400);
           }
           await admin.from("tenants").delete().eq("id", data.id);
           const { logError } = await import("@/lib/api-error");
           logError("trial-auth", aue);
-          return NextResponse.json(
-            { ok: false, error: "auth_failed" },
-            { status: 400 }
-          );
+          return fail("auth_failed", 400);
         }
         if (!au?.user) {
           await admin.from("tenants").delete().eq("id", data.id);
-          return NextResponse.json({ ok: false, error: "auth_failed" }, { status: 500 });
+          return fail("auth_failed", 500);
         }
         // إنشاء صف المستخدم (مطلوب لسياسات RLS) — أي فشل هنا = إلغاء كل شيء
         const { data: userRow, error: uErr } = await admin.from("users").insert({
@@ -252,10 +250,7 @@ export async function POST(req: Request) {
           const isPhoneDup = uErr?.message?.includes("users_phone_key") || uErr?.message?.includes("duplicate key");
           const { logError } = await import("@/lib/api-error");
           logError("trial-profile", uErr);
-          return NextResponse.json(
-            { ok: false, error: isPhoneDup ? "phone_exists" : "profile_failed" },
-            { status: 400 }
-          );
+          return fail(isPhoneDup ? "phone_exists" : "profile_failed", 400);
         }
         // ربط المالك بصف users (وليس auth id — القيد fk_owner يشير لـ users.id)
         // + حفظ owner_auth_id في settings للشفاء الذاتي لاحقاً
@@ -299,7 +294,7 @@ export async function POST(req: Request) {
       } catch (e: any) {
         console.error("trial failed:", e?.message);
         await admin.from("tenants").delete().eq("id", data.id);
-        return NextResponse.json({ ok: false, error: "server_error" }, { status: 500 });
+        return fail("server_error", 500);
       }
     }
 

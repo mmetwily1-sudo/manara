@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { WA_TRIAL_TEXT, waLink } from "@/lib/wa";
 import { createClient } from "@/lib/supabase";
 import { Turnstile } from "@/components/Turnstile";
+import { arError } from "@/lib/auth-errors";
 
 /**
  * نموذج تفعيل التجربة — مفيش نهاية عمياء أبداً:
@@ -139,7 +140,8 @@ export function TrialForm() {
         return;
       }
       if (!res.ok && data?.error) {
-        setFormError(data.message ?? data.details ?? data.error);
+        // عربية فقط — لا كود خام ولا تفاصيل تقنية للمستخدم أبداً
+        setFormError(arError(data.error, data.message));
         setPhase("idle");
         return;
       }

@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getSessionUser, adminClient } from "@/lib/server-auth";
+import { arError } from "@/lib/auth-errors";
+
+function fail(error: string, status: number) {
+  return NextResponse.json({ ok: false, error, message: arError(error) }, { status });
+}
 
 function makeSlug(centerName: string): string {
   const latin = centerName
@@ -20,13 +25,13 @@ function makeSlug(centerName: string): string {
  */
 export async function POST(req: Request) {
   const user = await getSessionUser();
-  if (!user) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
+  if (!user) return fail("unauth", 401);
 
   let admin;
   try {
     admin = adminClient();
   } catch {
-    return NextResponse.json({ ok: false, error: "not_configured" }, { status: 500 });
+    return fail("not_configured", 500);
   }
 
   const { data: existing } = await admin
@@ -40,9 +45,10 @@ export async function POST(req: Request) {
 
   const body = await req.json().catch(() => null as any);
   const centerName = (body?.centerName ?? "").trim();
-  const phone = (body?.phone ?? "").replace(/[^\d+]/g, "");
+  const { toAsciiDigits } = await import("@/lib/whatsapp");
+  const phone = toAsciiDigits(body?.phone ?? "").replace(/[^\d+]/g, "");
   if (centerName.length < 2 || phone.length < 8) {
-    return NextResponse.json({ ok: false, error: "invalid_input" }, { status: 400 });
+    return fail("invalid_input", 400);
   }
 
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -62,7 +68,7 @@ export async function POST(req: Request) {
     if (tErr || !tenant) {
       const code = (tErr as any)?.code;
       if (code === "23505") continue; // تكرار slug — حاول مجدداً
-      return NextResponse.json({ ok: false, error: "tenant_failed" }, { status: 500 });
+      return fail("tenant_failed", 500);
     }
 
     const meta = (user.user_metadata ?? {}) as any;
@@ -77,10 +83,7 @@ export async function POST(req: Request) {
     if (uErr || !userRow) {
       await admin.from("tenants").delete().eq("id", (tenant as any).id);
       const isPhoneDup = (uErr?.message ?? "").includes("duplicate key");
-      return NextResponse.json(
-        { ok: false, error: isPhoneDup ? "phone_exists" : "profile_failed", details: uErr?.message },
-        { status: 400 }
-      );
+      return fail(isPhoneDup ? "phone_exists" : "profile_failed", 400);
     }
 
     await admin.from("tenants").update({
@@ -91,5 +94,5 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, slug: (tenant as any).slug });
   }
 
-  return NextResponse.json({ ok: false, error: "server_error" }, { status: 500 });
+  return fail("server_error", 500);
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { arError } from "@/lib/auth-errors";
 
 /** دخول برقم الهاتف بدون باسورد — رمز واتساب ثم جلسة (tenant slug). */
 export function PhoneLoginForm({ slug }: { slug?: string }) {
@@ -25,7 +26,7 @@ export function PhoneLoginForm({ slug }: { slug?: string }) {
         setMasked(j.masked_phone ?? "");
         setMsg(j.sent ? `أرسلنا رمزاً إلى ${j.masked_phone}` : "الواتساب غير مربوط حالياً — اطلب الرمز من إدارة السنتر.");
         setPhase("code");
-      } else { setMsg(j?.message ?? "فشل الإرسال: " + (j?.error ?? "")); setPhase("idle"); }
+      } else { setMsg(arError(j?.error, j?.message)); setPhase("idle"); }
     } catch { setMsg("تعذر الاتصال بالخادم."); setPhase("idle"); }
     finally { setWorking(false); }
   }
@@ -42,7 +43,7 @@ export function PhoneLoginForm({ slug }: { slug?: string }) {
       if (r.ok && j?.ok) {
         setPhase("done");
         window.location.href = j.redirect ?? "/progress";
-      } else { setMsg(j?.message ?? "فشل التحقق: " + (j?.error ?? "")); setPhase("code"); }
+      } else { setMsg(arError(j?.error, j?.message)); setPhase("code"); }
     } catch { setMsg("تعذر الاتصال بالخادم."); setPhase("code"); }
     finally { setWorking(false); }
   }

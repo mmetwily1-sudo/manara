@@ -5,6 +5,7 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { PasskeyLoginButton } from "@/components/PasskeyLoginButton";
 import { PhoneLoginForm } from "@/components/PhoneLoginForm";
+import { supabaseAuthError, arError } from "@/lib/auth-errors";
 
 /** بوابة دخول الطلاب برقم الموبايل: رابط السنتر + النموذج */
 function PhoneSlugGate() {
@@ -46,11 +47,7 @@ export default function LoginPage() {
     const { error } = await sb.auth.signInWithPassword({ email: email.trim(), password });
     if (error) {
       setBusy(false);
-      setErr(
-        error.message.includes("Invalid login")
-          ? "البريد أو كلمة السر غير صحيحة"
-          : "حدث خطأ — حاول تاني أو كلمنا على واتساب"
-      );
+      setErr(supabaseAuthError(error.message));
       return;
     }
     // مزامنة الحساب مع سنتره (شفاء ذاتي لو الصف مفقود) ثم الدخول
@@ -64,7 +61,7 @@ export default function LoginPage() {
           setNeedsSetup(true);
           return;
         }
-        setErr("تعذر تجهيز حسابك — حاول تاني");
+        setErr(arError(j?.error, j?.message));
         return;
       }
     } catch {
@@ -105,7 +102,7 @@ export default function LoginPage() {
         window.location.href = "/dashboard";
         return;
       }
-      setErr(j?.error === "phone_exists" ? "هذا الرقم مسجل لطالب آخر — استخدم رقماً مختلفاً" : "تعذر إنشاء السنتر — حاول تاني");
+      setErr(arError(j?.error, j?.message));
     } catch {
       setErr("تعذر الاتصال بالخادم — حاول تاني");
     }

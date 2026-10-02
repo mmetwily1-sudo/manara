@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { arError } from "@/lib/auth-errors";
+
+function fail(error: string, status: number, message?: string) {
+  return NextResponse.json({ ok: false, error, message: message ?? arError(error) }, { status });
+}
 
 const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -11,23 +16,23 @@ const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 export async function POST(req: Request) {
   const { isRateLimited } = await import("@/lib/rate-limit");
   if (isRateLimited(req, "phone-code", 5)) {
-    return NextResponse.json({ ok: false, error: "too_many_attempts" }, { status: 429 });
+    return fail("too_many_attempts", 429);
   }
   if (!SUPA_URL || !SERVICE_KEY) {
-    return NextResponse.json({ ok: false, error: "not_configured" }, { status: 500 });
+    return fail("not_configured", 500);
   }
   const body = await req.json().catch(() => null as any);
   const { slug, phone } = body ?? {};
   if (!slug || !phone) {
-    return NextResponse.json({ ok: false, error: "missing_fields" }, { status: 400 });
+    return fail("missing_fields", 400);
   }
   const admin = createClient(SUPA_URL, SERVICE_KEY, { auth: { persistSession: false } });
   const { data: tenant } = await admin.from("tenants").select("id,name").eq("slug", slug).single();
-  if (!tenant) return NextResponse.json({ ok: false, error: "tenant_not_found" }, { status: 404 });
+  if (!tenant) return fail("tenant_not_found", 404);
 
   const { normalizePhone, sendWhatsAppText, isWhatsAppLive } = await import("@/lib/whatsapp");
   const target = normalizePhone(String(phone));
-  if (!target) return NextResponse.json({ ok: false, error: "bad_phone" }, { status: 400 });
+  if (!target) return fail("bad_phone", 400);
 
   // المستخدم بهذا الرقم في نفس السنتر (أي دور: طالب أو معلم)
   const { data: users } = await admin.from("users").select("id,phone").eq("tenant_id", (tenant as any).id).limit(200);
