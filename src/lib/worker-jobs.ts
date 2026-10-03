@@ -13,8 +13,22 @@ function backoffMin(attempts: number): number {
   return Math.min(360, Math.pow(2, attempts));
 }
 
-export async function runDueJobs(admin: any): Promise<{ ran: number; done: number; failed: number }> {
+export async function runDueJobs(admin: any): Promise<{ ran: number; done: number; failed: number; rescued: number }> {
   let ran = 0, done = 0, failed = 0;
+  // إنقاذ اليتامى: running معلقة >10 دقائق (مات العامل قبل إنهائها) → تعود queued
+  let rescued = 0;
+  try {
+    const cutoff = new Date(Date.now() - 10 * 60000).toISOString();
+    const { data: orphans } = await admin.from("bg_jobs").select("id")
+      .eq("status", "running").lt("leased_at", cutoff).limit(BATCH);
+    for (const o of ((orphans ?? []) as any[])) {
+      const { data: ok } = await admin.from("bg_jobs").update({
+        status: "queued", leased_at: null, lease_token: null,
+        last_error: "orphan_rescue",
+      }).eq("id", o.id).eq("status", "running").select("id").single();
+      if (ok) rescued++;
+    }
+  } catch {} // eslint-disable-line no-empty
   const { data: due } = await admin.from("bg_jobs").select("id,tenant_id,kind,payload,attempts,max_attempts")
     .eq("status", "queued").lte("run_at", new Date().toISOString())
     .order("run_at").limit(BATCH);
@@ -51,7 +65,7 @@ export async function runDueJobs(admin: any): Promise<{ ran: number; done: numbe
       }
     }
   }
-  return { ran, done, failed };
+  return { ran, done, failed, rescued };
 }
 
 async function execJob(admin: any, kind: string, payload: any): Promise<boolean> {
