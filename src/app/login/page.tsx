@@ -42,6 +42,25 @@ export default function LoginPage() {
   const [setupPhone, setSetupPhone] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [oauthBusy, setOauthBusy] = useState(false);
+  const [magicSent, setMagicSent] = useState(false);
+  const [magicBusy, setMagicBusy] = useState(false);
+
+  /** دخول برابط بريدي بدون باسورد — يعمل داخل واتساب/فيسبوك (بلا جوجل) */
+  async function handleMagicLink() {
+    const em = email.trim().toLowerCase();
+    if (!em || !em.includes("@")) { setErr("اكتب بريدك أولاً ثم اطلب الرابط"); return; }
+    setMagicBusy(true); setErr("");
+    try {
+      const sb = createClient();
+      const { error } = await sb.auth.signInWithOtp({
+        email: em,
+        options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      });
+      if (error) setErr(supabaseAuthError(error.message));
+      else setMagicSent(true);
+    } catch { setErr("تعذر الاتصال بالخادم — حاول تاني"); }
+    setMagicBusy(false);
+  }
 
   // بريد محفوظ + استكمال عودة جوجل (?oauth=1): مزامنة تلقائية بدل وقوف العميل حائراً
   useEffect(() => {
@@ -199,6 +218,18 @@ export default function LoginPage() {
         <button onClick={handleGoogle} disabled={busy} className="btn-secondary mt-3 w-full disabled:opacity-50">
           <span aria-hidden className="text-lg font-extrabold">G</span> دخول بجوجل بلمسة واحدة
         </button>
+        {magicSent ? (
+          <div className="mt-3 rounded-lg bg-success/10 px-3 py-2 text-center">
+            <p className="text-xs font-bold text-success">
+              📩 أرسلنا رابط الدخول لبريدك — افتحه من نفس الجهاز وستدخل مباشرة (يعمل داخل واتساب وفيسبوك).
+            </p>
+            <button onClick={() => { setMagicSent(false); }} className="mt-1 text-xs font-bold text-primary">إعادة الإرسال</button>
+          </div>
+        ) : (
+          <button onClick={handleMagicLink} disabled={magicBusy || busy} className="btn-secondary mt-3 w-full disabled:opacity-50">
+            {magicBusy ? "جاري الإرسال..." : "✉️ دخول برابط بريدي — بدون باسورد"}
+          </button>
+        )}
 
         <details className="mt-4">
           <summary className="cursor-pointer text-center text-small font-bold text-primary">دخول برقم الموبايل 📱</summary>

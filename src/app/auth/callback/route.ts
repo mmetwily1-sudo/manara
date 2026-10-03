@@ -10,6 +10,8 @@ import { createServerClient } from "@supabase/ssr";
 export async function GET(req: Request) {
   const u = new URL(req.url);
   const code = u.searchParams.get("code");
+  const tokenHash = u.searchParams.get("token_hash");
+  const otpType = u.searchParams.get("type") ?? "magiclink";
   const err = u.searchParams.get("error_description") ?? u.searchParams.get("error");
   const base = `${u.protocol}//${u.host}`;
   const store = cookies();
@@ -17,7 +19,7 @@ export async function GET(req: Request) {
   if (err) {
     return NextResponse.redirect(`${base}/login?oauth_err=${encodeURIComponent("رفض التفويض — حاول تاني")}`, 302);
   }
-  if (!code) {
+  if (!code && !tokenHash) {
     return NextResponse.redirect(`${base}/login?oauth_err=${encodeURIComponent("عودة غير صالحة — حاول تاني")}`, 302);
   }
 
@@ -41,7 +43,9 @@ export async function GET(req: Request) {
       },
     },
   });
-  const { error } = await supa.auth.exchangeCodeForSession(code);
+  const { error } = code
+    ? await supa.auth.exchangeCodeForSession(code)
+    : await supa.auth.verifyOtp({ token_hash: tokenHash as string, type: otpType as any });
   if (error) {
     const m = (error.message ?? "").toLowerCase();
     const ar = m.includes("expired") || m.includes("invalid")
