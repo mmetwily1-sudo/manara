@@ -161,7 +161,7 @@ export async function notifyStudent(
     }
   }
 
-  await admin.from("notification_log").insert({
+  const { data: wlog } = await admin.from("notification_log").insert({
     tenant_id: tenantId,
     user_id: studentId,
     event: event.kind,
@@ -170,7 +170,19 @@ export async function notifyStudent(
     status,
     dedupe_key: dedupeKey,
     sent_at: sentAt,
-  });
+  }).select("id").single();
+
+  // فشل واتساب → مهمة إعادة خلفية (backoff أسي) بدل الضياع
+  if (!sent && status === "failed" && (wlog as any)?.id) {
+    try {
+      const { enqueueJob } = await import("./bg");
+      await enqueueJob(admin, {
+        tenantId, kind: "notify_retry",
+        payload: { logId: (wlog as any).id },
+        dedupeKey: `nretry:${(wlog as any).id}`,
+      });
+    } catch {} // eslint-disable-line no-empty
+  }
 
   // Web Push لأجهزة الطالب/ولي الأمر (best-effort — يصل حتى والتطبيق مقفول)
   let pushSent = 0;
