@@ -45,17 +45,38 @@ export default async function TeacherPage({ params }: Props) {
   let displayName: string | null = null;
   let teacherPhone: string | undefined;
   let theme: string = "default";
+  let tenantId: string | null = null;
+  let sessions: any[] = [];
+  let videos: any[] = [];
+  let notes: any[] = [];
+  let examsCount = 0;
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (url && key) {
       const { createClient } = await import("@supabase/supabase-js");
       const admin = createClient(url, key, { auth: { persistSession: false } });
-      const { data } = await admin.from("tenants").select("name,settings").eq("slug", slug).single();
+      const { data } = await admin.from("tenants").select("id,name,settings").eq("slug", slug).single();
       if (data?.name) displayName = data.name;
       teacherPhone = (data as any)?.settings?.owner_phone;
       const th = String((data as any)?.settings?.theme ?? "default");
       if (["default", "dark", "minimal"].includes(th)) theme = th;
+      tenantId = (data as any)?.id ?? null;
+    }
+    if (tenantId) {
+      const { createClient } = await import("@supabase/supabase-js");
+      const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
+      const today = new Date().toISOString().slice(0, 10);
+      const [ss, vv, nn, ee] = await Promise.all([
+        admin.from("sessions").select("session_date,topic,groups(name)").eq("tenant_id", tenantId).gte("session_date", today).order("session_date").limit(6),
+        admin.from("videos").select("title,duration_sec").eq("tenant_id", tenantId).eq("visibility", "free").order("created_at", { ascending: false }).limit(4),
+        admin.from("notes").select("title,subject").eq("tenant_id", tenantId).eq("visibility", "public").order("created_at", { ascending: false }).limit(4),
+        admin.from("exams").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("is_published", true),
+      ]);
+      sessions = (ss.data ?? []) as any[];
+      videos = (vv.data ?? []) as any[];
+      notes = (nn.data ?? []) as any[];
+      examsCount = ee.count ?? 0;
     }
   } catch {}
   if (!displayName) notFound();
@@ -85,6 +106,51 @@ export default async function TeacherPage({ params }: Props) {
 
         <StudentRegisterForm slug={slug} teacherPhone={teacherPhone} />
         <PhoneLoginForm slug={slug} />
+
+        {(sessions.length > 0 || videos.length > 0 || notes.length > 0 || examsCount > 0) && (
+          <div className="mt-14 space-y-8 text-right">
+            {sessions.length > 0 && (
+              <div>
+                <h2 className="mb-3 font-extrabold">🗓️ الحصص القادمة</h2>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {sessions.map((s, i) => (
+                    <div key={i} className={th.card}>
+                      <div className="font-bold">{(s.groups as any)?.name ?? "حصة"}</div>
+                      <div className="mt-1 text-small opacity-70" dir="ltr">{String(s.session_date ?? "").slice(0, 10)}</div>
+                      {s.topic && <div className="mt-1 text-small opacity-70">{s.topic}</div>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {videos.length > 0 && (
+              <div>
+                <h2 className="mb-3 font-extrabold">🎬 حصص مجانية</h2>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {videos.map((v, i) => (
+                    <div key={i} className={th.card}><div className="font-bold">{v.title}</div></div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {notes.length > 0 && (
+              <div>
+                <h2 className="mb-3 font-extrabold">📚 مذكرات</h2>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {notes.map((n, i) => (
+                    <div key={i} className={th.card}>
+                      <div className="font-bold">{n.title}</div>
+                      {n.subject && <div className="mt-1 text-small opacity-70">{n.subject}</div>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {examsCount > 0 && (
+              <p className="text-center text-small font-bold opacity-70">📝 {examsCount} امتحان تدريبي متاح لطلاب السنتر</p>
+            )}
+          </div>
+        )}
 
         <div className="mt-14 grid gap-5 sm:grid-cols-3">
           {[["🎬", "حصص مسجلة", "شاهدها في أي وقت من موبايلك"],

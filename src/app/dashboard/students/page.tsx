@@ -14,6 +14,24 @@ export default function StudentsPage() {
   const [err, setErr] = useState("");
   const [parentLink, setParentLink] = useState<{ name: string; url: string } | null>(null);
   const [copiedParent, setCopiedParent] = useState(false);
+  const [linkBusy, setLinkBusy] = useState<string | null>(null);
+
+  /** توليد رابط ولي الأمر لطالب موجود (استرداد عند ضياع الرابط) */
+  async function genParentLink(id: string, name: string) {
+    setLinkBusy(id); setErr("");
+    try {
+      const r = await fetch("/api/parent/portal", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ student_id: id }),
+      });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok && j.token) {
+        setParentLink({ name, url: `${window.location.origin}/parent/enter?token=${j.token}` });
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } else setErr("تعذر توليد الرابط — حاول تاني");
+    } catch { setErr("تعذر الاتصال"); }
+    setLinkBusy(null);
+  }
   const [showAdd, setShowAdd] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [importText, setImportText] = useState("");
@@ -289,7 +307,12 @@ export default function StudentsPage() {
                           <button onClick={() => { setTransferFor(null); setTransferTo(""); }} className="text-[11px] text-slate-400">✕</button>
                         </>
                       ) : (
-                        <button onClick={() => { setTransferFor(s.id); setTransferTo(""); }} className="text-xs font-bold text-slate-500 hover:underline">نقل 🔀</button>
+                        <>
+                          <button onClick={() => { setTransferFor(s.id); setTransferTo(""); }} className="text-xs font-bold text-slate-500 hover:underline">نقل 🔀</button>{" "}
+                          <button onClick={() => genParentLink(s.id, s.name)} disabled={linkBusy === s.id} className="text-xs font-bold text-slate-500 hover:underline disabled:opacity-50">
+                            {linkBusy === s.id ? "..." : "رابط الولي 🔗"}
+                          </button>
+                        </>
                       )}
                     </div>
                   </td>
