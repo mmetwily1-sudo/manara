@@ -10,7 +10,7 @@ export default async function CertsPage() {
   if (url && anon) {
     const store = cookies();
     const sb = createServerClient(url, anon, {
-      cookies: { getAll() { return store.getAll(); }, setAll(cs: any[]) { cs.forEach(({ name, value, options }: any) => store.set(name, value, options)); } },
+      cookies: { getAll() { return store.getAll(); }, setAll(cs: any[]) { cs.forEach(({ name, value, options }: any) => { try { store.set(name, value, options); } catch {} }); } },
     });
     const { data: { user } } = await sb.auth.getUser();
     if (user) {

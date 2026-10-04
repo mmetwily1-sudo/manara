@@ -17,7 +17,7 @@ function supaServer() {
     cookies: {
       getAll() { return store.getAll(); },
       setAll(cookiesToSet: any[]) {
-        cookiesToSet.forEach(({ name, value, options }: any) => store.set(name, value, options));
+        cookiesToSet.forEach(({ name, value, options }: any) => { try { store.set(name, value, options); } catch {} });
       },
     },
   });
