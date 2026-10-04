@@ -17,7 +17,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   const admin = createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
   const { data: urow } = await admin.from("users").select("role").eq("auth_user_id", user.id).single();
-  if (urow?.role !== "platform_admin") {
+  // المالك ببريده (يحتفظ بدور المعلم في سنتره) + مديرو المنصة — القائمة من البيئة فقط
+  const owners = (process.env.PLATFORM_OWNER_EMAILS ?? "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+  const isOwner = owners.includes((user.email ?? "").toLowerCase());
+  if (urow?.role !== "platform_admin" && !isOwner) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-3 p-8 text-center">
         <div className="text-h1">🔒</div>
