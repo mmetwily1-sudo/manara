@@ -123,5 +123,15 @@ export async function POST(req: Request) {
     }
   } catch {} // eslint-disable-line no-empty
 
-  return NextResponse.json({ ok: true, id: row.id, parent_url: parentUrl });
+  // PIN دخول الطالب — يتولد لحظة الإنشاء ويُعرض مرة واحدة (للأونلاين والتقدم)
+  let studentPin: string | null = null;
+  try {
+    const { makePin, hashPin } = await import("@/lib/student-auth");
+    studentPin = makePin();
+    await ctx.admin.from("users").update({
+      pin_hash: hashPin(studentPin, ctx.tenantId), pin_set_at: new Date().toISOString(),
+    }).eq("id", (row as any).id);
+  } catch { studentPin = null; } // eslint-disable-line no-empty
+
+  return NextResponse.json({ ok: true, id: row.id, parent_url: parentUrl, student_pin: studentPin });
 }

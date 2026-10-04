@@ -22,9 +22,20 @@ function admin() {
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   const sbUser = supaUser();
   const { data: { user } } = sbUser ? await sbUser.auth.getUser() : { data: { user: null } } as any;
-  if (!user) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
 
   const sb = admin();
+
+  // جلسة طالب PIN (رقم + PIN) بديلاً عن حساب Supabase — تفتح الأونلاين لطلاب المدرس
+  let urow: { id: string; tenant_id: string; role: string } | null = null;
+  if (!user) {
+    const stoken = cookies().get("manara_student_token")?.value ?? req.headers.get("x-student-token") ?? "";
+    const { getStudentSession } = await import("@/lib/student-auth");
+    const sess = await getStudentSession(sb, stoken);
+    if (!sess) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
+    const { data: srow } = await sb.from("users").select("id,tenant_id,role").eq("id", sess.studentId).eq("tenant_id", sess.tenantId).single();
+    if (!srow) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
+    urow = srow as any;
+  }
 
   // الامتحان نفسه (البحث بالمعرف أولاً)
   const { data: exam } = await sb
@@ -35,7 +46,10 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   if (!exam) return NextResponse.json({ ok: false, error: "exam_not_found" }, { status: 404 });
 
   // صلاحية: يجب أن ينتمي المستخدم لنفس السنتر (أو يُسجَّل تلقائياً عند التسليم)
-  const { data: urow } = await sb.from("users").select("id,tenant_id,role").eq("auth_user_id", user.id).single();
+  if (user && !urow) {
+    const { data: aurow } = await sb.from("users").select("id,tenant_id,role").eq("auth_user_id", user.id).single();
+    urow = aurow as any;
+  }
   if (urow && urow.tenant_id !== exam.tenant_id) {
     return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
   }
@@ -63,7 +77,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     .order("position", { ascending: true });
 
   // خلط الخيارات + ترتيب الأسئلة لكل طالب (حتمي لكل طالب — ثابت عند التحديث)
-  const seed = [...user.id].reduce((a, c) => a + c.charCodeAt(0), 0);
+  const seed = [...((urow as any)?.id ?? user?.id ?? "x")].reduce((a, c) => a + c.charCodeAt(0), 0);
   let h = seed >>> 0;
   const rnd = () => {
     h |= 0; h = (h + 0x6D2B79F5) | 0;

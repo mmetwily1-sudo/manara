@@ -2,12 +2,13 @@ import { NextResponse } from "next/server";
 import { getSessionUser, adminClient } from "@/lib/server-auth";
 
 /** GET /api/me/plan — خطة الطالب: ترتيبه النسبي + متوسط مجموعته + دروسه المتأخرة + خطوات الأسبوع */
-export async function GET() {
-  const user = await getSessionUser();
-  if (!user) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
-  const admin = adminClient();
+export async function GET(req: Request) {
+  const { resolveMeStudent } = await import("@/lib/student-auth");
+  const ctx = await resolveMeStudent(req);
+  if ("error" in ctx) return ctx.error;
+  const { admin, tenantId, studentId } = ctx;
   const { data: urow } = await admin.from("users").select("id,tenant_id,points")
-    .eq("auth_user_id", user.id).single();
+    .eq("id", studentId).single();
   if (!urow) return NextResponse.json({ ok: false, error: "no_tenant" }, { status: 403 });
   const tid = (urow as any).tenant_id;
   const sid = (urow as any).id;

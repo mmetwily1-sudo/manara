@@ -3,18 +3,12 @@ import { getSessionUser, adminClient } from "@/lib/server-auth";
 import { eventLabel } from "@/lib/notify-labels";
 
 /** GET /api/me/notifications — صندوق الطالب نفسه (جلسة الدخول برقم الهاتف) */
-export async function GET() {
-  const user = await getSessionUser();
-  if (!user) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
-  let admin;
-  try {
-    admin = adminClient();
-  } catch {
-    return NextResponse.json({ ok: false, error: "not_configured" }, { status: 500 });
-  }
-  const { data: urow } = await admin.from("users").select("id,tenant_id")
-    .eq("auth_user_id", user.id).limit(1).single();
-  if (!(urow as any)?.id) return NextResponse.json({ ok: false, error: "no_profile" }, { status: 403 });
+export async function GET(req: Request) {
+  const { resolveMeStudent } = await import("@/lib/student-auth");
+  const ctx = await resolveMeStudent(req);
+  if ("error" in ctx) return ctx.error;
+  const admin = ctx.admin;
+  const urow = { id: ctx.studentId, tenant_id: ctx.tenantId };
   const { data: logs } = await admin.from("notification_log")
     .select("event,channel,status,sent_at,created_at,payload")
     .eq("tenant_id", (urow as any).tenant_id).eq("user_id", (urow as any).id)

@@ -9,12 +9,13 @@ import { getSessionUser, adminClient } from "@/lib/server-auth";
 
 import { streakOf, trophiesFor, dayKey } from "@/lib/gamification";
 
-export async function GET() {
-  const user = await getSessionUser();
-  if (!user) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
-  const admin = adminClient();
+export async function GET(req: Request) {
+  const { resolveMeStudent } = await import("@/lib/student-auth");
+  const ctx = await resolveMeStudent(req);
+  if ("error" in ctx) return ctx.error;
+  const { admin, tenantId, studentId } = ctx;
   const { data: urow } = await admin
-    .from("users").select("id,tenant_id,full_name,points").eq("auth_user_id", user.id).single();
+    .from("users").select("id,tenant_id,full_name,points").eq("id", studentId).single();
   if (!urow) return NextResponse.json({ ok: false, error: "no_tenant" }, { status: 403 });
   const tid = (urow as any).tenant_id;
   const sid = (urow as any).id;

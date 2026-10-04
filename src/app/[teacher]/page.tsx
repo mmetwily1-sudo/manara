@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { StudentRegisterForm } from "@/components/StudentRegisterForm";
 import { PhoneLoginForm } from "@/components/PhoneLoginForm";
+import { StudentPinLogin } from "@/components/StudentPinLogin";
 
 /**
  * صفحة المعلم العامة — Programmatic SEO
@@ -105,6 +106,7 @@ export default async function TeacherPage({ params }: Props) {
         </p>
 
         <StudentRegisterForm slug={slug} teacherPhone={teacherPhone} />
+        <StudentPinLogin slug={slug} />
         <PhoneLoginForm slug={slug} />
 
         {(sessions.length > 0 || videos.length > 0 || notes.length > 0 || examsCount > 0) && (

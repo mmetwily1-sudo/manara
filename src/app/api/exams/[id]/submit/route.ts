@@ -29,9 +29,21 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   const sbUser = supaUser();
   const { data: { user } } = sbUser ? await sbUser.auth.getUser() : { data: { user: null } } as any;
-  if (!user) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
 
   const sb = admin();
+
+  // جلسة طالب PIN بديلاً عن حساب Supabase
+  let pinRow: { id: string; tenant_id: string; role: string } | null = null;
+  if (!user) {
+    const stoken = cookies().get("manara_student_token")?.value ?? req.headers.get("x-student-token") ?? "";
+    const { getStudentSession } = await import("@/lib/student-auth");
+    const sess = await getStudentSession(sb, stoken);
+    if (sess) {
+      const { data: srow } = await sb.from("users").select("id,tenant_id,role").eq("id", sess.studentId).eq("tenant_id", sess.tenantId).single();
+      if (srow) pinRow = srow as any;
+    }
+    if (!pinRow) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
+  }
 
   // 1) الامتحان أولاً — هو مصدر الحقيقة للسنتر
   const { data: exam } = await sb
@@ -43,11 +55,15 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   // 2) صف المستخدم — وإن غاب يُنشأ تلقائياً كطالب في سنتر الامتحان
   // (فقط للامتحانات المنشورة — وإلا فالتسجيل التلقائي ثغرة cross-tenant)
-  let { data: urow } = await sb.from("users").select("id,tenant_id,role").eq("auth_user_id", user.id).single();
+  let urow: { id: string; tenant_id: string; role: string } | null = pinRow;
+  if (!urow && user) {
+    const { data: aurow } = await sb.from("users").select("id,tenant_id,role").eq("auth_user_id", user.id).single();
+    urow = aurow as any;
+  }
   if (!urow && !(exam as any).is_published) {
     return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
   }
-  if (!urow) {
+  if (!urow && user) {
     const meta = (user.user_metadata ?? {}) as any;
     const { data: created, error: cErr } = await sb.from("users").insert({
       tenant_id: exam.tenant_id,
@@ -61,7 +77,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     }
     urow = created;
   }
-  if (urow.tenant_id !== exam.tenant_id) {
+  if (!urow) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
+  if (urow.tenant_id !== (exam as any).tenant_id) {
     return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
   }
   {

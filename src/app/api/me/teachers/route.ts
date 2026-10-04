@@ -2,11 +2,12 @@ import { NextResponse } from "next/server";
 import { getSessionUser, adminClient } from "@/lib/server-auth";
 
 /** GET /api/me/teachers — معلمو مجموعاتي (لطالب) لبدء محادثة */
-export async function GET() {
-  const user = await getSessionUser();
-  if (!user) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
-  const admin = adminClient();
-  const { data: urow } = await admin.from("users").select("id,tenant_id,role").eq("auth_user_id", user.id).single();
+export async function GET(req: Request) {
+  const { resolveMeStudent } = await import("@/lib/student-auth");
+  const ctx = await resolveMeStudent(req);
+  if ("error" in ctx) return ctx.error;
+  const { admin, tenantId, studentId } = ctx;
+  const { data: urow } = await admin.from("users").select("id,tenant_id,role").eq("id", studentId).single();
   if (!urow || (urow as any).role !== "student") {
     return NextResponse.json({ ok: false, error: "students_only" }, { status: 403 });
   }

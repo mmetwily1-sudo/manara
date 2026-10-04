@@ -15,6 +15,23 @@ export default function StudentsPage() {
   const [parentLink, setParentLink] = useState<{ name: string; url: string } | null>(null);
   const [copiedParent, setCopiedParent] = useState(false);
   const [linkBusy, setLinkBusy] = useState<string | null>(null);
+  const [newPin, setNewPin] = useState<{ name: string; pin: string } | null>(null);
+  const [pinBusy, setPinBusy] = useState<string | null>(null);
+
+  /** تجديد PIN طالب (يُعرض مرة واحدة — للطالب/ولي الأمر) */
+  async function regenPin(id: string, name: string) {
+    setPinBusy(id); setErr("");
+    try {
+      const r = await fetch("/api/students/pin-set", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ student_id: id }),
+      });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok && j.pin) setNewPin({ name, pin: j.pin });
+      else setErr("تعذر توليد PIN — حاول تاني");
+    } catch { setErr("تعذر الاتصال"); }
+    setPinBusy(null);
+  }
 
   /** توليد رابط ولي الأمر لطالب موجود (استرداد عند ضياع الرابط) */
   async function genParentLink(id: string, name: string) {
@@ -143,6 +160,7 @@ export default function StudentsPage() {
         setForm({ name: "", phone: "", groupId: "" });
         setShowAdd(false);
         if (j.parent_url) setParentLink({ name: addedName, url: j.parent_url });
+        if (j.student_pin) setNewPin({ name: addedName, pin: j.student_pin });
         load();
       } else {
         setErr(j?.error === "phone_exists" ? "هذا الرقم مسجل لطالب آخر في سنترك." : "فشل الإضافة: " + (j?.error ?? "خطأ غير معروف"));
@@ -186,8 +204,7 @@ export default function StudentsPage() {
 
       {parentLink && (
         <div className="card space-y-2 border-success/30 bg-success/5 p-5">
-          <p className="text-small font-bold text-success">✅ تمت إضافة {parentLink.name} — رابط ولي الأمر جاهز</p>
-          <p className="text-xs text-slate-600">ابعت الرابط لولي الأمر (واتساب/ورقة) — يدخل مباشرة بلا حساب ولا باسورد.</p>
+          <p className="text-small font-bold text-success">✅ تمت إضافة {parentLink.name} — رابط ولي الأمر جاهز</p>          <p className="text-xs text-slate-600">ابعت الرابط لولي الأمر (واتساب/ورقة) — يدخل مباشرة بلا حساب ولا باسورد.</p>
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => { navigator.clipboard?.writeText(parentLink.url).then(() => { setCopiedParent(true); setTimeout(() => setCopiedParent(false), 2000); }).catch(() => {}); }}
@@ -203,6 +220,17 @@ export default function StudentsPage() {
               مشاركة واتساب 📤
             </a>
             <button onClick={() => setParentLink(null)} className="btn-secondary !px-4 !py-2 text-small">إغلاق</button>
+          </div>
+        </div>
+      )}
+
+      {newPin && (
+        <div className="card space-y-2 border-primary/30 bg-primary-light/40 p-5">
+          <p className="text-small font-bold text-primary">🔑 PIN دخول {newPin.name} (يُعرض مرة واحدة — سلّمه للطالب)</p>
+          <p className="text-center font-mono text-3xl font-extrabold tracking-[0.4em]" dir="ltr">{newPin.pin}</p>
+          <p className="text-center text-xs text-slate-500">يدخل برقم موبايله + هذا الـ PIN من صفحة السنتر — للأونلاين والتقدم.</p>
+          <div className="flex justify-center">
+            <button onClick={() => setNewPin(null)} className="btn-secondary !px-4 !py-2 text-small">تم — إخفاء</button>
           </div>
         </div>
       )}
@@ -311,6 +339,9 @@ export default function StudentsPage() {
                           <button onClick={() => { setTransferFor(s.id); setTransferTo(""); }} className="text-xs font-bold text-slate-500 hover:underline">نقل 🔀</button>{" "}
                           <button onClick={() => genParentLink(s.id, s.name)} disabled={linkBusy === s.id} className="text-xs font-bold text-slate-500 hover:underline disabled:opacity-50">
                             {linkBusy === s.id ? "..." : "رابط الولي 🔗"}
+                          </button>{" "}
+                          <button onClick={() => regenPin(s.id, s.name)} disabled={pinBusy === s.id} className="text-xs font-bold text-slate-500 hover:underline disabled:opacity-50">
+                            {pinBusy === s.id ? "..." : "PIN جديد 🔑"}
                           </button>
                         </>
                       )}

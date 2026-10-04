@@ -5,15 +5,16 @@ import { getSessionUser, adminClient } from "@/lib/server-auth";
  * GET /api/me/progress — تقدم الطالب الحالي في مكان واحد:
  * نتائج الامتحانات + الشهادات + مجموعاته + فيديوهاته المتاحة.
  */
-export async function GET() {
-  const user = await getSessionUser();
-  if (!user) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
+export async function GET(req: Request) {
+  const { resolveMeStudent } = await import("@/lib/student-auth");
+  const ctx = await resolveMeStudent(req);
+  if ("error" in ctx) return ctx.error;
+  const { admin, tenantId, studentId } = ctx;
 
-  const admin = adminClient();
   const { data: urow } = await admin
     .from("users")
     .select("id,tenant_id,role,full_name")
-    .eq("auth_user_id", user.id)
+    .eq("id", studentId)
     .single();
   if (!urow) return NextResponse.json({ ok: false, error: "no_tenant" }, { status: 403 });
 
