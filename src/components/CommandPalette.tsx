@@ -60,11 +60,31 @@ export function CommandPalette() {
   }, []);
 
   const norm = (s: string) => s.replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي").trim();
+  const [recent, setRecent] = useState<Entry[]>([]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("manara_recent_pages");
+      if (raw) {
+        const arr = JSON.parse(raw) as string[];
+        setRecent(arr.map((href) => INDEX.find((e) => e.href === href)).filter(Boolean) as Entry[]);
+      }
+    } catch {}
+  }, [open]);
+
+  function remember(href: string) {
+    try {
+      const raw = localStorage.getItem("manara_recent_pages");
+      const arr = ((raw ? JSON.parse(raw) : []) as string[]).filter((h) => h !== href);
+      localStorage.setItem("manara_recent_pages", JSON.stringify([href, ...arr].slice(0, 5)));
+    } catch {}
+  }
+
   const results = useMemo(() => {
     const nq = norm(q);
-    if (!nq) return INDEX.slice(0, 8);
+    if (!nq) return [...recent, ...INDEX.filter((e) => !recent.some((r) => r.href === e.href))].slice(0, 8);
     return INDEX.filter((e) => norm(e.label + " " + e.keys).includes(nq)).slice(0, 10);
-  }, [q]);
+  }, [q, recent]);
 
   useEffect(() => { setHi(0); }, [q]);
 
@@ -79,6 +99,7 @@ export function CommandPalette() {
   }
 
   function go(href: string) {
+    remember(href);
     setOpen(false);
     router.push(href);
   }

@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { CommandPalette } from "@/components/CommandPalette";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 
 const MENU: [string, string, string][] = [
   ["/admin", "🏠", "نظرة عامة"],
@@ -83,7 +84,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         </aside>
 
         <div className="min-w-0 flex-1 p-4 md:p-6">
-          <div className="mx-auto max-w-6xl">{children}</div>
+          <div className="mx-auto max-w-6xl">
+            <Breadcrumbs />
+            {children}
+          </div>
         </div>
       </div>
     </div>

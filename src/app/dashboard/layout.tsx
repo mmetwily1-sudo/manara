@@ -7,6 +7,7 @@ import { AgentWidget } from "@/components/AgentWidget";
 import { MobileBottomNav } from "@/components/MobileNav";
 import { SideNav } from "@/components/SideNav";
 import { CommandPalette } from "@/components/CommandPalette";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 
 const nav = [
   { href: "/dashboard", label: "الرئيسية", key: "01" },
@@ -103,7 +104,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <CommandPalette />
           </header>
 
-          <main className="px-4 pb-24 pt-6 md:px-8 lg:pb-10">{children}</main>
+          <main className="px-4 pb-24 pt-6 md:px-8 lg:pb-10">
+            <Breadcrumbs />
+            {children}
+          </main>
         </div>
 
         <MobileBottomNav
