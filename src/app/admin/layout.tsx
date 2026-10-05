@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { CommandPalette } from "@/components/CommandPalette";
 
 const MENU: [string, string, string][] = [
   ["/admin", "🏠", "نظرة عامة"],
@@ -62,7 +63,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </Link>
         </div>
         <div className="flex items-center gap-3 text-xs">
-          <span className="text-slate-300">أهلاً، {(user.email ?? "").split("@")[0]}</span>
+          <CommandPalette />
+          <span className="hidden text-slate-300 sm:inline">أهلاً، {(user.email ?? "").split("@")[0]}</span>
           <Link href="/dashboard" className="rounded-lg bg-slate-800 px-3 py-1.5 hover:bg-slate-700">لوحة المعلم</Link>
         </div>
       </header>
