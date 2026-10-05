@@ -5,7 +5,7 @@
 
 export type SectionType =
   | "announcement" | "hero_custom" | "features" | "countdown" | "text"
-  | "cta" | "testimonials" | "faq" | "gallery" | "custom_html" | "stats";
+  | "cta" | "testimonials" | "faq" | "gallery" | "custom_html" | "stats" | "teacher";
 
 export type SiteSection = { id: string; type: SectionType; visible?: boolean; data: Record<string, unknown> };
 
@@ -20,6 +20,7 @@ export const SECTION_TYPES: { id: SectionType; label: string; desc: string }[] =
   { id: "faq", label: "❓ أسئلة شائعة", desc: "حتى 6 أسئلة" },
   { id: "gallery", label: "🖼️ معرض", desc: "روابط صور" },
   { id: "stats", label: "🏆 إنجازات", desc: "أرقام متحركة (طلاب/نجاح)" },
+  { id: "teacher", label: "👨‍🏫 المعلم", desc: "صورة + نبذة + خبرة" },
   { id: "custom_html", label: "🧩 HTML مخصص", desc: "بلا سكربتات (تُزال تلقائياً)" },
 ];
 
@@ -57,6 +58,12 @@ export function sanitizeSection(s: any): SiteSection | null {
     case "stats": {
       const items = Array.isArray(d.items) ? d.items.slice(0, 4).map((it: any) => ({ num: Math.min(999999, Math.max(0, parseInt(String(it?.num ?? "0"), 10) || 0)), label: STR(it?.label, 40), suffix: STR(it?.suffix, 8) })) : [];
       out.items = items; break;
+    }
+    case "teacher": {
+      const photo = STR(d.photo, 500);
+      put("name", d.name, 80); put("title", d.title, 80); put("bio", d.bio, 600);
+      out.photo = /^https:\/\//.test(photo) ? photo : "";
+      break;
     }
     case "custom_html": {
       let html = STR(d.html, 5000);

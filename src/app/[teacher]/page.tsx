@@ -243,10 +243,17 @@ export default async function TeacherPage({ params }: Props) {
         )}
       </section>
 
-      <footer className="border-t border-slate-100 bg-white py-6 text-center text-xs text-slate-400">
+      <footer className="border-t border-slate-100 bg-white py-6 pb-24 text-center text-xs text-slate-400 sm:pb-6">
         مدعوم بمنارة —{" "}
         <Link href="/" className="underline">اعمل منصتك الخاصة</Link>
       </footer>
+
+      {/* زر التسجيل الثابت للموبايل (قرار المجلس) */}
+      <div className="fixed inset-x-0 bottom-0 z-30 p-3 sm:hidden" style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
+        <a href="#join" className="btn-primary block w-full !py-3 text-center shadow-xl">
+          سجل الآن مجاناً 🚀
+        </a>
+      </div>
     </main>
   );
 }

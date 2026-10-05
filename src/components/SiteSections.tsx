@@ -149,6 +149,22 @@ export function SiteSections({ sections, card, accent }: { sections: SiteSection
             ) : null;
           case "custom_html":
             return null; // يُعرض داخل sandbox الصفحة (عزل كامل) — لا حقن مباشر أبداً
+          case "teacher":
+            return (d.name || d.bio) ? (
+              <div key={s.id} className={`${card} flex flex-col items-center gap-4 text-center sm:flex-row sm:text-right`}>
+                {d.photo ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={String(d.photo)} alt={String(d.name ?? "")} loading="lazy" className="h-24 w-24 shrink-0 rounded-full object-cover" />
+                ) : (
+                  <span className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-primary-light text-4xl">👨‍🏫</span>
+                )}
+                <div>
+                  {d.name && <h3 className="font-extrabold">{d.name}</h3>}
+                  {d.title && <p className="text-xs font-bold text-primary">{d.title}</p>}
+                  {d.bio && <p className="mt-1 text-small leading-relaxed opacity-80">{d.body ?? d.bio}</p>}
+                </div>
+              </div>
+            ) : null;
           default:
             return null;
         }

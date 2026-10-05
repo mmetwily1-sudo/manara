@@ -73,6 +73,7 @@ export function SiteBuilder({ slug }: { slug: string }) {
       faq: { items: [{ q: "سؤال؟", a: "جواب." }] },
       gallery: { images: [] },
       stats: { items: [{ num: 500, label: "طالب", suffix: "+" }] },
+      teacher: { name: "", title: "", bio: "", photo: "" },
       custom_html: { html: "<p>محتوى مخصص</p>" },
     };
     const s: SiteSection = { id: Math.random().toString(36).slice(2, 10), type, visible: true, data: blank[type] };
@@ -246,6 +247,15 @@ function SectionEditor({ section, onChange }: { section: SiteSection; onChange: 
     case "stats":
       return <textarea defaultValue={lines(d.items)} rows={2} placeholder={"500 | طالب | +"} className={inp + " font-mono"}
         onBlur={(e) => set("items", parse(e.target.value, ["num", "label", "suffix"]))} />;
+    case "teacher":
+      return (<div className="space-y-2">
+        <div className="flex gap-2">
+          <input value={d.name ?? ""} onChange={(e) => set("name", e.target.value)} placeholder="الاسم" className={inp} />
+          <input value={d.title ?? ""} onChange={(e) => set("title", e.target.value)} placeholder="التخصص" className={inp} />
+        </div>
+        <textarea value={d.bio ?? ""} onChange={(e) => set("bio", e.target.value)} rows={2} placeholder="نبذة وخبرة" className={inp} />
+        <input value={d.photo ?? ""} onChange={(e) => set("photo", e.target.value)} placeholder="رابط الصورة https://..." dir="ltr" className={inp + " font-mono text-left"} />
+      </div>);
     case "custom_html":
       return <textarea defaultValue={String(d.html ?? "")} rows={4} dir="ltr" placeholder="<p>...</p>"
         className={inp + " font-mono text-left"} onBlur={(e) => set("html", e.target.value)} />;
