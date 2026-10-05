@@ -10,19 +10,43 @@ import { SITE_THEMES, type SiteThemeId } from "@/lib/site-themes";
 export function SiteDesigner({ slug }: { slug: string }) {
   const [theme, setTheme] = useState<SiteThemeId>("default");
   const [primary, setPrimary] = useState("");
+  const [accent, setAccent] = useState("");
+  const [logo, setLogo] = useState("");
+  const [seoTitle, setSeoTitle] = useState("");
+  const [seoDesc, setSeoDesc] = useState("");
   const [font, setFont] = useState("cairo");
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
+  const [warn, setWarn] = useState("");
 
   useEffect(() => {
     fetch("/api/tenant/settings").then(async (r) => {
       const j = await r.json().catch(() => null);
       const s = j?.settings ?? j ?? {};
       if (s.theme && SITE_THEMES[s.theme as SiteThemeId]) setTheme(s.theme);
-      if (s.site_primary) setPrimary(s.site_primary);
+      if (s.site_primary) { setPrimary(s.site_primary); checkContrast(s.site_primary); }
+      if (s.site_accent) setAccent(s.site_accent);
+      if (s.site_logo) setLogo(s.site_logo);
+      if (s.site_title) setSeoTitle(s.site_title);
+      if (s.site_desc) setSeoDesc(s.site_desc);
       if (["cairo", "readex", "plex"].includes(s.site_font)) setFont(s.site_font);
     }).catch(() => {});
   }, []);
+
+  function luminance(hex: string): number {
+    const c = hex.replace("#", "");
+    const f = (v: number) => {
+      const s = v / 255;
+      return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * f(parseInt(c.slice(0, 2), 16)) + 0.7152 * f(parseInt(c.slice(2, 4), 16)) + 0.0722 * f(parseInt(c.slice(4, 6), 16));
+  }
+
+  function checkContrast(hex: string) {
+    if (!/^#[0-9a-fA-F]{6}$/.test(hex)) { setWarn(""); return; }
+    const ratio = 1.05 / (luminance(hex) + 0.05);
+    setWarn(ratio < 4.5 ? `⚠️ تباين ${ratio.toFixed(1)} — أقل من 4.5: النص الأبيض عليه صعب القراءة. اختر لوناً أغمق.` : "");
+  }
 
   async function save(patch: Record<string, string>) {
     setSaving(true); setMsg("");
@@ -74,7 +98,7 @@ export function SiteDesigner({ slug }: { slug: string }) {
         ))}
       </div>
       <div className="mt-3 flex items-center gap-2">
-        <input value={primary} onChange={(e) => setPrimary(e.target.value)} dir="ltr" maxLength={7}
+        <input value={primary} onChange={(e) => { setPrimary(e.target.value); checkContrast(e.target.value); }} dir="ltr" maxLength={7}
           placeholder="#1A73E8"
           className="w-32 rounded-xl border-2 border-slate-200 px-3 py-2 font-mono text-small outline-none focus:border-primary" />
         <button onClick={saveColor} disabled={saving} className="btn-secondary !px-4 !py-2 text-small disabled:opacity-50">
@@ -83,6 +107,35 @@ export function SiteDesigner({ slug }: { slug: string }) {
         {primary && /^#[0-9a-fA-F]{6}$/.test(primary) && (
           <span className="h-8 w-8 rounded-full border border-slate-200" style={{ backgroundColor: primary }} />
         )}
+      </div>
+      {warn && <p className="mt-1 text-xs font-bold text-warning">{warn}</p>}
+      <div className="mt-3 flex items-center gap-2">
+        <input value={accent} onChange={(e) => setAccent(e.target.value)} dir="ltr" maxLength={7}
+          placeholder="لون ثانوي #F59E0B"
+          className="w-36 rounded-xl border-2 border-slate-200 px-3 py-2 font-mono text-small outline-none focus:border-primary" />
+        <button onClick={() => {
+          if (accent && !/^#[0-9a-fA-F]{6}$/.test(accent)) { setMsg("اللون بصيغة #RRGGBB"); return; }
+          save({ site_accent: accent });
+        }} disabled={saving} className="btn-secondary !px-4 !py-2 text-small disabled:opacity-50">
+          حفظ الثانوي
+        </button>
+        {accent && /^#[0-9a-fA-F]{6}$/.test(accent) && (
+          <span className="h-8 w-8 rounded-full border border-slate-200" style={{ backgroundColor: accent }} />
+        )}
+      </div>
+      <div className="mt-3 space-y-2">
+        <input value={logo} onChange={(e) => setLogo(e.target.value)} dir="ltr" maxLength={500}
+          placeholder="رابط الشعار https://..."
+          className="w-full rounded-xl border-2 border-slate-200 px-3 py-2 font-mono text-xs outline-none focus:border-primary" />
+        <input value={seoTitle} onChange={(e) => setSeoTitle(e.target.value)} maxLength={80}
+          placeholder="عنوان الموقع (SEO)"
+          className="w-full rounded-xl border-2 border-slate-200 px-3 py-2 text-small outline-none focus:border-primary" />
+        <input value={seoDesc} onChange={(e) => setSeoDesc(e.target.value)} maxLength={200}
+          placeholder="وصف الموقع (SEO)"
+          className="w-full rounded-xl border-2 border-slate-200 px-3 py-2 text-small outline-none focus:border-primary" />
+        <button onClick={() => save({ site_logo: logo, site_title: seoTitle, site_desc: seoDesc })} disabled={saving} className="btn-secondary !px-4 !py-2 text-small disabled:opacity-50">
+          حفظ الهوية
+        </button>
       </div>
       {msg && <p className="mt-1 text-xs font-bold text-primary">{msg}</p>}
       <div className="mt-3 flex flex-wrap items-center gap-2">

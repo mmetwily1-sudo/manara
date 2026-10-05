@@ -36,6 +36,10 @@ export async function GET() {
     site_sections: settings.site_sections ?? [],
     site_custom_css: settings.site_custom_css ?? "",
     site_custom_js: settings.site_custom_js ?? "",
+    site_accent: settings.site_accent ?? "",
+    site_logo: settings.site_logo ?? "",
+    site_title: settings.site_title ?? "",
+    site_desc: settings.site_desc ?? "",
     pay_numbers: settings.pay_numbers ?? {},
     has_vision_key: !!(settings.vision_key as string),
     has_vision_key_2: !!(settings.vision_key_2 as string),
@@ -74,7 +78,7 @@ export async function PATCH(req: Request) {
     patch._slug = sl;
   }
   // ثيم صفحة المعلم العامة: default | dark | minimal | emerald | royal | sunset
-  if (typeof body.theme !== "undefined" || typeof body.site_primary !== "undefined" || typeof body.site_font !== "undefined" || typeof body.site_sections !== "undefined" || typeof body.site_custom_css !== "undefined" || typeof body.site_custom_js !== "undefined") {
+  if (typeof body.theme !== "undefined" || typeof body.site_primary !== "undefined" || typeof body.site_font !== "undefined" || typeof body.site_sections !== "undefined" || typeof body.site_custom_css !== "undefined" || typeof body.site_custom_js !== "undefined" || typeof body.site_accent !== "undefined" || typeof body.site_logo !== "undefined" || typeof body.site_title !== "undefined" || typeof body.site_desc !== "undefined") {
     const admin0 = adminClient();
     const { data: plat } = await admin0.from("platform_settings").select("value").eq("key", "design").single();
     const { data: tplan } = await admin0.from("tenants").select("plan").eq("id", res.ctx.tenantId).single();
@@ -86,7 +90,7 @@ export async function PATCH(req: Request) {
   }
   if (typeof body.theme !== "undefined") {
     const th = String(body.theme ?? "");
-    if (!["default", "dark", "minimal", "emerald", "royal", "sunset"].includes(th)) {
+    if (!["default", "dark", "minimal", "emerald", "royal", "sunset", "warm", "vibrant"].includes(th)) {
       return NextResponse.json({ ok: false, error: "bad_theme" }, { status: 400 });
     }
     patch.theme = th;
@@ -121,6 +125,27 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ ok: false, error: "bad_font" }, { status: 400 });
     }
     patch.site_font = f;
+  }
+  // اللون الثانوي + الشعار + SEO (قرار المجلس)
+  if (typeof body.site_accent !== "undefined") {
+    const ac = String(body.site_accent ?? "").trim();
+    if (ac && !/^#[0-9a-fA-F]{6}$/.test(ac)) {
+      return NextResponse.json({ ok: false, error: "bad_color" }, { status: 400 });
+    }
+    patch.site_accent = ac || null;
+  }
+  if (typeof body.site_logo !== "undefined") {
+    const lg = String(body.site_logo ?? "").trim().slice(0, 500);
+    if (lg && !/^https:\/\//.test(lg)) {
+      return NextResponse.json({ ok: false, error: "bad_url", message: "رابط الشعار https فقط" }, { status: 400 });
+    }
+    patch.site_logo = lg || null;
+  }
+  if (typeof body.site_title !== "undefined") {
+    patch.site_title = String(body.site_title ?? "").trim().slice(0, 80) || null;
+  }
+  if (typeof body.site_desc !== "undefined") {
+    patch.site_desc = String(body.site_desc ?? "").trim().slice(0, 200) || null;
   }
   // مفتاحا Gemini للسنتر (تفريغ مرئي دقيق + تناوب عند نفاد الحصة) — فارغ = مسح
   // ملاحظة: مفاتيح AI Studio تحتوي نقاطاً (AQ.xxx) لذا تُقبل [A-Za-z0-9_.~-]

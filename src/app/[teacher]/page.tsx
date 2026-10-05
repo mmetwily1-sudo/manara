@@ -27,19 +27,23 @@ export const dynamicParams = true;
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const slug = decodeURIComponent(params.teacher);
   let titleName = slug;
+  let desc = `كورسات ومجموعات وحصص مسجلة مع ${slug} — سجل ابني في مجموعة الآن.`;
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (url && key) {
       const { createClient } = await import("@supabase/supabase-js");
       const admin = createClient(url, key, { auth: { persistSession: false } });
-      const { data } = await admin.from("tenants").select("name").eq("slug", slug).single();
+      const { data } = await admin.from("tenants").select("name,settings").eq("slug", slug).single();
       if (data?.name) titleName = data.name;
+      const s = (data as any)?.settings ?? {};
+      if (s.site_title) titleName = String(s.site_title);
+      if (s.site_desc) desc = String(s.site_desc);
     }
   } catch {}
   return {
     title: `${titleName} — منصة تعليمية على منارة`,
-    description: `كورسات ومجموعات وحصص مسجلة مع ${titleName} — سجل ابني في مجموعة الآن.`,
+    description: desc,
   };
 }
 
@@ -50,6 +54,10 @@ export default async function TeacherPage({ params }: Props) {
   let themeId: string = "default";
   let sitePrimary: string = "";
   let siteFont: string = "cairo";
+  let siteAccent = "";
+  let siteLogo = "";
+  let siteTitle = "";
+  let siteDesc = "";
   let tenantId: string | null = null;
   let siteSections: any[] = [];
   let siteCss = "";
@@ -73,6 +81,11 @@ export default async function TeacherPage({ params }: Props) {
       themeId = String((data as any)?.settings?.theme ?? "default");
       sitePrimary = String((data as any)?.settings?.site_primary ?? "");
       siteFont = String((data as any)?.settings?.site_font ?? "cairo");
+      const _s = (data as any)?.settings ?? {};
+      if (/^#[0-9a-fA-F]{6}$/.test(String(_s.site_accent ?? ""))) siteAccent = String(_s.site_accent);
+      if (/^https:\/\//.test(String(_s.site_logo ?? ""))) siteLogo = String(_s.site_logo).slice(0, 500);
+      siteTitle = String(_s.site_title ?? "").slice(0, 80);
+      siteDesc = String(_s.site_desc ?? "").slice(0, 200);
       if (Array.isArray((data as any)?.settings?.site_sections)) siteSections = (data as any).settings.site_sections;
       siteCss = String((data as any)?.settings?.site_custom_css ?? "");
       siteJs = String((data as any)?.settings?.site_custom_js ?? "");
@@ -119,7 +132,13 @@ export default async function TeacherPage({ params }: Props) {
       {fontLink && <link href={fontLink} rel="stylesheet" />}
       <header className={th.header}>
         <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-4">
-          <span className="text-h2 font-extrabold" style={{ color: accent }}>{headerName}</span>
+          <span className="flex items-center gap-2 text-h2 font-extrabold" style={{ color: accent }}>
+            {siteLogo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={siteLogo} alt="" className="h-9 w-9 rounded-lg object-cover" />
+            ) : null}
+            {headerName}
+          </span>
           <Link href="/login" className="btn-secondary !px-4 !py-2 text-small">دخول الطلاب</Link>
         </div>
       </header>
@@ -189,7 +208,7 @@ export default async function TeacherPage({ params }: Props) {
           ))}
         </div>
 
-        <SiteSections sections={siteSections as any} card={th.card} />
+        <SiteSections sections={siteSections as any} card={th.card} accent={/^#[0-9a-fA-F]{6}$/.test(siteAccent) ? siteAccent : accent} />
 
         {groups.length > 0 && (
           <div className="mt-14 text-right">

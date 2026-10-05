@@ -47,8 +47,9 @@ function StatNum({ num, suffix }: { num: number; suffix: string }) {
 }
 
 /** عارض أقسام السنتر — بيانات منقاة خادمياً فقط */
-export function SiteSections({ sections, card }: { sections: SiteSection[]; card: string }) {
+export function SiteSections({ sections, card, accent }: { sections: SiteSection[]; card: string; accent?: string }) {
   const vis = sections.filter((s) => s.visible !== false);
+  const accentOk = accent && /^#[0-9a-fA-F]{6}$/.test(accent) ? accent : undefined;
   if (!vis.length) return null;
   return (
     <div className="mt-14 space-y-8 text-right">
@@ -94,7 +95,7 @@ export function SiteSections({ sections, card }: { sections: SiteSection[]; card
             );
           case "cta":
             return d.title ? (
-              <div key={s.id} className="rounded-2xl bg-primary p-6 text-center text-white">
+              <div key={s.id} className="rounded-2xl p-6 text-center text-white" style={{ backgroundColor: accentOk ?? "#1A73E8" }}>
                 <h3 className="font-extrabold">{d.title}</h3>
                 {d.button && (
                   <a href={d.url && String(d.url).startsWith("http") ? d.url : "#"} className="mt-3 inline-block rounded-xl bg-white px-6 py-2.5 font-bold text-primary">
