@@ -23,6 +23,7 @@ export function generateStaticParams() {
 }
 
 export const dynamicParams = true;
+export const revalidate = 60; // مواقع السناتر تتحدث باستمرار (ثيم/أقسام) — تحديث كل دقيقة
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const slug = decodeURIComponent(params.teacher);
