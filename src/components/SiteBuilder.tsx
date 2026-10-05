@@ -12,6 +12,30 @@ export function SiteBuilder({ slug }: { slug: string }) {
   const [msg, setMsg] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [showCode, setShowCode] = useState(false);
+  const [showIo, setShowIo] = useState(false);
+  const [ioText, setIoText] = useState("");
+
+  function exportJson() {
+    const blob = new Blob([JSON.stringify({ sections, css, js }, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "site-design.json";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function importJson() {
+    try {
+      const j = JSON.parse(ioText);
+      if (!j || typeof j !== "object") { setMsg("ملف غير صالح"); return; }
+      const next = Array.isArray(j.sections) ? j.sections : sections;
+      const ncss = typeof j.css === "string" ? j.css : css;
+      const njs = typeof j.js === "string" ? j.js : js;
+      setSections(next); setCss(ncss); setJs(njs);
+      persist(next, ncss, njs);
+      setShowIo(false);
+    } catch { setMsg("ملف غير صالح"); }
+  }
 
   useEffect(() => {
     fetch("/api/tenant/settings").then(async (r) => {
@@ -96,9 +120,20 @@ export function SiteBuilder({ slug }: { slug: string }) {
       <div className="flex flex-wrap gap-2">
         <button onClick={() => setShowAdd((v) => !v)} className="btn-primary !px-5 !py-2 text-small">＋ إضافة قسم</button>
         <button onClick={() => setShowCode((v) => !v)} className="btn-secondary !px-5 !py-2 text-small">🧩 كود مخصص CSS/JS</button>
+        <button onClick={() => setShowIo((v) => !v)} className="btn-secondary !px-5 !py-2 text-small">📥 تصدير/استيراد</button>
         <a href={`/${slug}`} target="_blank" rel="noopener noreferrer" className="btn-secondary !px-5 !py-2 text-small">👁️ معاينة</a>
       </div>
       {msg && <p className="text-xs font-bold text-primary">{msg}</p>}
+
+      {showIo && (
+        <div className="space-y-2 rounded-xl border border-slate-200 p-4">
+          <button onClick={exportJson} className="btn-secondary !px-4 !py-2 text-xs">⬇️ تنزيل التصميم JSON</button>
+          <textarea value={ioText} onChange={(e) => setIoText(e.target.value)} rows={4} dir="ltr"
+            placeholder='الصق JSON هنا للاستيراد {"sections": [...], "css": "", "js": ""}'
+            className="w-full rounded-xl border-2 border-slate-200 px-3 py-2 font-mono text-xs outline-none focus:border-primary" />
+          <button onClick={importJson} disabled={saving} className="btn-primary !px-4 !py-2 text-xs disabled:opacity-50">استيراد وحفظ</button>
+        </div>
+      )}
 
       {showAdd && (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">

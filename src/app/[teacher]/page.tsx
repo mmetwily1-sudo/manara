@@ -59,6 +59,7 @@ export default async function TeacherPage({ params }: Props) {
   let videos: any[] = [];
   let notes: any[] = [];
   let examsCount = 0;
+  let groups: any[] = [];
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -81,16 +82,18 @@ export default async function TeacherPage({ params }: Props) {
       const { createClient } = await import("@supabase/supabase-js");
       const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
       const today = new Date().toISOString().slice(0, 10);
-      const [ss, vv, nn, ee] = await Promise.all([
+      const [ss, vv, nn, ee, gg] = await Promise.all([
         admin.from("sessions").select("session_date,topic,groups(name)").eq("tenant_id", tenantId).gte("session_date", today).order("session_date").limit(6),
         admin.from("videos").select("title,duration_sec").eq("tenant_id", tenantId).eq("visibility", "free").order("created_at", { ascending: false }).limit(4),
         admin.from("notes").select("title,subject").eq("tenant_id", tenantId).eq("visibility", "public").order("created_at", { ascending: false }).limit(4),
         admin.from("exams").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("is_published", true),
+        admin.from("groups").select("id,name").eq("tenant_id", tenantId).order("created_at").limit(8),
       ]);
       sessions = (ss.data ?? []) as any[];
       videos = (vv.data ?? []) as any[];
       notes = (nn.data ?? []) as any[];
       examsCount = ee.count ?? 0;
+      groups = (gg.data ?? []) as any[];
     }
   } catch {}
   if (!displayName) notFound();
@@ -187,6 +190,20 @@ export default async function TeacherPage({ params }: Props) {
         </div>
 
         <SiteSections sections={siteSections as any} card={th.card} />
+
+        {groups.length > 0 && (
+          <div className="mt-14 text-right">
+            <h2 className="mb-3 text-center font-extrabold">📚 المواد والمجموعات</h2>
+            <div className="grid gap-3 sm:grid-cols-4">
+              {groups.map((g: any) => (
+                <div key={g.id} className={th.card}>
+                  <div className="text-2xl">📖</div>
+                  <div className="mt-1 font-bold">{g.name}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="mt-14">
           <h2 className="font-extrabold">📝 سجل بياناتك وانضم</h2>
