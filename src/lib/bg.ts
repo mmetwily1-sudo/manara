@@ -1,6 +1,6 @@
 /** طابور المهام الخلفية — إيداع فقط (التنفيذ في /api/worker/run). */
 
-export type BgKind = "notify_retry" | "sms_flush" | "digest_weekly";
+export type BgKind = "notify_retry" | "notify" | "sms_flush" | "digest_weekly";
 
 /** إيداع مهمة idempotent عبر dedupe_key — التكرار يُتجاهل بصمت */
 export async function enqueueJob(

@@ -70,6 +70,14 @@ export async function runDueJobs(admin: any): Promise<{ ran: number; done: numbe
 
 async function execJob(admin: any, kind: string, payload: any): Promise<boolean> {
   if (kind === "notify_retry") return retryNotify(admin, payload);
+  if (kind === "notify") {
+    const { notifyStudent } = await import("./notify");
+    await notifyStudent(admin, {
+      tenantId: String(payload.tenantId ?? ""), studentId: String(payload.studentId ?? ""),
+      event: payload.event, dedupeKey: String(payload.dedupeKey ?? ""),
+    });
+    return true;
+  }
   if (kind === "sms_flush") {
     const { processSmsBatch } = await import("./sms");
     const out = await processSmsBatch(admin, 50);

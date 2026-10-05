@@ -155,14 +155,17 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     }
   }
 
-  // إشعار واتساب بالنتيجة (best-effort)
+  // إشعار النتيجة عبر العامل الخلفي (لا يحجب رد التسليم — قرار الكفاءة)
   try {
-    const { notifyStudent } = await import("@/lib/notify");
-    await notifyStudent(sb, {
-      tenantId: exam.tenant_id,
-      studentId: urow.id,
-      event: { kind: "exam_graded", studentName: "", examTitle: exam.title, score, total, certSerial },
-      dedupeKey: `exam:${att.id}`,
+    const { enqueueJob } = await import("@/lib/bg");
+    await enqueueJob(sb, {
+      tenantId: exam.tenant_id, kind: "notify",
+      payload: {
+        tenantId: exam.tenant_id, studentId: urow.id,
+        event: { kind: "exam_graded", studentName: "", examTitle: exam.title, score, total, certSerial },
+        dedupeKey: `exam:${att.id}`,
+      },
+      dedupeKey: `exam:${att.id}:notify`,
     });
   } catch {}
 
