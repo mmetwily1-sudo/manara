@@ -108,6 +108,27 @@ export default function ExamPage({ params }: { params: { id: string } }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [secLeft === null]);
 
+  // حفظ محلي تلقائي للإجابات (قرار المجلس: طبقة أمان أخيرة ضد انقطاع الإنترنت)
+  const draftKey = `manara_exam_draft_${params.id}`;
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (raw && qs) {
+        const saved = JSON.parse(raw);
+        if (saved && typeof saved === "object") setAnswers((a) => ({ ...saved, ...a }));
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qs !== null]);
+  useEffect(() => {
+    try {
+      if (qs && !result) localStorage.setItem(draftKey, JSON.stringify(answers));
+    } catch {}
+  }, [answers, qs, result]);
+  function clearDraft() {
+    try { localStorage.removeItem(draftKey); } catch {}
+  }
+
   useEffect(() => { submitRef.current = submit; });
   async function submit() {
     if (submitting || result) return;
@@ -119,10 +140,10 @@ export default function ExamPage({ params }: { params: { id: string } }) {
         body: JSON.stringify({ answers, tabSwitches, device_fp: deviceFp() }),
       });
       const j = await r.json().catch(() => null);
-      if (j?.ok) setResult(j);
-      else setSubmitError(ERROR_MESSAGES[j?.error] ?? "فشل التسليم — حاول مرة أخرى.");
+      if (j?.ok) { setResult(j); clearDraft(); }
+      else setSubmitError(ERROR_MESSAGES[j?.error] ?? "فشل التسليم — إجاباتك محفوظة على جهازك، حاول مرة أخرى.");
     } catch {
-      setSubmitError("تعذر الاتصال بالخادم — تحقق من الإنترنت وحاول مجدداً.");
+      setSubmitError("تعذر الاتصال بالخادم — إجاباتك محفوظة على جهازك، تحقق من الإنترنت وحاول مجدداً.");
     } finally { setSubmitting(false); }
   }
 
