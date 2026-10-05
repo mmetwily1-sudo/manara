@@ -2,6 +2,16 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
+import Link from "next/link";
+
+const MENU: [string, string, string][] = [
+  ["/admin", "🏠", "نظرة عامة"],
+  ["/admin/tenants", "🏫", "السناتر"],
+  ["/admin/billing", "💰", "الفوترة"],
+  ["/admin/impersonate", "👁️", "المتابعة"],
+  ["/admin/feedback", "💬", "صوت المعلمين"],
+  ["/admin/dev", "🛠️", "المطور"],
+];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -35,12 +45,39 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <div className="min-h-screen bg-bg">
-      <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-slate-200 bg-slate-900 px-4 text-white">
-        <span className="font-bold">Super Admin — منارة</span>
-        <a href="/dashboard" className="text-xs text-slate-300">← لوحة المعلم</a>
+    <div className="min-h-screen bg-slate-100">
+      {/* الشريط العلوي — طراز ووردبريس */}
+      <header className="sticky top-0 z-20 flex h-12 items-center justify-between bg-slate-900 px-4 text-white">
+        <div className="flex items-center gap-3">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-lg font-extrabold">ن</span>
+          <span className="font-bold">منارة</span>
+          <Link href="/" target="_blank" rel="noreferrer" className="hidden text-xs text-slate-300 hover:text-white sm:inline">
+            عرض الموقع ↗
+          </Link>
+        </div>
+        <div className="flex items-center gap-3 text-xs">
+          <span className="text-slate-300">أهلاً، {(user.email ?? "").split("@")[0]}</span>
+          <Link href="/dashboard" className="rounded-lg bg-slate-800 px-3 py-1.5 hover:bg-slate-700">لوحة المعلم</Link>
+        </div>
       </header>
-      <div className="mx-auto max-w-6xl p-4 md:p-6">{children}</div>
+
+      <div className="flex">
+        {/* القائمة الجانبية — يمين (RTL مثل ووردبريس العربي) */}
+        <aside className="min-h-[calc(100vh-3rem)] w-16 shrink-0 bg-slate-900 text-slate-300 md:w-52">
+          <nav className="space-y-1 p-2">
+            {MENU.map(([href, icon, label]) => (
+              <Link key={href} href={href} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-small font-bold transition hover:bg-slate-800 hover:text-white">
+                <span className="text-lg">{icon}</span>
+                <span className="hidden md:inline">{label}</span>
+              </Link>
+            ))}
+          </nav>
+        </aside>
+
+        <div className="min-w-0 flex-1 p-4 md:p-6">
+          <div className="mx-auto max-w-6xl">{children}</div>
+        </div>
+      </div>
     </div>
   );
 }
