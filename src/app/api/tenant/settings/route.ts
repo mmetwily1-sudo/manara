@@ -33,6 +33,9 @@ export async function GET() {
     theme: settings.theme ?? "default",
     site_primary: settings.site_primary ?? "",
     site_font: settings.site_font ?? "cairo",
+    site_sections: settings.site_sections ?? [],
+    site_custom_css: settings.site_custom_css ?? "",
+    site_custom_js: settings.site_custom_js ?? "",
     pay_numbers: settings.pay_numbers ?? {},
     has_vision_key: !!(settings.vision_key as string),
     has_vision_key_2: !!(settings.vision_key_2 as string),
@@ -71,11 +74,14 @@ export async function PATCH(req: Request) {
     patch._slug = sl;
   }
   // ثيم صفحة المعلم العامة: default | dark | minimal | emerald | royal | sunset
-  if (typeof body.theme !== "undefined" || typeof body.site_primary !== "undefined" || typeof body.site_font !== "undefined") {
+  if (typeof body.theme !== "undefined" || typeof body.site_primary !== "undefined" || typeof body.site_font !== "undefined" || typeof body.site_sections !== "undefined" || typeof body.site_custom_css !== "undefined" || typeof body.site_custom_js !== "undefined") {
     const admin0 = adminClient();
     const { data: plat } = await admin0.from("platform_settings").select("value").eq("key", "design").single();
-    if ((plat as any)?.value?.lock_tenant_design) {
-      return NextResponse.json({ ok: false, error: "locked", message: "التخصيص موقوف من إدارة المنصة حالياً" }, { status: 403 });
+    const { data: tplan } = await admin0.from("tenants").select("plan").eq("id", res.ctx.tenantId).single();
+    // القفل: زر المالك، أو خطة basic افتراضياً (التخصيص الكامل لـ pro+ — قرار المجلس)
+    const locked = !!((plat as any)?.value?.lock_tenant_design) || (tplan as any)?.plan === "basic";
+    if (locked) {
+      return NextResponse.json({ ok: false, error: "locked", message: "التخصيص الكامل لباقات Pro — راسلنا للترقية" }, { status: 403 });
     }
   }
   if (typeof body.theme !== "undefined") {
@@ -96,7 +102,19 @@ export async function PATCH(req: Request) {
     }
     patch.site_primary = sp || null;
   }
-  // خط موقع السنتر — قائمة معتمدة فقط (Claude/Gemini: لا خطوط حرة)
+  // أقسام الموقع + CSS/JS مخصص — بتنقية صارمة (page-builder)
+  if (typeof body.site_sections !== "undefined") {
+    const { sanitizeSections } = await import("@/lib/site-sections");
+    patch.site_sections = sanitizeSections(body.site_sections);
+  }
+  if (typeof body.site_custom_css !== "undefined") {
+    const { sanitizeCss } = await import("@/lib/site-sections");
+    patch.site_custom_css = sanitizeCss(body.site_custom_css) || null;
+  }
+  if (typeof body.site_custom_js !== "undefined") {
+    const { sanitizeJs } = await import("@/lib/site-sections");
+    patch.site_custom_js = sanitizeJs(body.site_custom_js) || null;
+  }
   if (typeof body.site_font !== "undefined") {
     const f = String(body.site_font ?? "");
     if (!["cairo", "readex", "plex"].includes(f)) {

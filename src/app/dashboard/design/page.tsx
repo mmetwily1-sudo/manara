@@ -1,4 +1,5 @@
 import { SiteDesigner } from "@/components/SiteDesigner";
+import { SiteBuilder } from "@/components/SiteBuilder";
 import { getTenantInfoDB } from "@/lib/data";
 
 /** قسم تصميم الموقع — منفصل بذاته: ثيم السنتر + اللون + الخط + معاينة حية. */
@@ -12,6 +13,11 @@ export default async function DesignPage() {
       </header>
       <section className="card space-y-4 p-6">
         <SiteDesigner slug={t.slug} />
+      </section>
+      <section className="card space-y-4 p-6">
+        <h2 className="font-bold">🧱 منشئ الأقسام</h2>
+        <p className="text-xs text-slate-500">بنرات، عدّاد، آراء، أسئلة، معرض، وكود مخصص — تُعرض فوق التسجيل مباشرة.</p>
+        <SiteBuilder slug={t.slug} />
       </section>
     </div>
   );

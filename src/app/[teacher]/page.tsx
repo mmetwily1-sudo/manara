@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { StudentRegisterForm } from "@/components/StudentRegisterForm";
 import { PhoneLoginForm } from "@/components/PhoneLoginForm";
 import { StudentPinLogin } from "@/components/StudentPinLogin";
+import { SiteSections } from "@/components/SiteSections";
 import { resolveTheme } from "@/lib/site-themes";
 
 /**
@@ -50,6 +51,10 @@ export default async function TeacherPage({ params }: Props) {
   let sitePrimary: string = "";
   let siteFont: string = "cairo";
   let tenantId: string | null = null;
+  let siteSections: any[] = [];
+  let siteCss = "";
+  let siteJs = "";
+  let tenantPlan = "trial";
   let sessions: any[] = [];
   let videos: any[] = [];
   let notes: any[] = [];
@@ -60,12 +65,16 @@ export default async function TeacherPage({ params }: Props) {
     if (url && key) {
       const { createClient } = await import("@supabase/supabase-js");
       const admin = createClient(url, key, { auth: { persistSession: false } });
-      const { data } = await admin.from("tenants").select("id,name,settings").eq("slug", slug).single();
+      const { data } = await admin.from("tenants").select("id,name,plan,settings").eq("slug", slug).single();
       if (data?.name) displayName = data.name;
+      tenantPlan = String((data as any)?.plan ?? "trial");
       teacherPhone = (data as any)?.settings?.owner_phone;
       themeId = String((data as any)?.settings?.theme ?? "default");
       sitePrimary = String((data as any)?.settings?.site_primary ?? "");
       siteFont = String((data as any)?.settings?.site_font ?? "cairo");
+      if (Array.isArray((data as any)?.settings?.site_sections)) siteSections = (data as any).settings.site_sections;
+      siteCss = String((data as any)?.settings?.site_custom_css ?? "");
+      siteJs = String((data as any)?.settings?.site_custom_js ?? "");
       tenantId = (data as any)?.id ?? null;
     }
     if (tenantId) {
@@ -90,6 +99,11 @@ export default async function TeacherPage({ params }: Props) {
 
   const { def: th } = resolveTheme(themeId);
   const accent = /^#[0-9a-fA-F]{6}$/.test(sitePrimary) ? sitePrimary : th.primary;
+  const hasCustomHtml = siteSections.some((s: any) => s?.type === "custom_html" && s?.visible !== false && String(s?.data?.html ?? "").trim() !== "");
+  const customHtml = siteSections
+    .filter((s: any) => s?.type === "custom_html" && s?.visible !== false)
+    .map((s: any) => String(s?.data?.html ?? "").slice(0, 5000))
+    .join("\n");
   const fontFamily =
     siteFont === "readex" ? "'Readex Pro', Cairo, sans-serif" :
     siteFont === "plex" ? "'IBM Plex Sans Arabic', Cairo, sans-serif" :
@@ -172,6 +186,8 @@ export default async function TeacherPage({ params }: Props) {
           ))}
         </div>
 
+        <SiteSections sections={siteSections as any} card={th.card} />
+
         <div className="mt-14">
           <h2 className="font-extrabold">📝 سجل بياناتك وانضم</h2>
           <p className="mt-1 text-small opacity-70">سيتم إنشاء حسابك فوراً — بيانات الدخول ستظهر لك على الشاشة.</p>
@@ -179,6 +195,16 @@ export default async function TeacherPage({ params }: Props) {
           <StudentPinLogin slug={slug} />
           <PhoneLoginForm slug={slug} />
         </div>
+
+        {!!(siteCss || siteJs || hasCustomHtml) && (
+          <iframe
+            title="محتوى مخصص"
+            sandbox="allow-scripts"
+            srcDoc={`<style>${siteCss.slice(0, 10000)}</style>${customHtml}<div id="root"></div><script>${siteJs.slice(0, 10000)}<\/script>`}
+            className="mt-8 w-full rounded-2xl border border-slate-200 bg-white"
+            style={{ height: 420 }}
+          />
+        )}
       </section>
 
       <footer className="border-t border-slate-100 bg-white py-6 text-center text-xs text-slate-400">
