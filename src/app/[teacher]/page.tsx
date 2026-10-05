@@ -224,7 +224,7 @@ export default async function TeacherPage({ params }: Props) {
           </div>
         )}
 
-        <div className="mt-14">
+        <div className="mt-14" id="join">
           <h2 className="font-extrabold">📝 سجل بياناتك وانضم</h2>
           <p className="mt-1 text-small opacity-70">سيتم إنشاء حسابك فوراً — بيانات الدخول ستظهر لك على الشاشة.</p>
           <StudentRegisterForm slug={slug} teacherPhone={teacherPhone} />
