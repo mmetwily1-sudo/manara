@@ -5,6 +5,7 @@ import { Onboarding } from "@/components/Onboarding";
 import { PushSubscribeButton } from "@/components/PushSubscribeButton";
 import { PushAutoPrompt } from "@/components/PushAutoPrompt";
 import { NotificationsInbox } from "@/components/NotificationsInbox";
+import { BackButton } from "@/components/BackButton";
 import { ParentOnboarding } from "@/components/ParentOnboarding";
 
 type Data = {
@@ -143,7 +144,8 @@ export default function ParentPortal() {
   return (
     <main className="mx-auto max-w-md p-4 space-y-4" dir={lang === "ar" ? "rtl" : "ltr"}>
       <Onboarding role="parent" />
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between">
+        <BackButton fallback="/" />
         <button onClick={() => switchLang(lang === "ar" ? "en" : "ar")}
           className="rounded-full bg-slate-100 px-4 py-1.5 text-xs font-bold">
           {lang === "ar" ? "English" : "عربي"}

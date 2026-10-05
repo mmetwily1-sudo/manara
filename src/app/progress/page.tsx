@@ -9,6 +9,7 @@ import {
 import { PushSubscribeButton } from "@/components/PushSubscribeButton";
 import { PushAutoPrompt } from "@/components/PushAutoPrompt";
 import { NotificationsInbox } from "@/components/NotificationsInbox";
+import { BackButton } from "@/components/BackButton";
 
 type Progress = {
   ok: boolean;
@@ -594,6 +595,9 @@ export default function ProgressPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-4">
+      <div className="flex items-center justify-between">
+        <BackButton fallback="/" />
+      </div>
       <header>
         <h1 className="text-h1">تقدمي الدراسي 🎯</h1>
         <p className="mt-1 text-small text-slate-500">أهلاً {data.student.name} — كل نتائجك وشهاداتك في مكان واحد</p>
