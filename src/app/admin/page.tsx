@@ -44,6 +44,10 @@ export default async function AdminHome() {
           <div className="font-bold">المتابعة بعين العميل 👁️</div>
           <div className="mt-1 text-small text-slate-500">ادخل أي بوابة ولي أمر أو طالب (مسجل)</div>
         </a>
+        <a href="/admin/dev" className="card p-6 transition hover:border-primary/40">
+          <div className="font-bold">لوحة المطور 🛠️</div>
+          <div className="mt-1 text-small text-slate-500">الإصدار · الطوابير · الفشل · المفاتيح</div>
+        </a>
         <a href="/admin/bank" className="card p-6 transition hover:border-primary/40">
           <div className="font-bold">البنك المركزي 🌍</div>
           <div className="mt-1 text-small text-slate-500">مراجعة المساهمات · فجوات التغطية</div>
