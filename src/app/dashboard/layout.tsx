@@ -28,6 +28,7 @@ const navMore = [
   { href: "/dashboard/referrals", label: "الإحالات والنمو", key: "09d", roles: ["teacher_admin"] },
   { href: "/dashboard/staff", label: "الفروع والطاقم", key: "09c", roles: ["teacher_admin"] },
   { href: "/dashboard/settings", label: "هويتي والإعدادات", key: "10", roles: ["teacher_admin"] },
+  { href: "/dashboard/design", label: "تصميم الموقع", key: "10b", roles: ["teacher_admin"] },
 ];
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {

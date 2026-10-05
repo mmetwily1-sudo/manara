@@ -1,0 +1,18 @@
+import { SiteDesigner } from "@/components/SiteDesigner";
+import { getTenantInfoDB } from "@/lib/data";
+
+/** قسم تصميم الموقع — منفصل بذاته: ثيم السنتر + اللون + الخط + معاينة حية. */
+export default async function DesignPage() {
+  const t = await getTenantInfoDB();
+  return (
+    <div className="mx-auto max-w-3xl space-y-6">
+      <header>
+        <h1 className="text-h1">تصميم الموقع 🎨</h1>
+        <p className="mt-1 text-small text-slate-500">هوية موقع سنترك العام — التغيير يظهر لزوارك فوراً.</p>
+      </header>
+      <section className="card space-y-4 p-6">
+        <SiteDesigner slug={t.slug} />
+      </section>
+    </div>
+  );
+}
