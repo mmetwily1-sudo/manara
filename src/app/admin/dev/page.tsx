@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { ReviveJob, ResendNotif } from "@/components/AdminOps";
 
 /**
  * لوحة المطور: صحة المنصة تقنياً — الإصدار، الطوابير، الفشل، المفاتيح (وجود فقط، بلا قيم).
@@ -12,6 +13,8 @@ export default async function AdminDevPage() {
   let jobs: Record<string, number> = {};
   let failed24 = 0;
   let queueSms = 0;
+  let deadJobs: any[] = [];
+  let failedNotifs: any[] = [];
 
   if (url && key) {
     const admin = createClient(url, key, { auth: { persistSession: false } });
@@ -20,9 +23,15 @@ export default async function AdminDevPage() {
       for (const j of ((data ?? []) as any[])) jobs[j.status] = (jobs[j.status] ?? 0) + 1;
     } catch {}
     try {
+      const { data } = await admin.from("bg_jobs").select("id,kind,attempts,last_error,created_at").eq("status", "dead").order("created_at", { ascending: false }).limit(10);
+      deadJobs = (data ?? []) as any[];
+    } catch {}
+    try {
       const since = new Date(Date.now() - 864e5).toISOString();
       const { count } = await admin.from("notification_log").select("id", { count: "exact", head: true }).eq("status", "failed").gte("created_at", since);
       failed24 = count ?? 0;
+      const { data } = await admin.from("notification_log").select("id,event,channel,created_at").eq("status", "failed").order("created_at", { ascending: false }).limit(10);
+      failedNotifs = (data ?? []) as any[];
     } catch {}
     try {
       const { count } = await admin.from("sms_queue").select("id", { count: "exact", head: true }).eq("status", "queued");
@@ -88,9 +97,39 @@ export default async function AdminDevPage() {
         )}
       </div>
 
+      {(deadJobs.length > 0 || failedNotifs.length > 0) && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {deadJobs.length > 0 && (
+            <section className="card p-5">
+              <h2 className="font-bold">مهام ميتة ☠️</h2>
+              <ul className="mt-3 space-y-2 text-small">
+                {deadJobs.map((j) => (
+                  <li key={j.id} className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2">
+                    <span className="font-mono text-xs" dir="ltr">{j.kind} · {j.attempts}x</span>
+                    <ReviveJob jobId={j.id} />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+          {failedNotifs.length > 0 && (
+            <section className="card p-5">
+              <h2 className="font-bold">تنبيهات فاشلة ⚠️</h2>
+              <ul className="mt-3 space-y-2 text-small">
+                {failedNotifs.map((n) => (
+                  <li key={n.id} className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2">
+                    <span className="font-bold">{n.event} · {n.channel}</span>
+                    <ResendNotif logId={n.id} />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </div>
+      )}
+
       <div className="card space-y-2 p-5">
-        <h2 className="font-bold">روابط التشغيل</h2>
-        <div className="flex flex-wrap gap-2 text-small">
+        <h2 className="font-bold">روابط التشغيل</h2>        <div className="flex flex-wrap gap-2 text-small">
           <a href="/api/health" target="_blank" rel="noreferrer" className="btn-secondary !px-4 !py-2 text-small">فحص الصحة</a>
           <a href="/api/worker/run" target="_blank" rel="noreferrer" className="btn-secondary !px-4 !py-2 text-small">تشغيل العامل (يحتاج سر)</a>
           <a href="/admin/impersonate" className="btn-secondary !px-4 !py-2 text-small">المتابعة بعين العميل</a>
