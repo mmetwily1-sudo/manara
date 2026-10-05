@@ -102,14 +102,10 @@ export default async function TeacherPage({ params }: Props) {
       <section className="mx-auto max-w-4xl px-4 py-16 text-center">
         <h1 className="text-display">منصة {heroName} التعليمية</h1>
         <p className="mx-auto mt-4 max-w-xl text-body text-slate-600">
-          سجل بياناتك وسيتم إنشاء حسابك فوراً — بيانات الدخول ستظهر لك على الشاشة.
+          الحصص والفيديوهات والمذكرات والامتحانات — تصفح بحرية، وسجل عندما تقرر الانضمام.
         </p>
 
-        <StudentRegisterForm slug={slug} teacherPhone={teacherPhone} />
-        <StudentPinLogin slug={slug} />
-        <PhoneLoginForm slug={slug} />
-
-        {(sessions.length > 0 || videos.length > 0 || notes.length > 0 || examsCount > 0) && (
+        {(sessions.length > 0 || videos.length > 0 || notes.length > 0 || examsCount > 0) ? (
           <div className="mt-14 space-y-8 text-right">
             {sessions.length > 0 && (
               <div>
@@ -152,6 +148,12 @@ export default async function TeacherPage({ params }: Props) {
               <p className="text-center text-small font-bold opacity-70">📝 {examsCount} امتحان تدريبي متاح لطلاب السنتر</p>
             )}
           </div>
+        ) : (
+          <div className={`mx-auto mt-10 max-w-xl ${th.card}`}>
+            <div className="text-3xl">🎓</div>
+            <p className="mt-2 font-bold">المحتوى يُجهز الآن — الحصص والفيديوهات والمذكرات ستظهر هنا أولاً بأول</p>
+            <p className="mt-1 text-small opacity-70">سجل بياناتك بالأسفل ليصلك كل جديد وتدخل الامتحانات الأونلاين</p>
+          </div>
         )}
 
         <div className="mt-14 grid gap-5 sm:grid-cols-3">
@@ -160,6 +162,14 @@ export default async function TeacherPage({ params }: Props) {
             ["🎓", "شهادات إتمام", "بتتولد لوحدها وتشاركها"]].map(([i, t, d]) => (
             <div key={t} className={th.card}><div className="text-3xl">{i}</div><h2 className="mt-2 font-bold">{t}</h2><p className="mt-1 text-small opacity-70">{d}</p></div>
           ))}
+        </div>
+
+        <div className="mt-14">
+          <h2 className="font-extrabold">📝 سجل بياناتك وانضم</h2>
+          <p className="mt-1 text-small opacity-70">سيتم إنشاء حسابك فوراً — بيانات الدخول ستظهر لك على الشاشة.</p>
+          <StudentRegisterForm slug={slug} teacherPhone={teacherPhone} />
+          <StudentPinLogin slug={slug} />
+          <PhoneLoginForm slug={slug} />
         </div>
       </section>
 
