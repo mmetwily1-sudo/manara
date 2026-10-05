@@ -8,6 +8,7 @@ import { MobileBottomNav } from "@/components/MobileNav";
 import { SideNav } from "@/components/SideNav";
 import { CommandPalette } from "@/components/CommandPalette";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { BackButton } from "@/components/BackButton";
 
 const nav = [
   { href: "/dashboard", label: "الرئيسية", key: "01" },
@@ -95,8 +96,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
         </aside>
 
         <div className="lg:mr-64">
+          <div className="sticky top-0 z-20 hidden items-center gap-3 border-b border-slate-100 bg-white/90 px-8 py-2.5 backdrop-blur lg:flex">
+            <BackButton />
+            <span className="text-xs text-slate-400">رجوع للصفحة السابقة</span>
+          </div>
           <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-slate-100 bg-white/90 px-4 backdrop-blur lg:hidden">
             <div className="flex items-center gap-2">
+              <BackButton />
               <span className="flex h-8 w-8 items-center justify-center rounded-lg text-sm font-extrabold text-white" style={{ backgroundColor: t.color }}>ن</span>
               <span className="font-bold">{t.name}</span>
             </div>

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { CommandPalette } from "@/components/CommandPalette";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { BackButton } from "@/components/BackButton";
 
 const MENU: [string, string, string][] = [
   ["/admin", "🏠", "نظرة عامة"],
@@ -57,6 +58,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       {/* الشريط العلوي — طراز ووردبريس */}
       <header className="sticky top-0 z-20 flex h-12 items-center justify-between bg-slate-900 px-4 text-white">
         <div className="flex items-center gap-3">
+          <BackButton fallback="/admin" dark />
           <span className="flex h-8 w-8 items-center justify-center rounded-lg text-lg font-extrabold text-white" style={{ backgroundColor: accent }}>ن</span>
           <span className="font-bold">منارة</span>
           <Link href="/" target="_blank" rel="noreferrer" className="hidden text-xs text-slate-300 hover:text-white sm:inline">
