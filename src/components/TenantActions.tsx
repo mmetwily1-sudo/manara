@@ -10,7 +10,7 @@ export function TenantActions({ tenantId, name, status }: { tenantId: string; na
   const router = useRouter();
 
   async function act(action: string, value?: string) {
-    const label = action === "suspend" ? `تعليق ${name}؟ (يتوقف دخول السنتر فوراً)` : action === "activate" ? `تفعيل ${name}؟` : action === "extend30" ? `تمديد تجربة ${name} 30 يوماً؟` : `تغيير باقة ${name} إلى ${value}؟`;
+    const label = action === "suspend" ? `تعليق ${name}؟ (يتوقف دخول السنتر فوراً)` : action === "activate" ? `تفعيل ${name}؟` : action === "extend30" ? `تمديد تجربة ${name} 30 يوماً؟` : action === "reset_design" ? `إعادة ثيم موقع ${name} للافتراضي؟` : `تغيير باقة ${name} إلى ${value}؟`;
     if (!confirm(label)) return;
     const reason = (prompt("سبب إلزامي (يُسجل في التدقيق):", "") ?? "").trim();
     if (!reason) { alert("السبب إلزامي"); return; }
@@ -34,6 +34,7 @@ export function TenantActions({ tenantId, name, status }: { tenantId: string; na
         <button onClick={() => act("activate")} disabled={busy} className="rounded-lg bg-success/10 px-2.5 py-1 text-[11px] font-bold text-success disabled:opacity-50">تفعيل</button>
       )}
       <button onClick={() => act("extend30")} disabled={busy} className="rounded-lg bg-primary-light px-2.5 py-1 text-[11px] font-bold text-primary disabled:opacity-50">+30 يوم</button>
+      <button onClick={() => act("reset_design")} disabled={busy} className="rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-500 disabled:opacity-50">🎨 افتراضي</button>
       <select value={plan} onChange={(e) => { const v = e.target.value; setPlan(""); if (v) act("plan", v); }} disabled={busy}
         className="rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-bold">
         <option value="">الباقة…</option>

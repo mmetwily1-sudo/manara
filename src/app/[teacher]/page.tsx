@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { StudentRegisterForm } from "@/components/StudentRegisterForm";
 import { PhoneLoginForm } from "@/components/PhoneLoginForm";
 import { StudentPinLogin } from "@/components/StudentPinLogin";
+import { resolveTheme } from "@/lib/site-themes";
 
 /**
  * صفحة المعلم العامة — Programmatic SEO
@@ -45,7 +46,9 @@ export default async function TeacherPage({ params }: Props) {
   const slug = decodeURIComponent(params.teacher);
   let displayName: string | null = null;
   let teacherPhone: string | undefined;
-  let theme: string = "default";
+  let themeId: string = "default";
+  let sitePrimary: string = "";
+  let siteFont: string = "cairo";
   let tenantId: string | null = null;
   let sessions: any[] = [];
   let videos: any[] = [];
@@ -60,8 +63,9 @@ export default async function TeacherPage({ params }: Props) {
       const { data } = await admin.from("tenants").select("id,name,settings").eq("slug", slug).single();
       if (data?.name) displayName = data.name;
       teacherPhone = (data as any)?.settings?.owner_phone;
-      const th = String((data as any)?.settings?.theme ?? "default");
-      if (["default", "dark", "minimal"].includes(th)) theme = th;
+      themeId = String((data as any)?.settings?.theme ?? "default");
+      sitePrimary = String((data as any)?.settings?.site_primary ?? "");
+      siteFont = String((data as any)?.settings?.site_font ?? "cairo");
       tenantId = (data as any)?.id ?? null;
     }
     if (tenantId) {
@@ -84,17 +88,21 @@ export default async function TeacherPage({ params }: Props) {
   const headerName = displayName.startsWith("سنتر") ? displayName : `أ. ${displayName}`;
   const heroName = displayName;
 
-  const themes: Record<string, { main: string; header: string; card: string }> = {
-    default: { main: "min-h-screen bg-gradient-to-b from-primary-light/30 to-bg", header: "bg-white/80 backdrop-blur", card: "card" },
-    dark: { main: "min-h-screen bg-slate-950 text-slate-100", header: "bg-slate-900/90 backdrop-blur", card: "rounded-xl border border-slate-800 bg-slate-900 p-5" },
-    minimal: { main: "min-h-screen bg-white", header: "bg-white border-b border-slate-200", card: "rounded-xl border border-slate-200 p-5" },
-  };
-  const th = themes[theme];
+  const { def: th } = resolveTheme(themeId);
+  const accent = /^#[0-9a-fA-F]{6}$/.test(sitePrimary) ? sitePrimary : th.primary;
+  const fontFamily =
+    siteFont === "readex" ? "'Readex Pro', Cairo, sans-serif" :
+    siteFont === "plex" ? "'IBM Plex Sans Arabic', Cairo, sans-serif" :
+    "Cairo, sans-serif";
+  const fontLink =
+    siteFont === "readex" ? "https://fonts.googleapis.com/css2?family=Readex+Pro:wght@400;600;700&display=swap" :
+    siteFont === "plex" ? "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap" : null;
   return (
-    <main className={th.main}>
+    <main className={th.main} style={{ fontFamily }}>
+      {fontLink && <link href={fontLink} rel="stylesheet" />}
       <header className={th.header}>
         <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-4">
-          <span className="text-h2 font-extrabold text-primary">{headerName}</span>
+          <span className="text-h2 font-extrabold" style={{ color: accent }}>{headerName}</span>
           <Link href="/login" className="btn-secondary !px-4 !py-2 text-small">دخول الطلاب</Link>
         </div>
       </header>

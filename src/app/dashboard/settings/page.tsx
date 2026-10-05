@@ -1,4 +1,5 @@
 import { PasskeyManager } from "@/components/PasskeyManager";
+import { SiteDesigner } from "@/components/SiteDesigner";
 import { TotpManager } from "@/components/TotpManager";
 import { DevicesManager } from "@/components/DevicesManager";
 import { SecurityAlerts } from "@/components/SecurityAlerts";
@@ -71,6 +72,10 @@ export default async function SettingsPage() {
 
       <section className="card space-y-4 p-6">
         <ThemeForm />
+      </section>
+
+      <section className="card space-y-4 p-6">
+        <SiteDesigner slug={t.slug} />
       </section>
 
       <section className="card space-y-4 p-6">

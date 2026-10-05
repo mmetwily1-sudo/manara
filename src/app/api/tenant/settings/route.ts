@@ -4,6 +4,17 @@ import { requireTeacher, adminClient } from "@/lib/server-auth";
 import { isWhatsAppLive } from "@/lib/whatsapp";
 import { isVisionLive } from "@/lib/vision";
 
+/** تباين اللون مع الأبيض (WCAG) — حارس القراءة */
+function contrastWhite(hex: string): number {
+  const c = hex.replace("#", "");
+  const f = (v: number) => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  };
+  const L = 0.2126 * f(parseInt(c.slice(0, 2), 16)) + 0.7152 * f(parseInt(c.slice(2, 4), 16)) + 0.0722 * f(parseInt(c.slice(4, 6), 16));
+  return 1.05 / (L + 0.05);
+}
+
 /** GET — حالة الإشعارات وإعداد الواتساب */
 export async function GET() {
   const res = await requireTeacher(["teacher_admin"]);
@@ -19,6 +30,9 @@ export async function GET() {
     ok: true,
     whatsapp_configured: isWhatsAppLive(),
     notify_whatsapp: settings.notify_whatsapp !== false,
+    theme: settings.theme ?? "default",
+    site_primary: settings.site_primary ?? "",
+    site_font: settings.site_font ?? "cairo",
     pay_numbers: settings.pay_numbers ?? {},
     has_vision_key: !!(settings.vision_key as string),
     has_vision_key_2: !!(settings.vision_key_2 as string),
@@ -56,13 +70,39 @@ export async function PATCH(req: Request) {
     if (slugErr) return NextResponse.json({ ok: false, error: "slug_failed" }, { status: 500 });
     patch._slug = sl;
   }
-  // ثيم صفحة المعلم العامة: default | dark | minimal
+  // ثيم صفحة المعلم العامة: default | dark | minimal | emerald | royal | sunset
+  if (typeof body.theme !== "undefined" || typeof body.site_primary !== "undefined" || typeof body.site_font !== "undefined") {
+    const admin0 = adminClient();
+    const { data: plat } = await admin0.from("platform_settings").select("value").eq("key", "design").single();
+    if ((plat as any)?.value?.lock_tenant_design) {
+      return NextResponse.json({ ok: false, error: "locked", message: "التخصيص موقوف من إدارة المنصة حالياً" }, { status: 403 });
+    }
+  }
   if (typeof body.theme !== "undefined") {
     const th = String(body.theme ?? "");
-    if (!["default", "dark", "minimal"].includes(th)) {
+    if (!["default", "dark", "minimal", "emerald", "royal", "sunset"].includes(th)) {
       return NextResponse.json({ ok: false, error: "bad_theme" }, { status: 400 });
     }
     patch.theme = th;
+  }
+  // اللون الأساسي لموقع السنتر (#RRGGBB) — فارغ = لون الثيم
+  if (typeof body.site_primary !== "undefined") {
+    const sp = String(body.site_primary ?? "").trim();
+    if (sp && !/^#[0-9a-fA-F]{6}$/.test(sp)) {
+      return NextResponse.json({ ok: false, error: "bad_color" }, { status: 400 });
+    }
+    if (sp && contrastWhite(sp) < 3) {
+      return NextResponse.json({ ok: false, error: "low_contrast", message: "اللون فاتح — النص به لن يُقرأ. اختر لوناً أغمق." }, { status: 400 });
+    }
+    patch.site_primary = sp || null;
+  }
+  // خط موقع السنتر — قائمة معتمدة فقط (Claude/Gemini: لا خطوط حرة)
+  if (typeof body.site_font !== "undefined") {
+    const f = String(body.site_font ?? "");
+    if (!["cairo", "readex", "plex"].includes(f)) {
+      return NextResponse.json({ ok: false, error: "bad_font" }, { status: 400 });
+    }
+    patch.site_font = f;
   }
   // مفتاحا Gemini للسنتر (تفريغ مرئي دقيق + تناوب عند نفاد الحصة) — فارغ = مسح
   // ملاحظة: مفاتيح AI Studio تحتوي نقاطاً (AQ.xxx) لذا تُقبل [A-Za-z0-9_.~-]

@@ -33,6 +33,19 @@ export async function POST(req: Request) {
     const { data: cur } = await admin.from("tenants").select("trial_ends_at").eq("id", tenantId).single();
     const base = Math.max(Date.now(), new Date((cur as any)?.trial_ends_at ?? 0).getTime() || 0);
     patch = { trial_ends_at: new Date(base + 30 * 864e5).toISOString(), status: "active" };
+  } else if (action === "reset_design") {
+    const { data: cur } = await admin.from("tenants").select("settings").eq("id", tenantId).single();
+    const settings = ({ ...((cur as any)?.settings ?? {}) });
+    delete settings.theme; delete settings.site_primary; delete settings.site_font;
+    const { error: sErr } = await admin.from("tenants").update({ settings }).eq("id", tenantId);
+    if (sErr) return NextResponse.json({ ok: false, error: "update_failed" }, { status: 500 });
+    try {
+      await admin.from("audit_log").insert({
+        tenant_id: tenantId, actor_id: null, action: "owner:reset_design", entity_type: "tenant", entity_id: tenantId,
+        details: { by: email, reason, before },
+      });
+    } catch {}
+    return NextResponse.json({ ok: true });
   } else {
     return NextResponse.json({ ok: false, error: "bad_action" }, { status: 400 });
   }
