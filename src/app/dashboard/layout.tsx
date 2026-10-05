@@ -54,8 +54,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <aside className="fixed inset-y-0 right-0 z-30 hidden w-64 flex-col border-l border-slate-100 bg-white lg:flex">
           <div className="flex h-16 items-center gap-3 border-b border-slate-100 px-6">
             <span className="flex h-9 w-9 items-center justify-center rounded-lg font-extrabold text-white" style={{ backgroundColor: t.color }}>ن</span>
-            <div>
-              <div className="text-small font-bold leading-tight">{t.name}</div>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-small font-bold leading-tight">{t.name}</div>
               <div className="text-xs text-slate-400">
                 {(t as any).trialState === "paid" ? "باقة مدفوعة ✅"
                   : (t as any).trialState === "expired" ? "انتهت التجربة ⚠️"
@@ -64,6 +64,21 @@ export default async function DashboardLayout({ children }: { children: React.Re
                   : "باقة تجريبية"}
               </div>
             </div>
+            {(t as any).slug && (
+              <a
+                href={`/${(t as any).slug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="عرض الموقع"
+                aria-label="عرض الموقع"
+                className="group relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-lg transition hover:bg-primary-light"
+              >
+                <span aria-hidden>👁️</span>
+                <span className="pointer-events-none absolute -bottom-8 left-1/2 z-50 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900 px-2 py-1 text-[11px] font-bold text-white opacity-0 transition group-hover:opacity-100">
+                  عرض الموقع
+                </span>
+              </a>
+            )}
           </div>
           <SideNav
             items={[...nav, ...navMore].filter((item: any) => !item.roles || !viewerRole || item.roles.includes(viewerRole) || viewerRole === "teacher_admin")}
