@@ -12,11 +12,13 @@ export function TenantActions({ tenantId, name, status }: { tenantId: string; na
   async function act(action: string, value?: string) {
     const label = action === "suspend" ? `تعليق ${name}؟ (يتوقف دخول السنتر فوراً)` : action === "activate" ? `تفعيل ${name}؟` : action === "extend30" ? `تمديد تجربة ${name} 30 يوماً؟` : `تغيير باقة ${name} إلى ${value}؟`;
     if (!confirm(label)) return;
+    const reason = (prompt("سبب إلزامي (يُسجل في التدقيق):", "") ?? "").trim();
+    if (!reason) { alert("السبب إلزامي"); return; }
     setBusy(true);
     try {
       const r = await fetch("/api/admin/tenants/action", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tenant_id: tenantId, action, value }),
+        body: JSON.stringify({ tenant_id: tenantId, action, value, reason }),
       });
       if (!r.ok) alert("فشل التنفيذ");
       router.refresh();

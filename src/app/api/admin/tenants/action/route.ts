@@ -14,7 +14,9 @@ export async function POST(req: Request) {
   const b = await req.json().catch(() => ({} as any));
   const tenantId = String(b?.tenant_id ?? "");
   const action = String(b?.action ?? "");
+  const reason = String(b?.reason ?? "").trim().slice(0, 200);
   if (!tenantId) return NextResponse.json({ ok: false, error: "tenant_required" }, { status: 400 });
+  if (!reason) return NextResponse.json({ ok: false, error: "reason_required", message: "السبب إلزامي" }, { status: 400 });
 
   const { data: t } = await admin.from("tenants").select("id,name").eq("id", tenantId).single();
   if (!t) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
@@ -39,7 +41,7 @@ export async function POST(req: Request) {
   try {
     await admin.from("audit_log").insert({
       tenant_id: tenantId, actor_id: null, action: `owner:${action}`, entity_type: "tenant", entity_id: tenantId,
-      details: { by: email, value: (b as any)?.value ?? null },
+      details: { by: email, value: (b as any)?.value ?? null, reason },
     });
   } catch {}
   return NextResponse.json({ ok: true });
