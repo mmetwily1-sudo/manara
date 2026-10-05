@@ -62,6 +62,10 @@ export async function GET(req: Request) {
   const sid = (sess as any).student_id;
   const { data: st } = await admin.from("users").select("id,full_name,phone").eq("id", (sess as any).student_id).eq("role", "student").single();
   if (!st) return NextResponse.json({ ok: false, error: "student_not_found" }, { status: 404 });
+  const { data: tn } = await admin.from("tenants").select("status").eq("id", (sess as any).tenant_id).single();
+  if ((tn as any)?.status && (tn as any).status !== "active") {
+    return NextResponse.json({ ok: false, error: "tenant_suspended", message: "حساب السنتر موقوف مؤقتاً — تواصل مع الإدارة" }, { status: 403 });
+  }
   const [{ data: att }, { data: grades }, { data: inv }] = await Promise.all([
     admin.from("attendance").select("status,session_id,sessions!inner(session_date)").eq("tenant_id", (sess as any).tenant_id).eq("student_id", sid).order("created_at", { ascending: false }).limit(50),
     admin.from("exam_attempts").select("score,exam_id,exams(title),submitted_at").eq("tenant_id", (sess as any).tenant_id).eq("student_id", sid).order("submitted_at", { ascending: false }).limit(20),

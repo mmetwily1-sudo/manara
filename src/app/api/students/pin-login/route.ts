@@ -35,6 +35,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "tenant_not_found", message: arError("tenant_not_found") }, { status: 404 });
   }
   const tid = (tenant as any).id as string;
+  const { data: tn } = await admin.from("tenants").select("status").eq("id", tid).single();
+  if ((tn as any)?.status && (tn as any).status !== "active") {
+    return NextResponse.json({ ok: false, error: "tenant_suspended", message: "حساب السنتر موقوف مؤقتاً — تواصل مع الإدارة" }, { status: 403 });
+  }
   const { data: users } = await admin.from("users").select("id,phone,pin_hash").eq("tenant_id", tid).eq("role", "student").limit(500);
   const match = ((users ?? []) as any[]).find((u) => normalizePhone(String(u.phone ?? "")) === phone);
   if (!match?.pin_hash) {

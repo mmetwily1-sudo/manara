@@ -18,8 +18,9 @@ export async function POST(req: Request) {
   if (!tenantId) return NextResponse.json({ ok: false, error: "tenant_required" }, { status: 400 });
   if (!reason) return NextResponse.json({ ok: false, error: "reason_required", message: "السبب إلزامي" }, { status: 400 });
 
-  const { data: t } = await admin.from("tenants").select("id,name").eq("id", tenantId).single();
+  const { data: t } = await admin.from("tenants").select("id,name,status,plan,trial_ends_at").eq("id", tenantId).single();
   if (!t) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
+  const before = { status: (t as any).status, plan: (t as any).plan, trial_ends_at: (t as any).trial_ends_at };
 
   let patch: Record<string, unknown> = {};
   if (action === "suspend") patch = { status: "suspended" };
@@ -41,7 +42,7 @@ export async function POST(req: Request) {
   try {
     await admin.from("audit_log").insert({
       tenant_id: tenantId, actor_id: null, action: `owner:${action}`, entity_type: "tenant", entity_id: tenantId,
-      details: { by: email, value: (b as any)?.value ?? null, reason },
+      details: { by: email, value: (b as any)?.value ?? null, reason, before, after: patch },
     });
   } catch {}
   return NextResponse.json({ ok: true });

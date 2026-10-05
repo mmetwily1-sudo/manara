@@ -48,6 +48,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   } catch {}
   if (viewerRole === "student") redirect("/progress");
   const t = await getTenantInfoDB();
+  if ((t as any)?.status && (t as any).status !== "active") redirect("/suspended");
   return (
     <AuthGate>
       <div className="min-h-screen bg-bg">

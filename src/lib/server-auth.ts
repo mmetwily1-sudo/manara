@@ -104,5 +104,10 @@ export async function requireTeacher(roles?: string[]): Promise<{ ctx: TeacherCo
   if (roles?.length && !roles.includes(urow.role)) {
     return { error: NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 }) };
   }
+  // السنتر الموقوف: كل عمليات الطاقم مرفوضة فوراً (قرار المالك)
+  const { data: trow } = await admin.from("tenants").select("status").eq("id", urow.tenant_id).single();
+  if ((trow as any)?.status && (trow as any).status !== "active") {
+    return { error: NextResponse.json({ ok: false, error: "tenant_suspended", message: "حساب السنتر موقوف — تواصل مع إدارة المنصة" }, { status: 403 }) };
+  }
   return { ctx: { admin, user, tenantId: urow.tenant_id, userRow: urow } };
 }

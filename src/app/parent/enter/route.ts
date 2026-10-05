@@ -16,10 +16,14 @@ export async function GET(req: Request) {
   if (!url || !svc) return bad(base, "الخدمة غير مهيأة — تواصل مع الإدارة.");
   const admin = createClient(url, svc, { auth: { persistSession: false } });
   const tokenHash = createHash("sha256").update("parent:" + token).digest("hex");
-  const { data: sess } = await admin.from("parent_portal_sessions").select("id,expires_at")
+  const { data: sess } = await admin.from("parent_portal_sessions").select("id,tenant_id,expires_at")
     .eq("token_hash", tokenHash).limit(1).single();
   if (!sess || new Date((sess as any).expires_at).getTime() < Date.now()) {
     return bad(base, "الرابط منتهي — اطلب رابطاً جديداً من إدارة السنتر.");
+  }
+  const { data: tn } = await admin.from("tenants").select("status").eq("id", (sess as any).tenant_id).single();
+  if ((tn as any)?.status && (tn as any).status !== "active") {
+    return bad(base, "حساب السنتر موقوف مؤقتاً — تواصل مع الإدارة.");
   }
   const res = NextResponse.redirect(`${base}/parent`, 302);
   res.cookies.set("manara_parent_token", token, {

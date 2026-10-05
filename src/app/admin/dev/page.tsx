@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { ReviveJob, ResendNotif } from "@/components/AdminOps";
+import { ForceWorker } from "@/components/ForceWorker";
 
 /**
  * لوحة المطور: صحة المنصة تقنياً — الإصدار، الطوابير، الفشل، المفاتيح (وجود فقط، بلا قيم).
@@ -61,11 +62,14 @@ export default async function AdminDevPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-h1">لوحة المطور 🛠️</h1>
-        <p className="mt-1 text-small text-slate-500">
-          الإصدار <span className="font-mono font-bold" dir="ltr">{sha}</span> · البيئة {env}
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-h1">لوحة المطور 🛠️</h1>
+          <p className="mt-1 text-small text-slate-500">
+            الإصدار <span className="font-mono font-bold" dir="ltr">{sha}</span> · البيئة {env}
+          </p>
+        </div>
+        <ForceWorker />
       </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

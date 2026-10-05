@@ -149,7 +149,7 @@ export async function getTenantInfoDB() {
       if (uid) {
         const { data: u } = await sb.from("users").select("tenant_id").eq("auth_user_id", uid).single();
         if (u?.tenant_id) {
-          const { data: t } = await sb.from("tenants").select("name,slug,plan,primary_color,trial_ends_at,settings").eq("id", u.tenant_id).single();
+          const { data: t } = await sb.from("tenants").select("name,slug,plan,status,primary_color,trial_ends_at,settings").eq("id", u.tenant_id).single();
           if (t) return withTrial(t as any);
         }
       }
@@ -170,7 +170,7 @@ export async function getTenantInfoDB() {
       const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
       if (url && key) {
         const admin = createClient(url, key, { auth: { persistSession: false } });
-        const { data: t } = await admin.from("tenants").select("name,slug,plan,primary_color,trial_ends_at,settings").eq("slug", slug).single();
+        const { data: t } = await admin.from("tenants").select("name,slug,plan,status,primary_color,trial_ends_at,settings").eq("slug", slug).single();
         if (t) return withTrial(t as any);
       }
     }
