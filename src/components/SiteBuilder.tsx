@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { SECTION_TYPES, type SiteSection, type SectionType } from "@/lib/site-sections";
+import { AssetUpload } from "@/components/AssetUpload";
 
 /** page-builder السنتر: أقسام جاهزة + تحرير + ترتيب + CSS/JS مخصص */
 export function SiteBuilder({ slug }: { slug: string }) {
@@ -108,10 +109,21 @@ export function SiteBuilder({ slug }: { slug: string }) {
   function edit(i: number, data: Record<string, unknown>) {
     const next = sections.map((s, k) => (k === i ? { ...s, data } : s));
     setSections(next);
+    return next;
   }
 
   function saveEdits() {
     persist(sections);
+  }
+
+  function uploadImage(i: number, url: string) {
+    const s = sections[i];
+    if (!s) return;
+    const cur = Array.isArray((s.data as any).images) ? [...(s.data as any).images] : [];
+    cur.push(url);
+    const next = sections.map((x, k) => (k === i ? { ...x, data: { ...(x.data as any), images: cur.slice(0, 8) } } : x));
+    setSections(next);
+    persist(next);
   }
 
   const tname = (t: SectionType) => SECTION_TYPES.find((x) => x.id === t)?.label ?? t;
@@ -179,7 +191,7 @@ export function SiteBuilder({ slug }: { slug: string }) {
               <button onClick={() => del(i)} className="rounded-lg bg-danger/10 px-2 py-1 text-xs font-bold text-danger">حذف</button>
             </div>
           </div>
-          <SectionEditor section={s} onChange={(d) => edit(i, d)} />
+          <SectionEditor index={i} section={s} onChange={(d) => edit(i, d)} onUpload={(url) => uploadImage(i, url)} />
           <button onClick={saveEdits} disabled={saving} className="btn-secondary !px-4 !py-1.5 text-xs disabled:opacity-50">
             {saving ? "جاري..." : "حفظ القسم"}
           </button>
@@ -190,7 +202,8 @@ export function SiteBuilder({ slug }: { slug: string }) {
 }
 
 /** محرر حقول بسيط حسب النوع (نصوص + عناصر سطرية بصيغة a | b) */
-function SectionEditor({ section, onChange }: { section: SiteSection; onChange: (d: Record<string, unknown>) => void }) {
+function SectionEditor({ index, section, onChange, onUpload }: { index: number; section: SiteSection; onChange: (d: Record<string, unknown>) => void; onUpload: (url: string) => void }) {
+  void index;
   const d = section.data as any;
   const set = (k: string, v: unknown) => onChange({ ...d, [k]: v });
   const inp = "w-full rounded-xl border-2 border-slate-200 px-3 py-2 text-small outline-none focus:border-primary";
@@ -242,8 +255,11 @@ function SectionEditor({ section, onChange }: { section: SiteSection; onChange: 
       return <textarea defaultValue={lines(d.items)} rows={4} placeholder={"السؤال | الجواب"} className={inp + " font-mono"}
         onBlur={(e) => set("items", parse(e.target.value, ["q", "a"]))} />;
     case "gallery":
-      return <textarea defaultValue={lines(d.images)} rows={3} placeholder="رابط صورة في كل سطر (https://...)" dir="ltr" className={inp + " font-mono text-left"}
-        onBlur={(e) => set("images", e.target.value.split("\n").map((x) => x.trim()).filter(Boolean))} />;
+      return (<div className="space-y-2">
+        <AssetUpload label="📤 رفع صور للمعرض" onDone={(url) => onUpload(url)} />
+        <textarea defaultValue={lines(d.images)} rows={3} placeholder="رابط صورة في كل سطر (https://...)" dir="ltr" className={inp + " font-mono text-left"}
+          onBlur={(e) => set("images", e.target.value.split("\n").map((x) => x.trim()).filter(Boolean))} />
+      </div>);
     case "stats":
       return <textarea defaultValue={lines(d.items)} rows={2} placeholder={"500 | طالب | +"} className={inp + " font-mono"}
         onBlur={(e) => set("items", parse(e.target.value, ["num", "label", "suffix"]))} />;

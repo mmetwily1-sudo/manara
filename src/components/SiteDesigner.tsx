@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { SITE_THEMES, type SiteThemeId } from "@/lib/site-themes";
+import { AssetUpload } from "@/components/AssetUpload";
 
 /**
  * قسم "تصميم الموقع" في إعدادات السنتر: ثيم + لون أساسي + معاينة حية.
@@ -124,9 +125,12 @@ export function SiteDesigner({ slug }: { slug: string }) {
         )}
       </div>
       <div className="mt-3 space-y-2">
-        <input value={logo} onChange={(e) => setLogo(e.target.value)} dir="ltr" maxLength={500}
-          placeholder="رابط الشعار https://..."
-          className="w-full rounded-xl border-2 border-slate-200 px-3 py-2 font-mono text-xs outline-none focus:border-primary" />
+        <div className="flex items-center gap-2">
+          <input value={logo} onChange={(e) => setLogo(e.target.value)} dir="ltr" maxLength={500}
+            placeholder="رابط الشعار https://..."
+            className="flex-1 rounded-xl border-2 border-slate-200 px-3 py-2 font-mono text-xs outline-none focus:border-primary" />
+          <AssetUpload label="📤 رفع الشعار" onDone={(url) => { setLogo(url); save({ site_logo: url }); }} />
+        </div>
         <input value={seoTitle} onChange={(e) => setSeoTitle(e.target.value)} maxLength={80}
           placeholder="عنوان الموقع (SEO)"
           className="w-full rounded-xl border-2 border-slate-200 px-3 py-2 text-small outline-none focus:border-primary" />
