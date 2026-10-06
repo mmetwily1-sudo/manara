@@ -13,8 +13,24 @@ function backoffMin(attempts: number): number {
   return Math.min(360, Math.pow(2, attempts));
 }
 
+/**
+ * مهام يومية ذاتية الجدولة — لا كورون خارجي منفصل. يعتمد على dedupe_key
+ * فريد باليوم (bg_jobs.dedupe_key unique) فيمنع تكرار نفس اليوم بأمان حتى
+ * لو استُدعيت هذه الدالة عدة مرات متزامنة (ON CONFLICT يرفض الإدراج الثاني بصمت).
+ */
+async function ensureDailyJobs(admin: any) {
+  const today = new Date().toISOString().slice(0, 10);
+  try {
+    await admin.from("bg_jobs").insert({
+      kind: "national_stats_recompute", payload: {},
+      dedupe_key: `national_stats_${today}`, max_attempts: 3,
+    });
+  } catch {} // يفشل بصمت لو اتعمل النهاردة بالفعل (unique violation) — متوقع لا خطأ
+}
+
 export async function runDueJobs(admin: any): Promise<{ ran: number; done: number; failed: number; rescued: number }> {
   let ran = 0, done = 0, failed = 0;
+  await ensureDailyJobs(admin);
   // إنقاذ اليتامى: running معلقة >10 دقائق (مات العامل قبل إنهائها) → تعود queued
   let rescued = 0;
   try {
@@ -82,6 +98,15 @@ async function execJob(admin: any, kind: string, payload: any): Promise<boolean>
     const { processSmsBatch } = await import("./sms");
     const out = await processSmsBatch(admin, 50);
     return (out.failed ?? 0) === 0 || (out.sent ?? 0) > 0;
+  }
+  if (kind === "tutor_recompute") {
+    const { recomputeStudentProfile } = await import("./tutor-engine");
+    return recomputeStudentProfile(admin, String(payload.tenantId ?? ""), String(payload.studentId ?? ""));
+  }
+  if (kind === "national_stats_recompute") {
+    const { recomputeNationalStats } = await import("./national-stats");
+    await recomputeNationalStats(admin);
+    return true;
   }
   return false;
 }

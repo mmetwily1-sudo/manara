@@ -201,5 +201,15 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     }
   } catch {}
 
+  // جدولة إعادة حساب ملف المدرّس الذكي للطالب (غير حرج — لا يوقف الرد لو فشل)
+  try {
+    const { enqueueJob } = await import("@/lib/bg");
+    await enqueueJob(sb, {
+      tenantId: exam.tenant_id, kind: "tutor_recompute",
+      payload: { tenantId: exam.tenant_id, studentId: urow.id },
+      dedupeKey: `tutor:${exam.tenant_id}:${urow.id}:${att.id}`,
+    });
+  } catch {}
+
   return NextResponse.json({ ok: true, score, total, certSerial });
 }

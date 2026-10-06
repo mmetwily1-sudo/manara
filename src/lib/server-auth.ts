@@ -111,3 +111,34 @@ export async function requireTeacher(roles?: string[]): Promise<{ ctx: TeacherCo
   }
   return { ctx: { admin, user, tenantId: urow.tenant_id, userRow: urow } };
 }
+
+/**
+ * بوابة مدير السلسلة: المستخدم عضو chain_admin في chain_members لسلسلة بعينها.
+ * يُستخدم لـ/api/chains/* — تقارير مجمّعة عبر فروع متعددة (chain واحدة).
+ * لا علاقة له بـrequireTeacher (سنتر واحد) ولا requirePlatformAdmin (كل شيء).
+ */
+export async function requireChainAdmin(chainId: string): Promise<
+  | { ctx: { admin: any; userId: string; chainId: string; tenantIds: string[] } }
+  | { error: ReturnType<typeof NextResponse.json> }
+> {
+  const user = await getSessionUser();
+  if (!user) return { error: NextResponse.json({ ok: false, error: "unauth" }, { status: 401 }) };
+  let admin;
+  try {
+    admin = adminClient();
+  } catch {
+    return { error: NextResponse.json({ ok: false, error: "not_configured" }, { status: 500 }) };
+  }
+  const { data: urow } = await admin.from("users").select("id,role").eq("auth_user_id", user.id).single();
+  if (!urow) return { error: NextResponse.json({ ok: false, error: "unauth" }, { status: 401 }) };
+
+  const isPlatform = (urow as any).role === "platform_admin";
+  if (!isPlatform) {
+    const { data: member } = await admin.from("chain_members").select("role")
+      .eq("chain_id", chainId).eq("user_id", (urow as any).id).maybeSingle();
+    if (!member) return { error: NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 }) };
+  }
+  const { data: tenants } = await admin.from("tenants").select("id").eq("chain_id", chainId);
+  const tenantIds = ((tenants ?? []) as any[]).map((t) => t.id);
+  return { ctx: { admin, userId: (urow as any).id, chainId, tenantIds } };
+}

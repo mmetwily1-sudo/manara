@@ -8,6 +8,7 @@ import {
 } from "@/components/StudentServices";
 import { PushSubscribeButton } from "@/components/PushSubscribeButton";
 import { PushAutoPrompt } from "@/components/PushAutoPrompt";
+import { TutorRecommendations } from "@/components/TutorRecommendations";
 import { NotificationsInbox } from "@/components/NotificationsInbox";
 import { BackButton } from "@/components/BackButton";
 
@@ -610,6 +611,7 @@ export default function ProgressPage() {
       </section>
       <PushAutoPrompt />
       <NotificationsInbox source="me" />
+      <TutorRecommendations />
 
       <div className="grid grid-cols-3 gap-3">
         {[
