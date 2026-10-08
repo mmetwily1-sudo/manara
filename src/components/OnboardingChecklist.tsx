@@ -28,6 +28,20 @@ export default function OnboardingChecklist() {
     setSteps(null);
   }
 
+  async function confirmSite() {
+    try {
+      const r = await fetch("/api/onboarding", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ confirm: "site" }),
+      });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) {
+        const r2 = await fetch("/api/onboarding", { cache: "no-store" });
+        const j2 = await r2.json().catch(() => null);
+        if (r2.ok && j2?.ok && !j2.dismissed) { setSteps(j2.steps); setDone(j2.done ?? 0); }
+      }
+    } catch {}
+  }
+
   if (!steps || steps.every((s) => s.done)) {
     if (steps?.length && steps.every((s) => s.done)) {
       return (
@@ -62,6 +76,12 @@ export default function OnboardingChecklist() {
                 <span className="block text-small font-bold">{s.title}</span>
                 <span className="block text-xs text-slate-500">{s.desc}{s.progress && !s.done ? ` (${s.progress})` : ""}</span>
               </span>
+              {!s.done && s.key === "site" && (
+                <button onClick={(e) => { e.preventDefault(); confirmSite(); }}
+                  className="shrink-0 rounded-lg bg-success/10 px-2.5 py-1 text-[11px] font-bold text-success">
+                  تمت المعاينة ✓
+                </button>
+              )}
               {!s.done && <span className="text-xs font-bold text-primary">ابدأ ←</span>}
             </a>
           </li>

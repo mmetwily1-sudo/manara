@@ -7,6 +7,7 @@ const nextConfig = {
   reactStrictMode: true,
   experimental: {
     serverComponentsExternalPackages: ["ioredis"],
+    instrumentationHook: true, // Sentry server init عبر src/instrumentation.ts
   },
   webpack(config, { isServer }) {
     if (isServer) {

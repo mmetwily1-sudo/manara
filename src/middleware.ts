@@ -121,7 +121,7 @@ export function middleware(request: NextRequest) {
       "font-src 'self' https://fonts.gstatic.com data:",
       "img-src 'self' data: blob: https:",
       "media-src 'self' blob: https:",
-      "connect-src 'self' https://*.supabase.co https://generativelanguage.googleapis.com https://challenges.cloudflare.com wss://*.supabase.co",
+      "connect-src 'self' https://*.supabase.co https://generativelanguage.googleapis.com https://challenges.cloudflare.com https://*.ingest.sentry.io wss://*.supabase.co",
       "frame-src https://challenges.cloudflare.com",
       "object-src 'none'",
       "base-uri 'self'",

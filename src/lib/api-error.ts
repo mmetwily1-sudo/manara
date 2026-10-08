@@ -8,6 +8,12 @@ export function logError(scope: string, err: unknown): void {
   try {
     const e = err as any;
     console.error(`[api:${scope}]`, e?.code ?? "", String(e?.message ?? e).slice(0, 300));
+    // Sentry: كل أخطاء الخادم (امتحان/دفع/غيرها) تصل للمراقبة تلقائياً — صامتة بلا DSN.
+    if (process.env.NEXT_PUBLIC_SENTRY_DSN) {
+      import("@sentry/nextjs").then((S) => {
+        try { S.captureException(e instanceof Error ? e : new Error(String(e?.message ?? e)), { tags: { scope } }); } catch {}
+      }).catch(() => {});
+    }
   } catch {}
 }
 
