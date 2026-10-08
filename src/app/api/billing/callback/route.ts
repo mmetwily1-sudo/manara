@@ -68,6 +68,11 @@ export async function POST(req: Request) {
         plan: (inv as any).plan,
         settings: { ...(((t as any)?.settings ?? {}) as object), plan_paid_until: paidUntil },
       }).eq("id", (inv as any).tenant_id);
+      // التجديد: إعادة تفعيل حالة الاشتراك بعد الدفع (due_soon/grace → active)
+      try {
+        const { resetOnPayment } = await import("@/lib/renewals");
+        await resetOnPayment(admin, (inv as any).tenant_id, (t as any)?.settings ?? {});
+      } catch {}
     }
     return NextResponse.json({ ok: true });
   } catch {
