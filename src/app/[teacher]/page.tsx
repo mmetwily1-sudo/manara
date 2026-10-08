@@ -15,11 +15,29 @@ import { resolveTheme } from "@/lib/site-themes";
 
 type Props = { params: { teacher: string } };
 
-// TODO Phase 2: استعلام فعلي من tenants — حالياً الـtenants التجريبية فقط
-const KNOWN_SLUGS = ["demo"];
+// Pre-render فقط للـdemo وقت البناء — أي slug/دومين آخر يُبنى ديناميكياً عند أول زيارة
+// (dynamicParams=true تحت) ثم يُخزَّن مؤقتاً حسب revalidate. هذا ليس قيداً على
+// عدد السناتر المدعومة، فقط اختيار أداء لقائمة البناء المسبق.
+const PRERENDER_AT_BUILD = ["demo"];
 
 export function generateStaticParams() {
-  return KNOWN_SLUGS.map((teacher) => ({ teacher }));
+  return PRERENDER_AT_BUILD.map((teacher) => ({ teacher }));
+}
+
+/**
+ * يبحث عن tenant بالـslug أولاً، وإن لم يوجد وكان المعرّف يشبه دومين (فيه نقطة)
+ * يبحث بـcustom_domain — هذا ما يجعل الدومين المخصص يعمل فعلياً (كان العمود
+ * موجوداً في schema.sql بلا أي استهلاك في الكود قبل هذا الإصلاح).
+ * استعلامان منفصلان بدل .or() لتفادي حقن فلتر PostgREST عبر معرّف مُدخَل من الـURL.
+ */
+async function findTenantByIdentifier(admin: any, identifier: string, select: string): Promise<any | null> {
+  const { data: bySlug } = await admin.from("tenants").select(select).eq("slug", identifier).maybeSingle();
+  if (bySlug) return bySlug;
+  if (identifier.includes(".")) {
+    const { data: byDomain } = await admin.from("tenants").select(select).eq("custom_domain", identifier).maybeSingle();
+    if (byDomain) return byDomain;
+  }
+  return null;
 }
 
 export const dynamicParams = true;
@@ -35,7 +53,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     if (url && key) {
       const { createClient } = await import("@supabase/supabase-js");
       const admin = createClient(url, key, { auth: { persistSession: false } });
-      const { data } = await admin.from("tenants").select("name,settings").eq("slug", slug).single();
+      const data = await findTenantByIdentifier(admin, slug, "name,settings");
       if (data?.name) titleName = data.name;
       const s = (data as any)?.settings ?? {};
       if (s.site_title) titleName = String(s.site_title);
@@ -75,7 +93,7 @@ export default async function TeacherPage({ params }: Props) {
     if (url && key) {
       const { createClient } = await import("@supabase/supabase-js");
       const admin = createClient(url, key, { auth: { persistSession: false } });
-      const { data } = await admin.from("tenants").select("id,name,plan,settings").eq("slug", slug).single();
+      const data = await findTenantByIdentifier(admin, slug, "id,name,plan,settings");
       if (data?.name) displayName = data.name;
       tenantPlan = String((data as any)?.plan ?? "trial");
       teacherPhone = (data as any)?.settings?.owner_phone;

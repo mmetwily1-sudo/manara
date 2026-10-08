@@ -10,6 +10,7 @@ import { BackButton } from "@/components/BackButton";
 const MENU: [string, string, string][] = [
   ["/admin", "🏠", "نظرة عامة"],
   ["/admin/tenants", "🏫", "السناتر"],
+  ["/admin/chains", "🏢", "السلاسل"],
   ["/admin/billing", "💰", "الفوترة"],
   ["/admin/impersonate", "👁️", "المتابعة"],
   ["/admin/feedback", "💬", "صوت المعلمين"],

@@ -5,6 +5,7 @@ import { SecurityAlerts } from "@/components/SecurityAlerts";
 import { KeysManager } from "@/components/KeysManager";
 import { FeaturesManager } from "@/components/FeaturesManager";
 import { BrandingManager } from "@/components/BrandingManager";
+import { CustomDomainManager } from "@/components/CustomDomainManager";
 import { PagesManager } from "@/components/PagesManager";
 import { NotifyRulesManager } from "@/components/NotifyRulesManager";
 import { NotifyToggle, PayNumbersForm, VisionKeyForm, ThemeForm, SlugForm } from "@/components/NotifyToggle";
@@ -99,6 +100,10 @@ export default async function SettingsPage() {
 
       <section className="card space-y-4 p-6">
         <BrandingManager />
+      </section>
+
+      <section className="card space-y-4 p-6">
+        <CustomDomainManager />
       </section>
 
       <section className="card space-y-4 p-6">
