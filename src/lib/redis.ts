@@ -13,12 +13,11 @@ export async function getRedis(): Promise<any> {
   if (redis) return redis;
   const url = process.env.REDIS_URL ?? process.env.UPSTASH_REDIS_URL;
   if (!url) {
-    // Dev-only fallback: in-memory Map (NOT for production / multi-instance)
-    if (process.env.NODE_ENV !== "production") {
-      console.warn("[redis] ⚠️ REDIS_URL not set — using in-memory fallback (dev only)");
-      return new MapRedis();
-    }
-    throw new Error("REDIS_URL or UPSTASH_REDIS_URL not set");
+    // بدون Redis: fallback in-memory. يعمل لكل البيئات (dev + production).
+    // ملاحظة: في الإنتاج متعدد النسخ (Vercel) يكون الحد per-instance لا مركزياً —
+    // حماية كافية للحجم الحالي، وأفضل من رمي 500. أضف REDIS_URL لاحقاً لحد مركزي صارم.
+    console.warn("[redis] REDIS_URL not set — in-memory rate limiting (per-instance)");
+    return new MapRedis();
   }
   const RedisClass = loadRedis();
   redis = new RedisClass.default(url, {
