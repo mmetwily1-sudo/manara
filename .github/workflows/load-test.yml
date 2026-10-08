@@ -1,0 +1,102 @@
+name: Load gate
+
+# بوابة الحمل: أي PR يلمس مسارات الامتحان/الدفع/التسجيل يشغّل اختبار الحمل تلقائياً.
+# - مهمة القراءة تعمل دائماً ضد build محلي (تفشل عند كسر العتبات).
+# - مهمة الكتابة تعمل فقط عند وجود LOADTEST_HMAC_SECRET في أسرار المستودع،
+#   وإلا تظهر بحالة skipped الصريحة (ليست نجاحاً مزيفاً).
+# - لتشغيل الكتابة ضد معاينة Vercel بدل المحلي: عيّن LOADTEST_BASE يدوياً عبر
+#   التشغيل اليدوي (workflow_dispatch) — مع ضبط PAYMOB_HMAC_SECRET للمعاينة
+#   على نفس قيمة السر المستخدم للتوقيع (راجع مهمة write أدناه).
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/app/api/exams/**"
+      - "src/app/api/billing/**"
+      - "src/app/api/students/**"
+      - "src/app/api/sessions/**"
+      - "src/lib/paymob.ts"
+      - "src/lib/rate-limit.ts"
+      - "src/lib/redis.ts"
+      - "scripts/load-test.cjs"
+  workflow_dispatch:
+    inputs:
+      base:
+        description: "Base URL to test (default: local build)"
+        required: false
+        default: ""
+
+jobs:
+  read-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+      - name: Start app (background)
+        run: |
+          (npm run start -- -p 3000 > /tmp/next.log 2>&1 &)
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:3000/api/health && break
+            sleep 3
+          done
+          curl -sf http://localhost:3000/api/health
+      - name: READ phase (thresholds enforced)
+        run: node scripts/load-test.cjs
+        env:
+          LOADTEST_BASE: ${{ inputs.base || 'http://localhost:3000' }}
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-read-${{ github.sha }}
+          path: load-test-results.json
+
+  write-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # بلا السر المطلوب: المهمة تُتخطى بحالة skipped معلنة — لا تمرير مزيف.
+    if: ${{ secrets.LOADTEST_HMAC_SECRET != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+      - name: Start app (background)
+        run: |
+          (npm run start -- -p 3000 > /tmp/next.log 2>&1 &)
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:3000/api/health && break
+            sleep 3
+          done
+          curl -sf http://localhost:3000/api/health
+        env:
+          # يجب أن يساوي PAYMOB_HMAC_SECRET للبيئة المُختبرة حتى يجتاز التوقيع —
+          # قيمة اختبار فقط، ليست مفتاح Paymob الحقيقي أبداً.
+          PAYMOB_HMAC_SECRET: ${{ secrets.LOADTEST_HMAC_SECRET }}
+      - name: WRITE phase (safe replays only)
+        run: node scripts/load-test.cjs
+        env:
+          LOADTEST_BASE: ${{ inputs.base || 'http://localhost:3000' }}
+          LOADTEST_WRITE: 1
+          LOADTEST_HMAC_SECRET: ${{ secrets.LOADTEST_HMAC_SECRET }}
+          PAYMOB_HMAC_SECRET: ${{ secrets.LOADTEST_HMAC_SECRET }}
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-write-${{ github.sha }}
+          path: load-test-results.json

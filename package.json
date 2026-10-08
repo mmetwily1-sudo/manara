@@ -5,6 +5,7 @@
   "description": "منارة — نظام تشغيل المعلم والسنتر: منصة تعليمية White-label للمعلمين في مصر",
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node scripts/check-prod-env.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"

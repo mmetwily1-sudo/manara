@@ -24,6 +24,7 @@
 - [بوابة العزل] scripts/isolation-test.cjs: سنتر أ لا يرى ب (قائمة + امتحان 403) — يعمل.
 - [الرهانات 1/2/4] مدرّس ذكي إحصائي + سلاسل/فرنشايز + تنبؤ وطني (083-085) — مختبر حياً ومدفوع.
 - [Rate Limiting] Redis/ioredis + fallback in-memory dev؛ 15 مسار awaited — مختبر 429 عند 10 req/IP.
+- [تدقيق شامل] دومين مخصص فعّال + واجهة السلاسل + RLS 086 + توثيق عزل صادق + env.example كامل (fb894bd).
 - [ثيمات 7/7] توكنز JSON + presets كود + HEX صارم + تباين 3.0 + خطوط مقيدة + معاينة + reset + فصل معلم/مالك + قفل basic افتراضياً (upsell) + HTML داخل sandbox (بلا حقن مباشر).
 
 ## Not yet specified

@@ -44,3 +44,6 @@ next-env.d.ts
 # local logical backups (never commit data)
 /backups/
 
+# load-test artifacts (regenerated every run)
+/load-test-results.json
+
