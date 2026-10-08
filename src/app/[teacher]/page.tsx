@@ -78,6 +78,9 @@ export default async function TeacherPage({ params }: Props) {
   let siteTitle = "";
   let siteDesc = "";
   let tenantId: string | null = null;
+  // على الدومين المخصص يكون params.teacher هو الدومين نفسه لا الـslug —
+  // كل النماذج تتعامل بالـslug الحقيقي (pin-login/register/phone-code تبحث به).
+  let resolvedSlug = slug;
   let siteSections: any[] = [];
   let siteCss = "";
   let siteJs = "";
@@ -93,8 +96,9 @@ export default async function TeacherPage({ params }: Props) {
     if (url && key) {
       const { createClient } = await import("@supabase/supabase-js");
       const admin = createClient(url, key, { auth: { persistSession: false } });
-      const data = await findTenantByIdentifier(admin, slug, "id,name,plan,settings");
+      const data = await findTenantByIdentifier(admin, slug, "id,name,slug,plan,settings");
       if (data?.name) displayName = data.name;
+      resolvedSlug = String((data as any)?.slug ?? slug);
       tenantPlan = String((data as any)?.plan ?? "trial");
       teacherPhone = (data as any)?.settings?.owner_phone;
       themeId = String((data as any)?.settings?.theme ?? "default");
@@ -246,9 +250,9 @@ export default async function TeacherPage({ params }: Props) {
         <div className="mt-14" id="join">
           <h2 className="font-extrabold">📝 سجل بياناتك وانضم</h2>
           <p className="mt-1 text-small opacity-70">سيتم إنشاء حسابك فوراً — بيانات الدخول ستظهر لك على الشاشة.</p>
-          <StudentRegisterForm slug={slug} teacherPhone={teacherPhone} />
-          <StudentPinLogin slug={slug} />
-          <PhoneLoginForm slug={slug} />
+          <StudentRegisterForm slug={resolvedSlug} teacherPhone={teacherPhone} />
+          <StudentPinLogin slug={resolvedSlug} />
+          <PhoneLoginForm slug={resolvedSlug} />
         </div>
 
         {!!(siteCss || siteJs || hasCustomHtml) && (
