@@ -91,7 +91,7 @@ export async function POST(req: Request) {
     if ("error" in res) return res.error;
     tid = res.ctx.tenantId;
     const { isRateLimited } = await import("@/lib/rate-limit");
-    if (isRateLimited(req, "knowledge-refresh", 5, 60 * 60 * 1000, tid)) {
+    if (await isRateLimited(req, "knowledge-refresh", 5, 60 * 60 * 1000, tid)) {
       return NextResponse.json({ ok: false, error: "rate_limited" }, { status: 429 });
     }
   }

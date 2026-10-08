@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { getSessionUser, adminClient } from "@/lib/server-auth";
-import { isRateLimited } from "@/lib/rate-limit";
 
 const CLAIM_METHODS = ["instapay", "wallet", "fawry", "card"];
 
@@ -22,7 +21,8 @@ export async function GET() {
  * ينشئ دفعة pending يراجعها المعلم. { amount, method, reference }
  */
 export async function POST(req: Request) {
-  if (isRateLimited(req, "pay-claim", 5)) {
+  const { isRateLimited } = await import("@/lib/rate-limit");
+  if (await isRateLimited(req, "pay-claim", 5)) {
     return NextResponse.json({ ok: false, error: "too_many_attempts" }, { status: 429 });
   }
   const user = await getSessionUser();

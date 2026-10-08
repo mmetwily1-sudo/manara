@@ -46,7 +46,7 @@ export async function POST(req: Request) {
   const tid = res.ctx.tenantId;
 
   const { isRateLimited } = await import("@/lib/rate-limit");
-  if (isRateLimited(req, "omr-create", 20, 60 * 60 * 1000, tid)) {
+  if (await isRateLimited(req, "omr-create", 20, 60 * 60 * 1000, tid)) {
     return NextResponse.json({ ok: false, error: "rate_limited" }, { status: 429 });
   }
   const body = await req.json().catch(() => ({} as any));

@@ -31,20 +31,7 @@ export function makeSessionToken(): { token: string; hash: string } {
   return { token, hash };
 }
 
-const attempts = new Map<string, { count: number; resetAt: number }>();
 
-/** حد المحاولات — true تعني مسموح، false تعني محظور مؤقتاً */
-export function pinRateOk(key: string): boolean {
-  const now = Date.now();
-  const b = attempts.get(key);
-  if (!b || now >= b.resetAt) {
-    attempts.set(key, { count: 1, resetAt: now + 15 * 60000 });
-    return true;
-  }
-  b.count++;
-  if (b.count > 5) return false;
-  return true;
-}
 
 export type StudentSession = { studentId: string; tenantId: string } | null;
 /** قراءة جلسة الطالب من الكوكيز (خادم فقط) */

@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { dbFail } from "@/lib/api-error";
 import { requireTeacher } from "@/lib/server-auth";
 import { R } from "@/lib/permissions";
-import { isRateLimited } from "@/lib/rate-limit";
 
 /**
  * POST /api/questions/generate {text, subject?, count?, lesson_code?}
@@ -11,7 +10,8 @@ import { isRateLimited } from "@/lib/rate-limit";
 export async function POST(req: Request) {
   const res = await requireTeacher(R.content);
   if ("error" in res) return res.error;
-  if (isRateLimited(req, "qgen", 20, 60 * 60 * 1000, res.ctx.tenantId)) {
+  const { isRateLimited } = await import("@/lib/rate-limit");
+  if (await isRateLimited(req, "qgen", 20, 60 * 60 * 1000, res.ctx.tenantId)) {
     return NextResponse.json({ ok: false, error: "too_many_attempts", message: "تجاوزت حد التوليد (20/ساعة)." }, { status: 429 });
   }
   const admin = res.ctx.admin;

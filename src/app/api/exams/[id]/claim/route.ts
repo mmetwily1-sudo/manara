@@ -31,7 +31,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   // ضد تخمين الأكواد: 60 محاولة/ساعة لكل IP
   try {
     const { isRateLimited } = await import("@/lib/rate-limit");
-    if (isRateLimited(req, "exam-claim", 60, 60 * 60 * 1000)) {
+    if (await isRateLimited(req, "exam-claim", 60, 60 * 60 * 1000)) {
       return NextResponse.json({ ok: false, error: "too_many_attempts", message: "محاولات كثيرة — انتظر ساعة." }, { status: 429 });
     }
   } catch {}

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { isRateLimited } from "@/lib/rate-limit";
 
 const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -19,7 +18,8 @@ const ERR_AR: Record<string, string> = {
  * { slug, phone, code, name, email, password }
  */
 export async function POST(req: Request) {
-  if (isRateLimited(req, "verify-link", 20)) {
+  const { isRateLimited } = await import("@/lib/rate-limit");
+  if (await isRateLimited(req, "verify-link", 20)) {
     return NextResponse.json({ ok: false, error: "too_many_attempts" }, { status: 429 });
   }
   if (!SUPA_URL || !SERVICE_KEY) {

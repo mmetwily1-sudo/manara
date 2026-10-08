@@ -110,7 +110,7 @@ export async function POST(req: Request) {
   if (action === "retranscribe") {
     // إعادة التفريغ تستهلك الرؤية — 30/ساعة لكل سنتر
     const { isRateLimited } = await import("@/lib/rate-limit");
-    if (isRateLimited(req, "retranscribe", 30, 60 * 60 * 1000, tid)) {
+    if (await isRateLimited(req, "retranscribe", 30, 60 * 60 * 1000, tid)) {
       return NextResponse.json({ ok: false, error: "rate_limited", message: "تجاوزت حد التفريغ (30/ساعة) — انتظر قليلاً." }, { status: 429 });
     }
     const m = metaOf(d);

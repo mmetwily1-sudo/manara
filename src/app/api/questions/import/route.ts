@@ -61,7 +61,7 @@ export async function POST(req: Request) {
   if ("error" in tres) return tres.error;
   const tctx = tres.ctx;
   const { isRateLimited } = await import("@/lib/rate-limit");
-  if (isRateLimited(req, "import", 20, 60 * 60 * 1000, tctx.tenantId)) {
+  if (await isRateLimited(req, "import", 20, 60 * 60 * 1000, tctx.tenantId)) {
     return NextResponse.json({ ok: false, error: "rate_limited", message: "تجاوزت حد الاستيراد (20/ساعة) — انتظر قليلاً." }, { status: 429 });
   }
 

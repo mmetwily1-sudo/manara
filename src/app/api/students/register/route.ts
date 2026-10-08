@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { isRateLimited } from "@/lib/rate-limit";
 
 const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -11,8 +10,9 @@ const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
  * ينشئ حساب Auth + صف users + يرجع بيانات الدخول
  */
 export async function POST(req: Request) {
+  const { isRateLimited } = await import("@/lib/rate-limit");
   // حد: 10 تسجيلات/ساعة لكل IP ضد إغراق حسابات الطلاب
-  if (isRateLimited(req, "student-register", 10)) {
+  if (await isRateLimited(req, "student-register", 10)) {
     return NextResponse.json({ ok: false, error: "too_many_attempts" }, { status: 429 });
   }
 

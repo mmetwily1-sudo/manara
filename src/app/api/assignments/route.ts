@@ -50,7 +50,7 @@ export async function POST(req: Request) {
   const tid = res.ctx.tenantId;
 
   const { isRateLimited } = await import("@/lib/rate-limit");
-  if (isRateLimited(req, "assignment-create", 30, 60 * 60 * 1000, tid)) {
+  if (await isRateLimited(req, "assignment-create", 30, 60 * 60 * 1000, tid)) {
     return NextResponse.json({ ok: false, error: "rate_limited", message: "تجاوزت حد إنشاء الواجبات (30/ساعة)." }, { status: 429 });
   }
 

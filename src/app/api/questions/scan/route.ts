@@ -102,7 +102,7 @@ export async function POST(req: Request) {
   const tenantId = res.ctx.tenantId;
   // المسح مكلف (رؤية/OCR) — 20 مسحاً/ساعة لكل سنتر
   const { isRateLimited } = await import("@/lib/rate-limit");
-  if (isRateLimited(req, "scan", 20, 60 * 60 * 1000, tenantId)) {
+  if (await isRateLimited(req, "scan", 20, 60 * 60 * 1000, tenantId)) {
     return NextResponse.json({ ok: false, error: "rate_limited", message: "تجاوزت حد المسح (20/ساعة) — انتظر قليلاً." }, { status: 429 });
   }
 

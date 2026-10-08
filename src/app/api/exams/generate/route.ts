@@ -40,7 +40,7 @@ export async function POST(req: Request) {
   const ares = await requireTeacher(R.content);
   if ("error" in ares) return ares.error;
   const { isRateLimited } = await import("@/lib/rate-limit");
-  if (isRateLimited(req, "generate", 30, 60 * 60 * 1000, ares.ctx.tenantId)) {
+  if (await isRateLimited(req, "generate", 30, 60 * 60 * 1000, ares.ctx.tenantId)) {
     return NextResponse.json({ ok: false, error: "rate_limited", message: "تجاوزت حد التوليد (30/ساعة) — انتظر قليلاً." }, { status: 429 });
   }
   const body = await req.json().catch(() => ({} as any));

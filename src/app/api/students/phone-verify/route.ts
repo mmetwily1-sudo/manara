@@ -17,7 +17,7 @@ const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
  */
 export async function POST(req: Request) {
   const { isRateLimited } = await import("@/lib/rate-limit");
-  if (isRateLimited(req, "phone-verify", 10)) {
+  if (await isRateLimited(req, "phone-verify", 10)) {
     return fail("too_many_attempts", 429);
   }
   if (!SUPA_URL || !ANON || !SERVICE_KEY) {

@@ -18,7 +18,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const tid = res.ctx.tenantId;
 
   const { isRateLimited } = await import("@/lib/rate-limit");
-  if (isRateLimited(req, "omr-grade", 30, 60 * 60 * 1000, tid)) {
+  if (await isRateLimited(req, "omr-grade", 30, 60 * 60 * 1000, tid)) {
     return NextResponse.json({ ok: false, error: "rate_limited", message: "تجاوزت حد التصحيح (30/ساعة)." }, { status: 429 });
   }
 

@@ -1,6 +1,5 @@
 ﻿import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { isRateLimited } from "@/lib/rate-limit";
 import { arError } from "@/lib/auth-errors";
 
 /** رد خطأ موحد: كود للآلة + رسالة عربية للإنسان — لا إنجليزية أبداً */
@@ -140,6 +139,7 @@ async function seedDemo(admin: any, tenantId: string): Promise<{ questions: numb
 }
 
 export async function POST(req: Request) {
+  const { isRateLimited } = await import("@/lib/rate-limit");
   let preBody: any = null;
   try { preBody = await req.json(); } catch {
     return fail("bad_json", 400);
@@ -147,11 +147,11 @@ export async function POST(req: Request) {
   const body = preBody;
   // الجولة الفورية: حد مستقل 3/ساعة لكل IP (حسابات مؤقتة بأسماء عشوائية)
   const isDemo = body.demo === true;
-  if (isDemo && isRateLimited(req, "trial-demo", 3)) {
+  if (isDemo && await isRateLimited(req, "trial-demo", 3)) {
     return fail("too_many_attempts", 429, "جولات كثيرة — انتظر ساعة.");
   }
   // حد: 5 محاولات/ساعة لكل IP ضد إغراق إنشاء السناتر
-  if (!isDemo && isRateLimited(req, "trial", 5)) {
+  if (!isDemo && await isRateLimited(req, "trial", 5)) {
     return fail("too_many_attempts", 429);
   }
 

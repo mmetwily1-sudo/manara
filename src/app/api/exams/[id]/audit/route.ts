@@ -20,7 +20,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   const tid = res.ctx.tenantId;
   // التدقيق يستهلك مكالمة لغوية — 20/ساعة لكل سنتر
   const { isRateLimited } = await import("@/lib/rate-limit");
-  if (isRateLimited(_req, "audit", 20, 60 * 60 * 1000, tid)) {
+  if (await isRateLimited(_req, "audit", 20, 60 * 60 * 1000, tid)) {
     return NextResponse.json({ ok: false, error: "rate_limited", message: "تجاوزت حد التدقيق (20/ساعة) — انتظر قليلاً." }, { status: 429 });
   }
 

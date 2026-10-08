@@ -17,7 +17,7 @@ export async function POST(req: Request) {
   const uid = res.ctx.userRow.id;
 
   const { isRateLimited } = await import("@/lib/rate-limit");
-  if (isRateLimited(req, "agent-chat", 20, 60 * 60 * 1000, tid)) {
+  if (await isRateLimited(req, "agent-chat", 20, 60 * 60 * 1000, tid)) {
     return NextResponse.json({ ok: false, error: "rate_limited", message: "تجاوزت حد المحادثة (20/ساعة)." }, { status: 429 });
   }
 

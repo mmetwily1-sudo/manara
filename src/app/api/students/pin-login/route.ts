@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { isRateLimited } from "@/lib/rate-limit";
-import { hashPin, makeSessionToken, pinRateOk } from "@/lib/student-auth";
+import { hashPin, makeSessionToken } from "@/lib/student-auth";
 import { toAsciiDigits, normalizePhone } from "@/lib/whatsapp";
 import { arError } from "@/lib/auth-errors";
 
@@ -13,7 +12,8 @@ const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
  * دخول الطالب برقم الهاتف + PIN — جلسة httpOnly سنة (للأونلاين والتقدم).
  */
 export async function POST(req: Request) {
-  if (isRateLimited(req, "pin-login", 10)) {
+  const { isRateLimited, pinLoginRateOk } = await import("@/lib/rate-limit");
+  if (await isRateLimited(req, "pin-login", 10)) {
     return NextResponse.json({ ok: false, error: "too_many_attempts", message: arError("too_many_attempts") }, { status: 429 });
   }
   if (!SUPA_URL || !SERVICE_KEY) {
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
   if (!slug || !phone || pin.length !== 6) {
     return NextResponse.json({ ok: false, error: "invalid_input", message: "رقم الموبايل (11 رقم) + PIN من 6 أرقام" }, { status: 400 });
   }
-  if (!pinRateOk(`${slug}:${phone}`)) {
+  if (!pinLoginRateOk(req, slug, phone)) {
     return NextResponse.json({ ok: false, error: "too_many_attempts", message: "محاولات كثيرة — انتظر 15 دقيقة" }, { status: 429 });
   }
   const admin = createClient(SUPA_URL, SERVICE_KEY, { auth: { persistSession: false } });

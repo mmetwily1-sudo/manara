@@ -5,6 +5,16 @@ const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 const nextConfig = {
   reactStrictMode: true,
+  experimental: {
+    serverComponentsExternalPackages: ["ioredis"],
+  },
+  webpack(config, { isServer }) {
+    if (isServer) {
+      config.externals = config.externals || [];
+      config.externals.push("ioredis");
+    }
+    return config;
+  },
   async redirects() {
     return [
       // صفحة المساعد القديمة أُدمجت في الودجت العائم — لا 404 للروابط المحفوظة
