@@ -19,14 +19,21 @@ export async function POST(req: Request) {
   const yearly = body.yearly === true;
   const prices = PLAN_PRICES[plan];
   if (!prices) return NextResponse.json({ ok: false, error: "bad_plan" }, { status: 400 });
-  const amount = yearly ? prices.yearly : prices.monthly;
   const months = yearly ? 12 : 1;
 
   try {
     const { data: t } = await admin.from("tenants").select("name,settings").eq("id", tid).single();
+    // خصم التجديد المبكر (5% شهري فقط): الأهلية من renewal_state لحظة الدفع — سيرفر-سايد
+    // حصراً، والعميل لا يرسلها أبداً (منع انتحال الأهلية). السنوية مستثناة (خصمها الضمني ~17%).
+    // القرار: كل دورة (حافز سلوك متكرر)، لا مرة واحدة — بلا حالة إضافية.
+    const rState = String((t as any)?.settings?.renewal_state ?? "active");
+    const discountPct = (!yearly && (rState === "active" || rState === "due_soon")) ? 5 : 0;
+    const baseAmount = yearly ? prices.yearly : prices.monthly;
+    const amount = Math.round(baseAmount * (1 - discountPct / 100) * 100) / 100;
     const merchantOrderId = `manara-${tid.slice(0, 8)}-${Date.now().toString(36)}`;
     const { data: inv, error } = await admin.from("platform_payments").insert({
       tenant_id: tid, plan, months, amount, currency: "EGP", status: "pending",
+      discount_pct: discountPct > 0 ? discountPct : null,
     }).select("id").single();
     if (error) throw error;
     const { iframeUrl, orderId } = await createIntention({
@@ -37,7 +44,7 @@ export async function POST(req: Request) {
       method: body.method === "wallet" ? "wallet" : "card",
     });
     await admin.from("platform_payments").update({ paymob_order_id: String(orderId) }).eq("id", (inv as any).id);
-    return NextResponse.json({ ok: true, iframe_url: iframeUrl });
+    return NextResponse.json({ ok: true, iframe_url: iframeUrl, amount, base_amount: baseAmount, discount_pct: discountPct });
   } catch (e: any) {
     if (isMissingTable(e)) {
       return NextResponse.json({ ok: false, error: "not_ready", message: "نفّذ ترحيل 006 من لوحة Supabase أولاً." }, { status: 400 });
