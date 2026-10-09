@@ -25,7 +25,7 @@ function shuffled<T>(arr: T[], seed: number): T[] {
  * نفس الأسئلة موزعة بالتناوب على مسودات (توزيع عادل للصعوبة قدر الإمكان).
  */
 export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const res = await requireTeacher(R.content);
+  const res = await requireTeacher(R.content, { req: req });
   if ("error" in res) return res.error;
   const sb = res.ctx.admin;
   const tid = res.ctx.tenantId;

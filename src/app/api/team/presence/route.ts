@@ -23,7 +23,7 @@ export async function GET() {
 
 /** POST /api/team/presence {action:"in"|"out"} — تسجيل دخول/خروج (طاقم) */
 export async function POST(req: Request) {
-  const res = await requireTeacher(R.feedback);
+  const res = await requireTeacher(R.feedback, { req: req });
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const tid = res.ctx.tenantId;

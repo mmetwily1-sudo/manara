@@ -37,7 +37,7 @@ export async function GET() {
 
 /** POST /api/payroll {month} — توليد مسير من العقود النشطة (مالك فقط) */
 export async function POST(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const tid = res.ctx.tenantId;
@@ -82,7 +82,7 @@ export async function POST(req: Request) {
 
 /** PATCH /api/payroll {run_id, action: approve|item, user_id?, bonus?, deduction?, note?} */
 export async function PATCH(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const tid = res.ctx.tenantId;

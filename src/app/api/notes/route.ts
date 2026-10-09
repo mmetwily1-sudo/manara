@@ -29,7 +29,7 @@ export async function GET(req: Request) {
 
 /** POST /api/notes — إنشاء/تحديث مذكرة (معلم فقط) */
 export async function POST(req: Request) {
-  const res = await requireTeacher(["teacher_admin", "supervisor"]);
+  const res = await requireTeacher(["teacher_admin", "supervisor"], { req });
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const tid = res.ctx.tenantId;
@@ -68,7 +68,7 @@ export async function POST(req: Request) {
 
 /** PATCH /api/notes {id, ...} — تحديث جزئي (معلم فقط) */
 export async function PATCH(req: Request) {
-  const res = await requireTeacher(["teacher_admin", "supervisor"]);
+  const res = await requireTeacher(["teacher_admin", "supervisor"], { req });
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const tid = res.ctx.tenantId;
@@ -91,7 +91,7 @@ export async function PATCH(req: Request) {
 
 /** DELETE /api/notes?id= — حذف (مالك فقط) */
 export async function DELETE(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const id = new URL(req.url).searchParams.get("id");
   if (!id) return NextResponse.json({ ok: false, error: "id_required" }, { status: 400 });

@@ -33,7 +33,7 @@ export async function GET() {
 
 /** PATCH /api/team/commissions {rate} — نسبة العمولة الموحدة (مالك) */
 export async function PATCH(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const admin = adminClient();
   const b = await req.json().catch(() => ({} as any));

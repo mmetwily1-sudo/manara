@@ -8,7 +8,7 @@ import { dbFail } from "@/lib/api-error";
  * student: اسم أو هاتف أو id. upsert على (exam_id, student_id) — لا يمسح محاولات الأونلاين الأعلى.
  */
 export async function POST(req: Request) {
-  const res = await requireTeacher(R.content);
+  const res = await requireTeacher(R.content, { req: req });
   if ("error" in res) return res.error;
   const sb = res.ctx.admin;
   const tid = res.ctx.tenantId;

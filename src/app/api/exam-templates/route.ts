@@ -25,7 +25,7 @@ export async function GET() {
  * - {action:"use", template_id, title?} إنشاء مسودة من قالب
  */
 export async function POST(req: Request) {
-  const res = await requireTeacher(R.content);
+  const res = await requireTeacher(R.content, { req: req });
   if ("error" in res) return res.error;
   const sb = res.ctx.admin;
   const tid = res.ctx.tenantId;

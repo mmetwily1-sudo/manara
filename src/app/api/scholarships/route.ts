@@ -27,7 +27,7 @@ export async function GET() {
 
 /** POST /api/scholarships {student_id, pct, reason?} — منحة جديدة/تحديث (تحصيل) */
 export async function POST(req: Request) {
-  const res = await requireTeacher(R.billingWrite);
+  const res = await requireTeacher(R.billingWrite, { req: req });
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const tid = res.ctx.tenantId;
@@ -49,7 +49,7 @@ export async function POST(req: Request) {
 
 /** PATCH /api/scholarships {id, active} — تفعيل/إيقاف */
 export async function PATCH(req: Request) {
-  const res = await requireTeacher(R.billingWrite);
+  const res = await requireTeacher(R.billingWrite, { req: req });
   if ("error" in res) return res.error;
   const b = await req.json().catch(() => ({} as any));
   if (!b?.id) return NextResponse.json({ ok: false, error: "bad_id" }, { status: 400 });

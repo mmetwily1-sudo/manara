@@ -18,7 +18,7 @@ export async function GET(req: Request) {
 
 /** POST /api/consents {student_id,title,body?} — طلب موافقة + رابط موقع (مالك + مشرف) */
 export async function POST(req: Request) {
-  const res = await requireTeacher(R.content);
+  const res = await requireTeacher(R.content, { req: req });
   if ("error" in res) return res.error;
   const sb = res.ctx.admin;
   const tid = res.ctx.tenantId;

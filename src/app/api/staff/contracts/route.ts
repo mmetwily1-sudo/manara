@@ -34,7 +34,7 @@ export async function GET() {
 
 /** POST /api/staff/contracts {user_id, salary_base, kind, start_date?, end_date?} — عقد جديد (يثبت السابق) */
 export async function POST(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const tid = res.ctx.tenantId;
@@ -59,7 +59,7 @@ export async function POST(req: Request) {
 
 /** PATCH /api/staff/contracts {id} — إنهاء عقد (مالك فقط) */
 export async function PATCH(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const b = await req.json().catch(() => ({} as any));
   if (!b?.id) return NextResponse.json({ ok: false, error: "bad_id" }, { status: 400 });

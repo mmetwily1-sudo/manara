@@ -16,7 +16,7 @@ export async function GET() {
 
 /** POST /api/developers/keys {name} — إصدار مفتاح (يظهر مرة واحدة) */
 export async function POST(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const b = await req.json().catch(() => ({} as any));
   if (!String(b?.name ?? "").trim()) return NextResponse.json({ ok: false, error: "bad_input" }, { status: 400 });
@@ -32,7 +32,7 @@ export async function POST(req: Request) {
 
 /** PATCH /api/developers/keys {id, revoked} — إلغاء/استعادة */
 export async function PATCH(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const b = await req.json().catch(() => ({} as any));
   if (!b?.id) return NextResponse.json({ ok: false, error: "bad_id" }, { status: 400 });

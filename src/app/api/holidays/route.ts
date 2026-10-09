@@ -13,7 +13,7 @@ export async function GET() {
 
 /** POST /api/holidays {holiday_date, title?} — إضافة إجازة (مالك) */
 export async function POST(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const b = await req.json().catch(() => ({} as any));
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(b?.holiday_date ?? ""))) {
@@ -30,7 +30,7 @@ export async function POST(req: Request) {
 
 /** DELETE /api/holidays?id= — حذف إجازة (مالك) */
 export async function DELETE(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const id = new URL(req.url).searchParams.get("id");
   const { error } = await res.ctx.admin.from("holidays").delete().eq("id", id).eq("tenant_id", res.ctx.tenantId);

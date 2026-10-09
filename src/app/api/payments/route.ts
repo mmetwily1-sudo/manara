@@ -81,7 +81,7 @@ export async function GET() {
 
 /** POST /api/payments — تسجيل دفعة جديدة (مالك + محاسب) */
 export async function POST(req: Request) {
-  const res = await requireTeacher(R.billingWrite);
+  const res = await requireTeacher(R.billingWrite, { req: req });
   if ("error" in res) return res.error;
   const { ctx } = res;
 

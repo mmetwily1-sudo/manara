@@ -4,7 +4,7 @@ import { R, staffScope } from "@/lib/permissions";
 
 /** POST /api/sessions — إنشاء أو جلب جلسة اليوم لمجموعة (طاقم الفرع لمجموعات فرعه) */
 export async function POST(req: Request) {
-  const res = await requireTeacher(R.attendance);
+  const res = await requireTeacher(R.attendance, { req: req });
   if ("error" in res) return res.error;
   const { ctx } = res;
 

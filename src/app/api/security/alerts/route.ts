@@ -31,7 +31,7 @@ export async function GET() {
 
 /** PATCH /api/security/alerts {id?|all} — تعليم كمقروء (صاحبه أو المالك) */
 export async function PATCH(req: Request) {
-  const res = await requireTeacher(["teacher_admin", "supervisor", "assistant", "accountant"]);
+  const res = await requireTeacher(["teacher_admin", "supervisor", "assistant", "accountant"], { req });
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const tid = res.ctx.tenantId;

@@ -14,7 +14,7 @@ export async function GET() {
 
 /** POST /api/coupons {code, pct, max_uses?, expires_at?} — كوبون جديد */
 export async function POST(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const b = await req.json().catch(() => ({} as any));
   const code = String(b?.code ?? "").trim().toUpperCase().replace(/[^A-Z0-9\u0621-\u064A-]/g, "").slice(0, 24);
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
 
 /** PATCH /api/coupons {id, is_active} — تفعيل/إيقاف */
 export async function PATCH(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const b = await req.json().catch(() => ({} as any));
   const { error } = await res.ctx.admin.from("coupons").update({ is_active: !!b?.is_active })

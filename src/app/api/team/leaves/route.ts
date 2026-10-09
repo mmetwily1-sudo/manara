@@ -18,7 +18,7 @@ export async function GET() {
 
 /** POST /api/team/leaves {from_date, to_date, reason?} — طلب إجازة (أي طاقم) */
 export async function POST(req: Request) {
-  const res = await requireTeacher(R.feedback);
+  const res = await requireTeacher(R.feedback, { req: req });
   if ("error" in res) return res.error;
   const b = await req.json().catch(() => ({} as any));
   if (!b?.from_date || !b?.to_date || String(b.from_date) > String(b.to_date)) {
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
 
 /** PATCH /api/team/leaves {id, status} — اعتماد/رفض (مالك فقط) */
 export async function PATCH(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const b = await req.json().catch(() => ({} as any));
   if (!["approved", "rejected"].includes(b?.status)) {

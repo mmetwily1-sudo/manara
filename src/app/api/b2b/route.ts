@@ -14,7 +14,7 @@ export async function GET() {
 
 /** POST /api/b2b {org_name, contact?, value?, start_date?, end_date?, notes?} — عقد جديد */
 export async function POST(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const b = await req.json().catch(() => ({} as any));
   const org = String(b?.org_name ?? "").trim().slice(0, 150);
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
 
 /** PATCH /api/b2b {id, status} — إنهاء/إلغاء عقد */
 export async function PATCH(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const b = await req.json().catch(() => ({} as any));
   if (!["active", "done", "cancelled"].includes(b?.status)) {

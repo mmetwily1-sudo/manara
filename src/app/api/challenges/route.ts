@@ -35,7 +35,7 @@ export async function GET() {
 
 /** POST /api/challenges {title, target_points?, group_id?, deadline?} — تحدٍ جديد (مالك + مشرف) */
 export async function POST(req: Request) {
-  const res = await requireTeacher(R.content);
+  const res = await requireTeacher(R.content, { req: req });
   if ("error" in res) return res.error;
   const b = await req.json().catch(() => ({} as any));
   const title = String(b?.title ?? "").trim().slice(0, 120);
@@ -52,7 +52,7 @@ export async function POST(req: Request) {
 
 /** PATCH /api/challenges {id, status} — إغلاق التحدي (مالك + مشرف) */
 export async function PATCH(req: Request) {
-  const res = await requireTeacher(R.content);
+  const res = await requireTeacher(R.content, { req: req });
   if ("error" in res) return res.error;
   const b = await req.json().catch(() => ({} as any));
   if (!["closed", "open"].includes(b?.status)) return NextResponse.json({ ok: false, error: "bad_status" }, { status: 400 });

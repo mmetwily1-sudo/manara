@@ -38,7 +38,7 @@ export async function GET() {
 
 /** POST /api/bank {stmt_date, amount, reference?} — حركة بنكية يدوية */
 export async function POST(req: Request) {
-  const res = await requireTeacher(R.billingWrite);
+  const res = await requireTeacher(R.billingWrite, { req: req });
   if ("error" in res) return res.error;
   const b = await req.json().catch(() => ({} as any));
   const amount = Number(b?.amount ?? NaN);
@@ -55,7 +55,7 @@ export async function POST(req: Request) {
 
 /** PATCH /api/bank {id, invoice_id?|null} — ربط بفاتورة (أو فك الربط) */
 export async function PATCH(req: Request) {
-  const res = await requireTeacher(R.billingWrite);
+  const res = await requireTeacher(R.billingWrite, { req: req });
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const tid = res.ctx.tenantId;

@@ -34,7 +34,7 @@ export async function GET() {
 
 /** POST /api/groups — إنشاء مجموعة جديدة */
 export async function POST(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const { ctx } = res;
 
@@ -61,7 +61,7 @@ export async function POST(req: Request) {
 
 /** PATCH /api/groups {id, capacity} — ضبط سعة المجموعة (مالك) */
 export async function PATCH(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const body = await req.json().catch(() => ({} as any));
   const cap = Number(body?.capacity);
@@ -76,7 +76,7 @@ export async function PATCH(req: Request) {
 
 /** DELETE /api/groups?id= — حذف مجموعة (يحذف تسجيلاتها تبعياً) */
 export async function DELETE(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const { ctx } = res;
 

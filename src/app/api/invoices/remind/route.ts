@@ -5,8 +5,8 @@ import { R } from "@/lib/permissions";
 import { remindTenant } from "@/lib/remind";
 
 /** POST /api/invoices/remind — تذكير كل المتأخرين المستحقين الآن (مالك + محاسب) */
-export async function POST() {
-  const res = await requireTeacher(R.billingWrite);
+export async function POST(req: Request) {
+const res = await requireTeacher(R.billingWrite, { req });
   if ("error" in res) return res.error;
   try {
     const out = await remindTenant(res.ctx.admin, res.ctx.tenantId);

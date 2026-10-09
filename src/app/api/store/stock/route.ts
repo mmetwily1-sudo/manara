@@ -5,7 +5,7 @@ import { dbFail } from "@/lib/api-error";
 
 /** PATCH /api/store/stock {product_id, stock_qty} — ضبط مخزون (-1 = غير محدود) */
 export async function PATCH(req: Request) {
-  const res = await requireTeacher(R.billingWrite);
+  const res = await requireTeacher(R.billingWrite, { req: req });
   if ("error" in res) return res.error;
   const b = await req.json().catch(() => ({} as any));
   const qty = Number(b?.stock_qty);

@@ -40,7 +40,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 
 /** PATCH — وقت إضافي فردي {code_id, extra_minutes} (حتى 120) لظروف خاصة */
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
-  const res = await requireTeacher(R.content);
+  const res = await requireTeacher(R.content, { req: req });
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const tid = res.ctx.tenantId;
@@ -66,7 +66,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
 /** POST — توليد أكواد {student_ids?: string[], count?: number} — يعيد الأكواد الصريحة مرة واحدة فقط */
 export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const res = await requireTeacher(R.content);
+  const res = await requireTeacher(R.content, { req: req });
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const tid = res.ctx.tenantId;
@@ -137,7 +137,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
 /** DELETE — سحب كود {code_id} */
 export async function DELETE(req: Request, { params }: { params: { id: string } }) {
-  const res = await requireTeacher(R.content);
+  const res = await requireTeacher(R.content, { req: req });
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const tid = res.ctx.tenantId;

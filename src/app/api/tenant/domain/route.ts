@@ -27,7 +27,7 @@ export async function GET() {
 
 /** PUT /api/tenant/domain { domain } — ضبط/إزالة الدومين المخصص (مالك فقط) */
 export async function PUT(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const admin = adminClient();
   const body = await req.json().catch(() => null as any);

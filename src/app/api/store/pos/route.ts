@@ -8,7 +8,7 @@ import { dbFail } from "@/lib/api-error";
  * فحص مخزون + أوامر مدفوعة + خصم مخزون. stock_qty = -1 يعني غير محدود (رقمي).
  */
 export async function POST(req: Request) {
-  const res = await requireTeacher(R.billingWrite);
+  const res = await requireTeacher(R.billingWrite, { req: req });
   if ("error" in res) return res.error;
   const sb = res.ctx.admin;
   const tid = res.ctx.tenantId;

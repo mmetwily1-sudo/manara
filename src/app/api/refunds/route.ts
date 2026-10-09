@@ -15,7 +15,7 @@ export async function GET() {
 
 /** POST /api/refunds {payment_id, reason?} — طلب استرداد (مالك + محاسب) */
 export async function POST(req: Request) {
-  const res = await requireTeacher(R.billingWrite);
+  const res = await requireTeacher(R.billingWrite, { req: req });
   if ("error" in res) return res.error;
   const sb = res.ctx.admin;
   const tid = res.ctx.tenantId;
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
 
 /** PATCH /api/refunds {id, status} — اعتماد/رفض (مالك فقط؛ الاعتماد يلغي الدفعة) */
 export async function PATCH(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const sb = res.ctx.admin;
   const tid = res.ctx.tenantId;

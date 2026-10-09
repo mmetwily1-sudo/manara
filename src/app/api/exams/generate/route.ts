@@ -37,7 +37,7 @@ function apportion(total: number, weights: number[]): number[] {
 
 export async function POST(req: Request) {
   const { requireTeacher } = await import("@/lib/server-auth");
-  const ares = await requireTeacher(R.content);
+  const ares = await requireTeacher(R.content, { req: req });
   if ("error" in ares) return ares.error;
   const { isRateLimited } = await import("@/lib/rate-limit");
   if (await isRateLimited(req, "generate", 30, 60 * 60 * 1000, ares.ctx.tenantId)) {

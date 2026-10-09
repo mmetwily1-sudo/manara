@@ -13,7 +13,7 @@ export async function GET() {
 
 /** POST /api/branches {name, address?} — فرع جديد (مالك فقط) */
 export async function POST(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const body = await req.json().catch(() => ({} as any));
   const name = String(body?.name ?? "").trim().slice(0, 80);
@@ -28,7 +28,7 @@ export async function POST(req: Request) {
 /** DELETE /api/branches?id= — حذف فرع (مالك فقط، يُحرر المرتبطين) */
 /** PATCH /api/branches {id, lat, lng} — إحداثيات الفرع للخريطة (مالك فقط) */
 export async function PATCH(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const b = await req.json().catch(() => ({} as any));
   const lat = Number(b?.lat ?? NaN);
@@ -43,7 +43,7 @@ export async function PATCH(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const id = new URL(req.url).searchParams.get("id");
   if (!id) return NextResponse.json({ ok: false, error: "missing_id" }, { status: 400 });

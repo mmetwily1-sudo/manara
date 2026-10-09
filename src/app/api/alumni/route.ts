@@ -26,7 +26,7 @@ export async function GET(req: Request) {
 
 /** POST /api/alumni {name, grad_year, achievement?, phone?} — تسجيل خريج (معلم) */
 export async function POST(req: Request) {
-  const res = await requireTeacher();
+  const res = await requireTeacher(undefined, { req: req });
   if ("error" in res) return res.error;
   const b = await req.json().catch(() => ({} as any));
   const year = Number(b?.grad_year ?? NaN);
@@ -44,7 +44,7 @@ export async function POST(req: Request) {
 
 /** PATCH /api/alumni {id, featured} — تمييز للجدار العام (معلم) */
 export async function PATCH(req: Request) {
-  const res = await requireTeacher();
+  const res = await requireTeacher(undefined, { req: req });
   if ("error" in res) return res.error;
   const b = await req.json().catch(() => ({} as any));
   if (!b?.id) return NextResponse.json({ ok: false, error: "bad_id" }, { status: 400 });

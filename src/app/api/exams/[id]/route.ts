@@ -109,7 +109,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 /** PATCH /api/exams/[id] — تعديل العنوان/المدة/النشر (معلم فقط، سنتره فقط) */
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   const { requireTeacher } = await import("@/lib/server-auth");
-  const res = await requireTeacher(R.content);
+  const res = await requireTeacher(R.content, { req: req });
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
 
@@ -137,7 +137,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 /** DELETE /api/exams/[id] — حذف الامتحان وروابطه ومحاولاته وشهاداتها (معلم فقط) */
 export async function DELETE(req: Request, { params }: { params: { id: string } }) {
   const { requireTeacher } = await import("@/lib/server-auth");
-  const res = await requireTeacher(R.content);
+  const res = await requireTeacher(R.content, { req: req });
   if ("error" in res) return res.error;
   const sb = res.ctx.admin;
   const urow = { tenant_id: res.ctx.tenantId };

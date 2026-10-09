@@ -39,7 +39,7 @@ export async function GET(req: Request) {
 
 /** PATCH /api/grading {attempt_id, score} — اعتماد درجة يدوية (تشمل المقالي) */
 export async function PATCH(req: Request) {
-  const res = await requireTeacher(R.content);
+  const res = await requireTeacher(R.content, { req: req });
   if ("error" in res) return res.error;
   const sb = res.ctx.admin;
   const b = await req.json().catch(() => ({} as any));

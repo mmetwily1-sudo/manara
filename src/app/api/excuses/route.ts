@@ -15,7 +15,7 @@ export async function GET() {
 
 /** POST /api/excuses {student_id, session_id?, reason?} — تسجيل عذر */
 export async function POST(req: Request) {
-  const res = await requireTeacher(R.attendance);
+  const res = await requireTeacher(R.attendance, { req: req });
   if ("error" in res) return res.error;
   const sb = res.ctx.admin;
   const tid = res.ctx.tenantId;
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
 
 /** PATCH /api/excuses {id, status} — اعتماد/رفض (مالك + مشرف) */
 export async function PATCH(req: Request) {
-  const res = await requireTeacher(R.content);
+  const res = await requireTeacher(R.content, { req: req });
   if ("error" in res) return res.error;
   const b = await req.json().catch(() => ({} as any));
   if (!["approved", "rejected"].includes(b?.status)) {

@@ -8,7 +8,7 @@ import { R } from "@/lib/permissions";
  * يوفر إعادة الإنشاء اليدوي لكل مجموعة — أعلى تكرار استخدام يومي (قرار اللجنة).
  */
 export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const res = await requireTeacher(R.content);
+  const res = await requireTeacher(R.content, { req: req });
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const tid = res.ctx.tenantId;

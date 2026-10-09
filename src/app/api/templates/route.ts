@@ -35,7 +35,7 @@ export async function GET() {
 
 /** POST /api/templates {key,title?,body,channel?,is_active?} — حفظ/تجاوز قالب (مالك فقط) */
 export async function POST(req: Request) {
-  const res = await requireTeacher(R.owner);
+  const res = await requireTeacher(R.owner, { req: req });
   if ("error" in res) return res.error;
   const sb = res.ctx.admin;
   const tid = res.ctx.tenantId;

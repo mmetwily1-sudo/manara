@@ -25,7 +25,7 @@ export async function GET(req: Request) {
 
 /** POST /api/staff/reviews {user_id, month, score 1-5, note?} — تقييم/تحديث (مالك فقط) */
 export async function POST(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const tid = res.ctx.tenantId;

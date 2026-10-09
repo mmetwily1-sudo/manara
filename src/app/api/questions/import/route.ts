@@ -57,7 +57,7 @@ function parseBulkText(text: string): any[] {
 
 export async function POST(req: Request) {
   const { requireTeacher } = await import("@/lib/server-auth");
-  const tres = await requireTeacher(R.content);
+  const tres = await requireTeacher(R.content, { req: req });
   if ("error" in tres) return tres.error;
   const tctx = tres.ctx;
   const { isRateLimited } = await import("@/lib/rate-limit");

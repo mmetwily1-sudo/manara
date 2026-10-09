@@ -18,7 +18,7 @@ export async function GET() {
 
 /** PUT /api/features {key, enabled} — تبديل ميزة (مالك) */
 export async function PUT(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const b = await req.json().catch(() => ({} as any));
   if (!FEATURES.some((f) => f.key === b?.key)) {

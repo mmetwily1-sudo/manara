@@ -96,7 +96,7 @@ async function extractPath(
 
 export async function POST(req: Request) {
   const { requireTeacher, adminClient } = await import("@/lib/server-auth");
-  const res = await requireTeacher(R.content);
+  const res = await requireTeacher(R.content, { req: req });
   if ("error" in res) return res.error;
   const admin = adminClient();
   const tenantId = res.ctx.tenantId;

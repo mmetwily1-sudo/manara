@@ -18,7 +18,7 @@ export async function GET() {
 
 /** POST /api/cash-audits {expected, actual, note?} — تسجيل جرد (مالك + محاسب) */
 export async function POST(req: Request) {
-  const res = await requireTeacher(R.billingWrite);
+  const res = await requireTeacher(R.billingWrite, { req: req });
   if ("error" in res) return res.error;
   const b = await req.json().catch(() => ({} as any));
   const expected = Math.round(Number(b?.expected));
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
 
 /** PATCH /api/cash-audits {id, status} — اعتماد/رفض العجز أو الفائض (مالك فقط) */
 export async function PATCH(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const b = await req.json().catch(() => ({} as any));
   if (!["approved", "rejected"].includes(b?.status)) {

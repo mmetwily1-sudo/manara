@@ -14,7 +14,7 @@ type Warn = { n: number; question_id: string; body: string; issues: string[]; su
 
 export async function POST(_req: Request, { params }: { params: { id: string } }) {
   const { requireTeacher } = await import("@/lib/server-auth");
-  const res = await requireTeacher(R.content);
+  const res = await requireTeacher(R.content, { req: _req });
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const tid = res.ctx.tenantId;

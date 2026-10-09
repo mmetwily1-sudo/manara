@@ -15,7 +15,7 @@ const MAX = 2 * 1024 * 1024;
  * يرجع رابطاً عاماً يُستخدم في المعرض/الشعار/الخلفيات.
  */
 export async function POST(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   let file: File | null = null;
   try {

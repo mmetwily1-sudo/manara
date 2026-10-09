@@ -49,7 +49,7 @@ export async function GET() {
 
 /** PATCH — { notify_whatsapp?: boolean; pay_numbers?: { instapay?, wallet?, fawry? } } */
 export async function PATCH(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const body = await req.json().catch(() => ({} as any));
   const patch: Record<string, unknown> = {};

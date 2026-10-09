@@ -9,7 +9,7 @@ import { R } from "@/lib/permissions";
  * القبول يرسل إيصال واتساب تلقائياً (نفس قناة الدفع المباشر).
  */
 export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const res = await requireTeacher(R.billingWrite);
+  const res = await requireTeacher(R.billingWrite, { req: req });
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const tid = res.ctx.tenantId;

@@ -6,6 +6,7 @@ import NpsBanner from "@/components/NpsBanner";
 import OnboardingChecklist from "@/components/OnboardingChecklist";
 import { Onboarding } from "@/components/Onboarding";
 import TrialBanner from "@/components/TrialBanner";
+import RenewalBanner from "@/components/RenewalBanner";
 import FeedbackWidget from "@/components/FeedbackWidget";
 import HealthScore from "@/components/HealthScore";
 import InstallPwa from "@/components/InstallPwa";
@@ -59,6 +60,7 @@ export default async function DashboardHome() {
       </section>
 
       <TrialBanner />
+      <RenewalBanner />
       <Onboarding role="teacher" />
       <SourceSurvey />
       <HealthScore />

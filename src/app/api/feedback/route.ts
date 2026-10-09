@@ -5,7 +5,7 @@ import { R } from "@/lib/permissions";
 
 /** POST /api/feedback {kind: nps|idea|bug|praise|survey, score?, text?, page?} — صوت المعلم */
 export async function POST(req: Request) {
-  const res = await requireTeacher(R.feedback);
+  const res = await requireTeacher(R.feedback, { req: req });
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
 

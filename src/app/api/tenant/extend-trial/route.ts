@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { requireTeacher, adminClient } from "@/lib/server-auth";
 
 /** POST /api/tenant/extend-trial — تمديد تجربة ذاتي +3 أيام، مرة واحدة فقط (مالك) */
-export async function POST() {
-  const res = await requireTeacher(["teacher_admin"]);
+export async function POST(req: Request) {
+const res = await requireTeacher(["teacher_admin"], { req });
   if ("error" in res) return res.error;
   const admin = adminClient();
   const tid = res.ctx.tenantId;

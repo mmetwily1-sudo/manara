@@ -20,7 +20,7 @@ export async function GET() {
 
 /** POST /api/b2b/qb-orders {school_name, contact?, subject?, price?} — طلب جديد (مالك) */
 export async function POST(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const b = await req.json().catch(() => ({} as any));
   if (!String(b?.school_name ?? "").trim()) {
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
 
 /** PATCH /api/b2b/qb-orders {id, status, access_until?} — تفعيل/إنهاء (مالك) */
 export async function PATCH(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const b = await req.json().catch(() => ({} as any));
   if (!b?.id || !["pending", "active", "expired"].includes(b?.status)) {

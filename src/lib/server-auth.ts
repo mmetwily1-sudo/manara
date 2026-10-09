@@ -83,8 +83,12 @@ export type TeacherContext = {
  * يتحقق من الجلسة + صف المستخدم، ويرجع سياق المعلم أو رد خطأ جاهز.
  * @param roles إن مُررت (مثل ["teacher_admin"]) يُرفض أي role خارجها بـ 403 —
  * يمنع طالباً داخل السنتر من استدعاء APIs المعلم.
+ * @param opts.req مرّر Request المسار في مسارات الكتابة (POST/PUT/PATCH/DELETE) لتفعيل
+ * إنفاذ التجديد: القراءة مسموحة دائماً للموقوف مؤقتاً (ثقة + ضغط ترقية)، والكتابة
+ * تُرد 402 برسالة تجديد. بلا req يُعامل كقراءة (توافق رجعي كامل).
+ * @param opts.allowSuspended استثناء صريح (مثل /api/billing/pay — الدفع هو طريق فك الإيقاف).
  */
-export async function requireTeacher(roles?: string[]): Promise<{ ctx: TeacherContext } | { error: ReturnType<typeof NextResponse.json> }> {
+export async function requireTeacher(roles?: string[], opts?: { req?: Request; allowSuspended?: boolean }): Promise<{ ctx: TeacherContext } | { error: ReturnType<typeof NextResponse.json> }> {
   const user = await getSessionUser();
   if (!user) return { error: NextResponse.json({ ok: false, error: "unauth" }, { status: 401 }) };
   let admin;
@@ -105,9 +109,16 @@ export async function requireTeacher(roles?: string[]): Promise<{ ctx: TeacherCo
     return { error: NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 }) };
   }
   // السنتر الموقوف: كل عمليات الطاقم مرفوضة فوراً (قرار المالك)
-  const { data: trow } = await admin.from("tenants").select("status").eq("id", urow.tenant_id).single();
+  const { data: trow } = await admin.from("tenants").select("status,settings").eq("id", urow.tenant_id).single();
   if ((trow as any)?.status && (trow as any).status !== "active") {
     return { error: NextResponse.json({ ok: false, error: "tenant_suspended", message: "حساب السنتر موقوف — تواصل مع إدارة المنصة" }, { status: 403 }) };
+  }
+  // إنفاذ التجديد (قراءة فقط للموقوف مؤقتاً): يُفعَّل فقط عندما يُمرر req وكانت كتابة.
+  // GET بلا req = قراءة = مسموحة دائماً. المتصل مسؤول عن تمرير req في مسارات الكتابة.
+  const method = opts?.req ? String((opts.req as any).method ?? "GET").toUpperCase() : "GET";
+  const isWrite = method !== "GET" && method !== "HEAD" && method !== "OPTIONS";
+  if (isWrite && !opts?.allowSuspended && (trow as any)?.settings?.renewal_state === "suspended") {
+    return { error: NextResponse.json({ ok: false, error: "subscription_suspended", message: "اشتراك السنتر منتهٍ — جدّد من صفحة الفوترة لاستئناف الإضافة والتعديل (بياناتك للقراءة متاحة)" }, { status: 402 }) };
   }
   return { ctx: { admin, user, tenantId: urow.tenant_id, userRow: urow } };
 }

@@ -31,7 +31,7 @@ export async function GET() {
 
 /** POST /api/store/audit {product_id, counted_qty, note?} — تسجيل عد (يحسب الفرق) */
 export async function POST(req: Request) {
-  const res = await requireTeacher(R.attendance);
+  const res = await requireTeacher(R.attendance, { req: req });
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const tid = res.ctx.tenantId;
@@ -54,7 +54,7 @@ export async function POST(req: Request) {
 
 /** PATCH /api/store/audit {id} — تطبيق العد على المخزون (مرة واحدة) */
 export async function PATCH(req: Request) {
-  const res = await requireTeacher(R.attendance);
+  const res = await requireTeacher(R.attendance, { req: req });
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const tid = res.ctx.tenantId;

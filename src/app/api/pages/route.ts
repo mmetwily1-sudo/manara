@@ -18,7 +18,7 @@ export async function GET() {
 
 /** POST /api/pages {slug, title, body} — صفحة جديدة (مالك) */
 export async function POST(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const b = await req.json().catch(() => ({} as any));
   const slug = String(b?.slug ?? "").trim().toLowerCase();
@@ -35,7 +35,7 @@ export async function POST(req: Request) {
 
 /** PATCH /api/pages {id, title?, body?, published?} — تعديل/نشر (مالك) */
 export async function PATCH(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const b = await req.json().catch(() => ({} as any));
   if (!b?.id) return NextResponse.json({ ok: false, error: "bad_id" }, { status: 400 });
@@ -52,7 +52,7 @@ export async function PATCH(req: Request) {
 
 /** DELETE /api/pages?id= — حذف (مالك) */
 export async function DELETE(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const id = new URL(req.url).searchParams.get("id");
   if (!id) return NextResponse.json({ ok: false, error: "bad_id" }, { status: 400 });

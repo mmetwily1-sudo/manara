@@ -8,9 +8,9 @@ import { dbFail } from "@/lib/api-error";
  * POST /api/announcements { group_id?|null, body } — نشر إعلان (معلم).
  * كل إعلان = thread + أول رسالة (بدون ترحيل جديد).
  */
-async function ctx() {
+async function ctx(req?: Request) {
   const { requireTeacher } = await import("@/lib/server-auth");
-  return requireTeacher(R.content);
+  return requireTeacher(R.content, req ? { req } : undefined);
 }
 
 export async function GET() {
@@ -68,7 +68,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const res = await ctx();
+  const res = await ctx(req);
   if ("error" in res) return res.error;
   const admin = adminClient();
   const tid = res.ctx.tenantId;

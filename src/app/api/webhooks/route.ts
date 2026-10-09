@@ -19,7 +19,7 @@ export async function GET() {
 
 /** POST /api/webhooks {url, events[], secret?} — ويبهوك جديد */
 export async function POST(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const b = await req.json().catch(() => ({} as any));
   const url = String(b?.url ?? "").trim().slice(0, 500);
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
 
 /** PATCH /api/webhooks {id, is_active} — تفعيل/إيقاف */
 export async function PATCH(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const b = await req.json().catch(() => ({} as any));
   const { error } = await res.ctx.admin.from("outgoing_webhooks").update({ is_active: !!b?.is_active })
@@ -48,7 +48,7 @@ export async function PATCH(req: Request) {
 
 /** DELETE /api/webhooks?id= — حذف ويبهوك */
 export async function DELETE(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const id = new URL(req.url).searchParams.get("id");
   const { error } = await res.ctx.admin.from("outgoing_webhooks").delete()

@@ -20,7 +20,7 @@ export async function GET() {
 
 /** POST /api/expenses {title, amount, category?, spent_at?, note?} — مصروف جديد (مالك + محاسب) */
 export async function POST(req: Request) {
-  const res = await requireTeacher(R.billingWrite);
+  const res = await requireTeacher(R.billingWrite, { req: req });
   if ("error" in res) return res.error;
   const b = await req.json().catch(() => ({} as any));
   const title = String(b?.title ?? "").trim().slice(0, 150);

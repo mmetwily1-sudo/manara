@@ -52,7 +52,7 @@ export async function GET(req: Request) {
 
 /** POST /api/goals {student_id,title,kind,target,deadline?} — هدف جديد (مالك + مشرف) */
 export async function POST(req: Request) {
-  const res = await requireTeacher(R.content);
+  const res = await requireTeacher(R.content, { req: req });
   if ("error" in res) return res.error;
   const sb = res.ctx.admin;
   const tid = res.ctx.tenantId;
@@ -74,7 +74,7 @@ export async function POST(req: Request) {
 
 /** PATCH /api/goals {id, status} — إنهاء/إلغاء هدف */
 export async function PATCH(req: Request) {
-  const res = await requireTeacher(R.content);
+  const res = await requireTeacher(R.content, { req: req });
   if ("error" in res) return res.error;
   const b = await req.json().catch(() => ({} as any));
   if (!["done", "cancelled", "active"].includes(b?.status)) {

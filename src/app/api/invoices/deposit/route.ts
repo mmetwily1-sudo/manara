@@ -5,7 +5,7 @@ import { dbFail } from "@/lib/api-error";
 
 /** POST /api/invoices/deposit {student_id, amount, note?} — فاتورة عربون حجز مقعد (تُخصم من أول تحصيل FIFO) */
 export async function POST(req: Request) {
-  const res = await requireTeacher(R.billingWrite);
+  const res = await requireTeacher(R.billingWrite, { req: req });
   if ("error" in res) return res.error;
   const sb = res.ctx.admin;
   const tid = res.ctx.tenantId;

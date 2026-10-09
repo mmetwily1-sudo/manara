@@ -68,7 +68,7 @@ export async function GET(req: Request) {
 
 /** POST /api/invoices {action:"issue", period?} — إصدار فواتير شهر (مالك + محاسب) */
 export async function POST(req: Request) {
-  const res = await requireTeacher(R.billingWrite);
+  const res = await requireTeacher(R.billingWrite, { req: req });
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const tid = res.ctx.tenantId;

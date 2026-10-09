@@ -18,7 +18,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 
 /** POST /api/sessions/[id]/rotate — توليد سر QR جديد صالح 90 ثانية (طاقم التحضير) */
 export async function POST(_req: Request, { params }: { params: { id: string } }) {
-  const res = await requireTeacher(R.attendance);
+  const res = await requireTeacher(R.attendance, { req: _req });
   if ("error" in res) return res.error;
   const { data: s } = await res.ctx.admin.from("sessions").select("id,group_id")
     .eq("id", params.id).eq("tenant_id", res.ctx.tenantId).single();

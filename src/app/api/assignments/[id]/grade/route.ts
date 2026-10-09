@@ -5,7 +5,7 @@ import { dbFail } from "@/lib/api-error";
 /** POST /api/assignments/[id]/grade { student_id, score, feedback_text? } — تصحيح تسليم (معلم). */
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const { requireTeacher, adminClient } = await import("@/lib/server-auth");
-  const res = await requireTeacher(R.content);
+  const res = await requireTeacher(R.content, { req: req });
   if ("error" in res) return res.error;
   const admin = adminClient();
   const tid = res.ctx.tenantId;

@@ -15,7 +15,7 @@ export async function GET() {
 
 /** POST /api/team/tasks {title, assignee_id?, due_date?} — مهمة جديدة (مالك + مشرف) */
 export async function POST(req: Request) {
-  const res = await requireTeacher(R.content);
+  const res = await requireTeacher(R.content, { req: req });
   if ("error" in res) return res.error;
   const b = await req.json().catch(() => ({} as any));
   const title = String(b?.title ?? "").trim().slice(0, 200);
@@ -40,7 +40,7 @@ export async function POST(req: Request) {
 
 /** PATCH /api/team/tasks {id, status} — إنجاز/إلغاء (المكلف أو المالك) */
 export async function PATCH(req: Request) {
-  const res = await requireTeacher(R.feedback);
+  const res = await requireTeacher(R.feedback, { req: req });
   if ("error" in res) return res.error;
   const b = await req.json().catch(() => ({} as any));
   if (!["done", "cancelled", "open"].includes(b?.status)) {

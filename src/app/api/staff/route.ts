@@ -32,7 +32,7 @@ export async function GET() {
 
 /** POST /api/staff {email,password,full_name,phone,role,branch_id?} — دعوة عضو (مالك فقط) */
 export async function POST(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const tid = res.ctx.tenantId;
@@ -79,7 +79,7 @@ export async function POST(req: Request) {
 
 /** PATCH /api/staff {id, branch_id?, role?} — نقل موظف لفرع / تغيير دوره / تعيين مدير فرع (مشرف+فرع) */
 export async function PATCH(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const tid = res.ctx.tenantId;
@@ -116,7 +116,7 @@ export async function PATCH(req: Request) {
 
 /** DELETE /api/staff?id= — إزالة عضو (مالك فقط، ليس نفسه ولا مالكاً آخر) */
 export async function DELETE(req: Request) {
-  const res = await requireTeacher(["teacher_admin"]);
+  const res = await requireTeacher(["teacher_admin"], { req: req });
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const id = new URL(req.url).searchParams.get("id");

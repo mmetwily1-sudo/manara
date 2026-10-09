@@ -38,7 +38,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 
 export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
   const { requireTeacher, adminClient } = await import("@/lib/server-auth");
-  const res = await requireTeacher(R.content);
+  const res = await requireTeacher(R.content, { req: _req });
   if ("error" in res) return res.error;
   const admin = adminClient();
   const { error } = await admin.from("assignments").delete().eq("id", params.id).eq("tenant_id", res.ctx.tenantId);

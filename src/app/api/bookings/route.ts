@@ -52,7 +52,7 @@ export async function POST(req: Request) {
 
 /** PATCH /api/bookings {id, status} — تأكيد/إلغاء/إتمام (طاقم) */
 export async function PATCH(req: Request) {
-  const res = await requireTeacher(R.attendance);
+  const res = await requireTeacher(R.attendance, { req: req });
   if ("error" in res) return res.error;
   const b = await req.json().catch(() => ({} as any));
   if (!["confirmed", "cancelled", "done"].includes(b?.status)) {

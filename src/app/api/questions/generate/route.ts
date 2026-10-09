@@ -8,7 +8,7 @@ import { R } from "@/lib/permissions";
  * محرك أسئلة من المذكرات: استخراج → مسودات للمراجعة (لا نشر تلقائي).
  */
 export async function POST(req: Request) {
-  const res = await requireTeacher(R.content);
+  const res = await requireTeacher(R.content, { req: req });
   if ("error" in res) return res.error;
   const { isRateLimited } = await import("@/lib/rate-limit");
   if (await isRateLimited(req, "qgen", 20, 60 * 60 * 1000, res.ctx.tenantId)) {

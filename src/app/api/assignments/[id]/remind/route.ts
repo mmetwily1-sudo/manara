@@ -4,7 +4,7 @@ import { R } from "@/lib/permissions";
 
 /** POST /api/assignments/[id]/remind — تذكير push لمن لم يسلّم (معلم) */
 export async function POST(_req: Request, { params }: { params: { id: string } }) {
-  const res = await requireTeacher(R.content);
+  const res = await requireTeacher(R.content, { req: _req });
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const tid = res.ctx.tenantId;
