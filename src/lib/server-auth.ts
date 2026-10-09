@@ -124,6 +124,22 @@ export async function requireTeacher(roles?: string[], opts?: { req?: Request; a
 }
 
 /**
+ * حارس الكتابة للمسارات المختلطة (معلم+طالب بنفس الراوت بلا requireTeacher):
+ * يُستدعى داخل فرع المعلم فقط — الطلاب وأولياء الأمور يمرون دائماً (null).
+ * يُرجع رد 402 جاهزاً عند الإيقاف المؤقت، أو null للمتابعة.
+ */
+export async function enforceRenewalWrite(admin: any, tenantId: string, role: string | null | undefined): Promise<ReturnType<typeof NextResponse.json> | null> {
+  if (!role || role === "student" || role === "parent") return null;
+  try {
+    const { data: t } = await admin.from("tenants").select("settings").eq("id", tenantId).single();
+    if ((t as any)?.settings?.renewal_state === "suspended") {
+      return NextResponse.json({ ok: false, error: "subscription_suspended", message: "اشتراك السنتر منتهٍ — جدّد من صفحة الفوترة لاستئناف الإضافة والتعديل (بياناتك للقراءة متاحة)" }, { status: 402 });
+    }
+  } catch {}
+  return null;
+}
+
+/**
  * بوابة مدير السلسلة: المستخدم عضو chain_admin في chain_members لسلسلة بعينها.
  * يُستخدم لـ/api/chains/* — تقارير مجمّعة عبر فروع متعددة (chain واحدة).
  * لا علاقة له بـrequireTeacher (سنتر واحد) ولا requirePlatformAdmin (كل شيء).

@@ -58,6 +58,7 @@ export async function POST(req: Request) {
   const { admin, urow } = m;
   const tid = urow.tenant_id;
   const isTeacher = urow.role !== "student";
+  if (isTeacher) { const _sw = await (await import("@/lib/server-auth")).enforceRenewalWrite(admin, tid, urow.role); if (_sw) return _sw; }
   const b = await req.json().catch(() => ({} as any));
   if (isTeacher) {
     const cost = Number(b?.cost_points ?? NaN);

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { verifyCallbackHmac } from "@/lib/paymob";
+import { dbFail } from "@/lib/api-error";
 
 /**
  * POST /api/billing/callback — إشعار Paymob بعد الدفع (عام، مؤمّن بـ HMAC).
@@ -64,15 +65,21 @@ export async function POST(req: Request) {
       } catch {}
       const { data: t } = await admin.from("tenants").select("settings").eq("id", (inv as any).tenant_id).single();
       const paidUntil = new Date(Date.now() + Number((inv as any).months || 1) * 30 * 24 * 60 * 60 * 1000).toISOString();
-      await admin.from("tenants").update({
-        plan: (inv as any).plan,
-        settings: { ...(((t as any)?.settings ?? {}) as object), plan_paid_until: paidUntil },
-      }).eq("id", (inv as any).tenant_id);
-      // التجديد: إعادة تفعيل حالة الاشتراك بعد الدفع (due_soon/grace → active)
-      try {
-        const { resetOnPayment } = await import("@/lib/renewals");
-        await resetOnPayment(admin, (inv as any).tenant_id, (t as any)?.settings ?? {});
-      } catch {}
+      // كتابة ذرية واحدة: الخطة + plan_paid_until + إعادة تفعيل التجديد معاً (088) —
+      // لا قراءة-ثم-دمج هنا، فلا سباق مع كرون التجديد (نفس نمط lib/renewals).
+      const prevRenewal = String((t as any)?.settings?.renewal_state ?? "active");
+      const { error: werr } = await admin.rpc("tenant_patch_settings", {
+        p_tenant_id: (inv as any).tenant_id,
+        p_plan: (inv as any).plan,
+        p_patch: { plan_paid_until: paidUntil, renewal_state: "active", grace_until: null, renewal_reminder_sent_at: null },
+      });
+      if (werr) return dbFail("callback-activate", werr);
+      if (prevRenewal !== "active") {
+        try {
+          const { logRenewalEvent } = await import("@/lib/renewals");
+          await logRenewalEvent(admin, (inv as any).tenant_id, prevRenewal, "active", "payment");
+        } catch {}
+      }
     }
     return NextResponse.json({ ok: true });
   } catch {

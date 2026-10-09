@@ -52,7 +52,7 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null as any);
   if (!body?.body) return NextResponse.json({ ok: false, error: "body required" }, { status: 400 });
   const { requireTeacher: rt } = await import("@/lib/server-auth");
-  const res = await rt(["teacher_admin"]);
+  const res = await rt(["teacher_admin"], { req });
   if ("error" in res) return res.error;
   const admin = res.ctx.admin;
   const urow = { tenant_id: res.ctx.tenantId };
@@ -97,7 +97,7 @@ export async function POST(req: Request) {
 /** DELETE /api/questions?id= — حذف سؤال من البنك (معلم فقط) */
 export async function DELETE(req: Request) {
   const { requireTeacher: rt } = await import("@/lib/server-auth");
-  const res = await rt(["teacher_admin"]);
+  const res = await rt(["teacher_admin"], { req });
   if ("error" in res) return res.error;
   const id = new URL(req.url).searchParams.get("id");
   if (!id) return NextResponse.json({ ok: false, error: "missing_id" }, { status: 400 });

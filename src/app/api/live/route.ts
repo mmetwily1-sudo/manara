@@ -79,6 +79,7 @@ export async function POST(req: Request) {
   const { admin, urow } = m;
   const tid = urow.tenant_id;
   const isTeacher = urow.role !== "student";
+  if (isTeacher) { const _sw = await (await import("@/lib/server-auth")).enforceRenewalWrite(admin, tid, urow.role); if (_sw) return _sw; }
   const b = await req.json().catch(() => ({} as any));
   // رفع/إنزال اليد — قبل فرع الإنشاء (يعمل للمعلم والطالب)
   if (b?.action === "raise" && b?.session_id) {

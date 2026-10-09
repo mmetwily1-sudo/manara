@@ -45,6 +45,8 @@ export async function POST(req: Request) {
   const { data: urow } = await admin.from("users").select("tenant_id,role").eq("auth_user_id", user.id).single();
   if (!urow) return NextResponse.json({ ok: false, error: "no_tenant" }, { status: 403 });
   if ((urow as any).role !== "teacher_admin") return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  const _sw = await (await import("@/lib/server-auth")).enforceRenewalWrite(admin, urow.tenant_id, (urow as any).role);
+  if (_sw) return _sw;
 
   let form: FormData;
   try {
@@ -98,6 +100,8 @@ export async function DELETE(req: Request) {
   const { data: urow } = await admin.from("users").select("tenant_id,role").eq("auth_user_id", user.id).single();
   if (!urow) return NextResponse.json({ ok: false, error: "no_tenant" }, { status: 403 });
   if ((urow as any).role !== "teacher_admin") return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  const _sw = await (await import("@/lib/server-auth")).enforceRenewalWrite(admin, urow.tenant_id, (urow as any).role);
+  if (_sw) return _sw;
 
   const videoId = new URL(req.url).searchParams.get("videoId") ?? "";
   if (!videoId) return NextResponse.json({ ok: false, error: "videoId" }, { status: 400 });

@@ -65,6 +65,8 @@ export async function PATCH(req: Request) {
   const m = await me();
   if (!m) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
   if (m.urow.role === "student") return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  const _sw = await (await import("@/lib/server-auth")).enforceRenewalWrite(m.admin, m.urow.tenant_id, m.urow.role);
+  if (_sw) return _sw;
   const b = await req.json().catch(() => ({} as any));
   const reply = String(b?.reply ?? "").trim().slice(0, 1000);
   if (!b?.id || reply.length < 2) return NextResponse.json({ ok: false, error: "bad_input" }, { status: 400 });

@@ -92,6 +92,10 @@ export async function POST(req: Request) {
   const { data: urow } = await admin.from("users").select("id,tenant_id,role").eq("auth_user_id", user.id).single();
   if (!urow) return NextResponse.json({ ok: false, error: "no_tenant" }, { status: 403 });
   const tid = (urow as any).tenant_id;
+  if ((urow as any).role !== "student") {
+    const _sw = await (await import("@/lib/server-auth")).enforceRenewalWrite(admin, tid, (urow as any).role);
+    if (_sw) return _sw;
+  }
   const b = await req.json().catch(() => ({} as any));
   const title = String(b?.title ?? "").trim().slice(0, 150);
   const body = String(b?.body ?? "").trim().slice(0, 2000);

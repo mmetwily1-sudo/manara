@@ -12,7 +12,7 @@ const DUE_SOON_DAYS = 3;
 const GRACE_DAYS = 3;
 const DAY = 24 * 60 * 60 * 1000;
 
-async function logEvent(admin: any, tenantId: string, from: string, to: string, trigger: string) {
+export async function logRenewalEvent(admin: any, tenantId: string, from: string, to: string, trigger: string) {
   try {
     await admin.from("tenant_renewal_events").insert({
       tenant_id: tenantId, from_state: from, to_state: to, trigger,
@@ -46,18 +46,24 @@ async function sendOwnerReminder(admin: any, tenantId: string, centerName: strin
 }
 
 async function transition(admin: any, tenantId: string, centerName: string, from: RenewalState, to: RenewalState, extra: Record<string, any> = {}) {
-  const { data: t } = await admin.from("tenants").select("settings").eq("id", tenantId).single();
-  const settings = { ...(((t as any)?.settings ?? {}) as object), renewal_state: to, ...extra } as any;
   const today = new Date().toISOString().slice(0, 10);
   let channel = "none";
+  let reminderStamp: string | null = null;
   if (to === "due_soon" || to === "grace" || to === "suspended") {
-    if (settings.renewal_reminder_sent_at !== today) {
+    // حارس يومي: يُقرأ قبل الإرسال (الكتابة نفسها ذرية أدناه، فأسوأ الحالات تكرار تذكير لا فقدان بيانات)
+    const { data: cur } = await admin.from("tenants").select("settings").eq("id", tenantId).single();
+    if (((cur as any)?.settings ?? {}).renewal_reminder_sent_at !== today) {
       channel = await sendOwnerReminder(admin, tenantId, centerName, to);
-      settings.renewal_reminder_sent_at = today;
+      reminderStamp = today;
     }
   }
-  await admin.from("tenants").update({ settings }).eq("id", tenantId);
-  await logEvent(admin, tenantId, from, to, "cron");
+  // كتابة ذرية: تلمس مفاتيح التجديد فقط — لا تقرأ settings كاملاً فلا تمسح مفاتيح كاتب آخر
+  // (مثل plan_paid_until من callback الدفع). تُنفذ كعملية SQL واحدة عبر 088.
+  await admin.rpc("tenant_patch_settings", {
+    p_tenant_id: tenantId,
+    p_patch: { renewal_state: to, ...extra, ...(reminderStamp ? { renewal_reminder_sent_at: reminderStamp } : {}) },
+  });
+  await logRenewalEvent(admin, tenantId, from, to, "cron");
   return { to, channel };
 }
 
@@ -112,17 +118,4 @@ export async function runRenewals(admin: any) {
     } catch {}
   }
   return { scanned, checked, transitioned, reminded };
-}
-
-/** إعادة التفعيل عند دفعة ناجحة — تُستدعى من billing/callback (مسار المنصة فقط). */
-export async function resetOnPayment(admin: any, tenantId: string, prevSettings: any) {
-  const prev = String(prevSettings?.renewal_state ?? "active");
-  if (prev === "active") return;
-  const { data: t } = await admin.from("tenants").select("settings").eq("id", tenantId).single();
-  const settings = { ...(((t as any)?.settings ?? {}) as object) } as any;
-  settings.renewal_state = "active";
-  settings.grace_until = null;
-  settings.renewal_reminder_sent_at = null;
-  await admin.from("tenants").update({ settings }).eq("id", tenantId);
-  await logEvent(admin, tenantId, prev, "active", "payment");
 }
