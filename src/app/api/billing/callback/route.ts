@@ -28,7 +28,7 @@ export async function POST(req: Request) {
     const invId = merchantOrder.split(":").pop() ?? "";
     if (!invId) return NextResponse.json({ ok: false, error: "bad_order" }, { status: 400 });
     try {
-      const { data: inv } = await admin.from("invoices").select("id,tenant_id,amount,paid,status").eq("id", invId).single();
+      const { data: inv } = await admin.from("invoices").select("id,tenant_id,student_id,amount,paid,status").eq("id", invId).single();
       if (!inv) return NextResponse.json({ ok: false, error: "unknown_invoice" }, { status: 404 });
       if ((inv as any).status === "paid") return NextResponse.json({ ok: true, duplicate: true });
       if (!success) return NextResponse.json({ ok: true, failed: true });
@@ -39,6 +39,22 @@ export async function POST(req: Request) {
         paid, status: paid >= total ? "paid" : "partial", paid_at: new Date().toISOString(),
       }).eq("id", invId);
       if (error) return NextResponse.json({ ok: false, error: "server_error" }, { status: 500 });
+      // إيصال فوري لولي الأمر: إعادة استخدام notifyStudent (يدعم العربية + dedupe + كل القنوات)
+      try {
+        const { notifyStudent } = await import("@/lib/notify");
+        const [{ data: tt }, { data: st }] = await Promise.all([
+          admin.from("tenants").select("name").eq("id", (inv as any).tenant_id).single(),
+          admin.from("users").select("full_name").eq("id", (inv as any).student_id).single(),
+        ]);
+        await notifyStudent(admin, {
+          tenantId: (inv as any).tenant_id, studentId: (inv as any).student_id,
+          event: {
+            kind: "payment_received", studentName: String((st as any)?.full_name ?? ""),
+            amount: got, centerName: String((tt as any)?.name ?? ""),
+          },
+          dedupeKey: `invoice:${invId}:${String(obj.id ?? "na")}`,
+        });
+      } catch {}
       return NextResponse.json({ ok: true, paid });
     } catch {
       return NextResponse.json({ ok: false, error: "server_error" }, { status: 500 });
@@ -80,6 +96,24 @@ export async function POST(req: Request) {
           await logRenewalEvent(admin, (inv as any).tenant_id, prevRenewal, "active", "payment");
         } catch {}
       }
+      // إيصال فوري للمالك: الخطة + المبلغ المحصّل فعلاً + تاريخ الانتهاء الجديد
+      // (يذكر الخصم فقط لو مسجل على الفاتورة — الصدق أولاً).
+      try {
+        const { notifyOwner } = await import("@/lib/notify");
+        const gotPlat = Math.max(0, Math.round(Number(obj.amount_cents ?? 0) / 100));
+        const [{ data: pp }, { data: tt2 }] = await Promise.all([
+          admin.from("platform_payments").select("discount_pct").eq("id", invId).single(),
+          admin.from("tenants").select("name").eq("id", (inv as any).tenant_id).single(),
+        ]);
+        const disc = Number((pp as any)?.discount_pct ?? 0) > 0 ? " (شامل خصم التجديد المبكر 5%)" : "";
+        const until = new Date(paidUntil).toLocaleDateString("ar-EG");
+        await notifyOwner(admin, {
+          tenantId: (inv as any).tenant_id,
+          body: `تم استلام اشتراك ${String((tt2 as any)?.name ?? "")} (${(inv as any).plan}) بمبلغ ${gotPlat} جنيه${disc} — مفعّل حتى ${until}. شكراً لثقتكم بمنارة ✅`,
+          event: "platform_payment_received",
+          dedupeKey: `platform-pay:${invId}:${String(obj.id ?? "na")}`,
+        });
+      } catch {}
     }
     return NextResponse.json({ ok: true });
   } catch {

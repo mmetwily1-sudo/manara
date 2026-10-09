@@ -269,3 +269,47 @@ export async function notifyStudent(
 
   return { sent, reason: sent ? undefined : reason };
 }
+
+/**
+ * إشعار مالك السنتر (إيصال اشتراك منصة): واتساب مباشر إن كان حياً، وإلا طابور SMS.
+ * idempotency عبر dedupe_key — إعادة تنفيذ الـcallback لا ترسل مرتين.
+ */
+export async function notifyOwner(
+  admin: any,
+  opts: { tenantId: string; body: string; event: string; dedupeKey: string }
+): Promise<{ sent: boolean; channel?: string }> {
+  const { tenantId, body, event, dedupeKey } = opts;
+  try {
+    const { data: dup } = await admin.from("notification_log")
+      .select("id").eq("dedupe_key", dedupeKey).limit(1);
+    if (dup?.length) return { sent: false };
+    const { data: owner } = await admin.from("users").select("id")
+      .eq("tenant_id", tenantId).eq("role", "teacher_admin").limit(1).single();
+    const ownerId = (owner as any)?.id ?? null;
+    const { data: t } = await admin.from("tenants").select("settings").eq("id", tenantId).single();
+    const phone = String((t as any)?.settings?.owner_phone ?? "").trim();
+    if (!phone) return { sent: false };
+    const { isWhatsAppLive, sendWhatsAppText } = await import("./whatsapp");
+    if (isWhatsAppLive()) {
+      const r = await sendWhatsAppText(phone, body);
+      if ((r as any)?.ok) {
+        // سجل notification_log يشترط user_id — يُسجَّل فقط عند وجود صف المالك
+        if (ownerId) {
+          await admin.from("notification_log").insert({
+            tenant_id: tenantId, user_id: ownerId, event,
+            channel: "whatsapp", payload: {}, status: "sent",
+            dedupe_key: dedupeKey, sent_at: new Date().toISOString(),
+          }).then(() => {}, () => {});
+        }
+        return { sent: true, channel: "whatsapp" };
+      }
+    }
+    await admin.from("sms_queue").insert({
+      tenant_id: tenantId, user_id: ownerId, phone,
+      body: body.slice(0, 300), event,
+    });
+    return { sent: true, channel: "sms_queued" };
+  } catch {
+    return { sent: false };
+  }
+}
