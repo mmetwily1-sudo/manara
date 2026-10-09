@@ -26,7 +26,7 @@ async function sendOwnerReminder(admin: any, tenantId: string, centerName: strin
     const phone = String((t as any)?.settings?.owner_phone ?? "").trim();
     if (!phone) return "no_phone";
     const bodies: Record<string, string> = {
-      due_soon: `تذكير منارة: اشتراك سنتر ${centerName} ينتهي قريباً — جدّد من صفحة الفوترة في لوحتك لاستمرار الخدمة بلا انقطاع.`,
+      due_soon: `تذكير منارة: اشتراك سنتر ${centerName} ينتهي قريباً — جدّد الآن بخصم تجديد مبكر 5% من صفحة الأسعار قبل انتهاء اشتراكك.`,
       grace: `عاجل منارة: انتهى اشتراك سنتر ${centerName} ودخل فترة السماح — جدّد الآن من صفحة الفوترة قبل الإيقاف.`,
       suspended: `منارة: تم إيقاف سنتر ${centerName} مؤقتاً لانتهاء الاشتراك — جدّد من صفحة الفوترة لإعادة التفعيل فوراً.`,
     };

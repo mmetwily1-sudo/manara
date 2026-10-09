@@ -2,12 +2,20 @@
 
 import { useState } from "react";
 
-/** زر «ادفع أونلاين» — يفتح بوابة Paymob في تبويب جديد (يتطلب دخول المعلم). */
+/** زر «ادفع أونلاين» — يفتح بوابة Paymob في تبويب جديد (يتطلب دخول المعلم).
+ * عند وجود خصم تجديد مبكر: الضغطة الأولى تعرض السعر بعد الخصم للتأكيد،
+ * والثانية تفتح الدفع — بلا مفاجآت في السعر. */
 export function PayOnlineButton({ plan, label }: { plan: string; label?: string }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  const [quote, setQuote] = useState<{ amount: number; base: number; pct: number; url: string } | null>(null);
 
   async function pay() {
+    // خطوة التأكيد: الرابط جاهز من الخطوة الأولى — افتحه مباشرة
+    if (quote) {
+      window.open(quote.url, "_blank", "noopener");
+      return;
+    }
     setBusy(true); setMsg("");
     try {
       const r = await fetch("/api/billing/pay", {
@@ -16,7 +24,11 @@ export function PayOnlineButton({ plan, label }: { plan: string; label?: string 
       });
       const j = await r.json().catch(() => null);
       if (r.ok && j?.ok && j.iframe_url) {
-        window.open(j.iframe_url, "_blank", "noopener");
+        if (Number(j.discount_pct ?? 0) > 0 && Number(j.base_amount ?? 0) > Number(j.amount ?? 0)) {
+          setQuote({ amount: Number(j.amount), base: Number(j.base_amount), pct: Number(j.discount_pct), url: String(j.iframe_url) });
+        } else {
+          window.open(j.iframe_url, "_blank", "noopener");
+        }
       } else if (r.status === 401 || j?.error === "unauth") {
         window.location.href = "/join";
       } else {
@@ -31,8 +43,13 @@ export function PayOnlineButton({ plan, label }: { plan: string; label?: string 
 
   return (
     <span className="block">
+      {quote && (
+        <span className="mt-2 block rounded-xl bg-success/10 px-4 py-2 text-center text-xs font-bold text-success">
+          🎉 خصم تجديد مبكر {quote.pct}%: <s className="text-slate-400">{quote.base}</s> ← {quote.amount} ج
+        </span>
+      )}
       <button onClick={pay} disabled={busy} className="mt-2 w-full rounded-xl border-2 border-success/40 px-4 py-2 text-small font-bold text-success transition hover:bg-success/10 disabled:opacity-50">
-        {busy ? "جاري تجهيز الدفع..." : (label ?? "💳 ادفع أونلاين")}
+        {busy ? "جاري تجهيز الدفع..." : quote ? "تأكيد وفتح الدفع ←" : (label ?? "💳 ادفع أونلاين")}
       </button>
       {msg && <span className="mt-1 block text-center text-xs font-bold text-warning">{msg}</span>}
     </span>
