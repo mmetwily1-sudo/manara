@@ -3,13 +3,21 @@ import * as Sentry from "@sentry/nextjs";
 
 /**
  * إزالة الأسرار من أي URL قبل مغادرته للخارج: استدعاءات UptimeRobot للكرون
- * تحمل ?secret=، وتتبع Sentry (5% من الطلبات) يلتقط الـURL الكامل افتراضياً —
- * بدون هذه التنقية كان السر سيتسرب لخوادم Sentry خلال ساعات (حتمية حسابية
- * لا نظرية). نفس روح scrubPii() في api-error.ts، لقناة الـURLs.
+ * تحمل ?secret=، وروابط الدخول السحري للأهالي تحمل ?token= (صالح سنة!)،
+ * وتبادل OAuth يحمل ?code= — وتتبع Sentry (5% من الطلبات) يلتقط الـURL الكامل
+ * افتراضياً. بدون هذه التنقية كانت الأسرار ستتسرب لخوادم Sentry خلال ساعات
+ * (حتمية حسابية لا نظرية). نفس روح scrubPii() في api-error.ts، لقناة الـURLs.
+ * القائمة موسعة عمداً (لا نمط واحد): أي بارامتر بهذه الأسماء يُنقّى أينما ظهر.
  */
+const SENSITIVE_PARAMS = "secret|token|code|api_key|apikey|password|access_token";
 function stripSecretFromUrl(url: unknown): unknown {
   if (typeof url !== "string") return url;
-  return url.replace(/([?&])secret=[^&]*/gi, "$1secret=[REDACTED]");
+  // اللاحقة [\w-]* تلتقط token_hash وaccess-token ونحوها؛ التثبيت على [?&] يمنع
+  // الإيجابيات الكاذبة داخل الكلمات (category/decode سليمة — مختبرة أدناه).
+  return url.replace(
+    new RegExp(`([?&])(${SENSITIVE_PARAMS})([\\w-]*)=[^&]*`, "gi"),
+    "$1$2$3=[REDACTED]"
+  );
 }
 
 function scrubEventUrls(event: any): any {
