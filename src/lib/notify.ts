@@ -218,8 +218,11 @@ export async function notifyStudent(
     }
   } catch {} // eslint-disable-line no-empty
 
-  // تليجرام المنصة (مجاني غير محدود): رابط chat_id المخزن لنفس الطالب
+  // تليجرام المنصة (مجاني غير محدود): رابط chat_id المخزن لنفس الطالب.
+  // قرار صريح (لا بث مزدوج): نجاح واتساب يُسكت تليجرام لنفس الحدث — رسالتان
+  // متطابقتان للأهل تُضعفان الثقة. تليجرام يبقى البديل عند فشل/غياب واتساب.
   let tgSent = false;
+  if (!sent) {
   try {
     const { sendTelegram, isTelegramLive } = await import("./telegram");
     if (isTelegramLive()) {
@@ -240,6 +243,7 @@ export async function notifyStudent(
       }
     }
   } catch {} // eslint-disable-line no-empty
+  } // end if (!sent) — تفضيل واتساب الصريح أعلاه
 
   // بريد المنصة (Resend — مجاني حتى 3000/شهر): يُحل بريد الطالب من auth عند الإمكان
   try {
