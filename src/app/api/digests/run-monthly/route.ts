@@ -18,10 +18,10 @@ export async function GET(req: Request) {
     const { buildDigest } = await import("@/lib/digest");
     const { sendPushToUser } = await import("@/lib/push");
     const period = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 7);
-    const { data: tenants } = await admin.from("tenants").select("id").eq("status", "active").limit(50);
-    let tenantsDone = 0, created = 0, pushed = 0;
+    const { data: tenants } = await admin.from("tenants").select("id,name").eq("status", "active").limit(50);
+    let tenantsDone = 0, created = 0, pushed = 0, waFallback = 0;
     for (const t of (tenants ?? []) as any[]) {
-      const { data: students } = await admin.from("users").select("id")
+      const { data: students } = await admin.from("users").select("id,full_name")
         .eq("tenant_id", t.id).eq("role", "student").limit(300);
       for (const s of (students ?? []) as any[]) {
         try {
@@ -37,12 +37,26 @@ export async function GET(req: Request) {
               url: "/progress",
             });
             pushed += r.sent;
+            if (!r.sent && d.wa_text) {
+              try {
+                const { notifyStudent } = await import("@/lib/notify");
+                const w = await notifyStudent(admin, {
+                  tenantId: t.id, studentId: s.id,
+                  event: {
+                    kind: "digest_weekly", studentName: String(s.full_name ?? ""),
+                    centerName: String(t.name ?? ""), text: String(d.wa_text).slice(0, 1000),
+                  },
+                  dedupeKey: `digest-wa-monthly:${period}:${s.id}`,
+                });
+                if (w.sent) waFallback++;
+              } catch {}
+            }
           }
         } catch {}
       }
       tenantsDone++;
     }
-    return NextResponse.json({ ok: true, tenantsDone, created, pushed, period, mode: "monthly" });
+    return NextResponse.json({ ok: true, tenantsDone, created, pushed, waFallback, period, mode: "monthly" });
   } catch {
     return NextResponse.json({ ok: false, error: "server_error" }, { status: 500 });
   }

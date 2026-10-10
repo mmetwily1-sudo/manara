@@ -13,7 +13,8 @@ export type NotifyEvent =
   | { kind: "payment_received"; studentName: string; amount: number; centerName: string; receiptNo?: number | null }
   | { kind: "payment_reminder"; studentName: string; amount: number; centerName: string; periods: string }
   | { kind: "homework_submitted"; studentName: string; hwTitle: string }
-  | { kind: "homework_graded"; studentName: string; hwTitle: string; score: number; total: number };
+  | { kind: "homework_graded"; studentName: string; hwTitle: string; score: number; total: number }
+  | { kind: "digest_weekly"; studentName: string; centerName: string; text: string };
 
 function renderBody(e: NotifyEvent): string {
   switch (e.kind) {
@@ -33,6 +34,9 @@ function renderBody(e: NotifyEvent): string {
       const pct = e.total > 0 ? Math.round((e.score / e.total) * 100) : 0;
       return `تصحيح واجب 📝\n${e.studentName} حصل على ${e.score}/${e.total} (${pct}%) في «${e.hwTitle}»`;
     }
+    case "digest_weekly":
+      // نص التقرير مُركّب مسبقاً في lib/digest (wa_text) — يُرسل حرفياً بلا إعادة صياغة
+      return e.text;
   }
 }
 
@@ -44,6 +48,7 @@ function titlesFallback(kind: NotifyEvent["kind"]): string {
     payment_reminder: "تذكير بالمصروفات 🔔",
     homework_submitted: "واجب جديد 📝",
     homework_graded: "تصحيح واجب 📝",
+    digest_weekly: "التقرير الأسبوعي 📊",
   }[kind];
 }
 
@@ -116,6 +121,7 @@ export async function notifyStudent(
     attendance_absent: "absence_alert", exam_graded: "exam_grade",
     payment_received: "payment_receipt", payment_reminder: "installment_reminder",
     homework_submitted: "session_reminder", homework_graded: "exam_grade",
+    digest_weekly: "digest_weekly",
   };
   let body: string | null = null;
   try {
@@ -195,6 +201,7 @@ export async function notifyStudent(
       payment_reminder: "تذكير بالمصروفات 🔔",
       homework_submitted: "واجب جديد 📝",
       homework_graded: "تصحيح واجب 📝",
+      digest_weekly: "التقرير الأسبوعي 📊",
     };
     const r = await sendPushToUser(admin, tenantId, studentId, {
       title: titles[event.kind],
