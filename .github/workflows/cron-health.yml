@@ -7,26 +7,24 @@ name: Cron health
 
 on:
   schedule:
-    - cron: "0 5 * * 1"
+    - cron: "0 5 * * *"
   workflow_dispatch:
 
 jobs:
   probe:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    env:
-      BASE: https://manara-mmetwily.vercel.app
     steps:
       - name: Probe worker/run
         run: |
-          out=$(curl -sf "https://manara-mmetwily.vercel.app/api/worker/run?secret=${{ secrets.CRON_SECRET }}") \
+          out=$(curl --max-time 10 -sf "https://manara-mmetwily.vercel.app/api/worker/run?secret=${{ secrets.CRON_SECRET }}") \
             || { echo "WORKER: HTTP-FAIL"; exit 1; }
           echo "$out" | grep -q '"ok":true' || { echo "WORKER: BAD-BODY: $out"; exit 1; }
           echo "WORKER: OK $out"
 
       - name: Probe sms/process
         run: |
-          out=$(curl -sf "https://manara-mmetwily.vercel.app/api/sms/process?secret=${{ secrets.CRON_SECRET }}") \
+          out=$(curl --max-time 10 -sf "https://manara-mmetwily.vercel.app/api/sms/process?secret=${{ secrets.CRON_SECRET }}") \
             || { echo "SMS: HTTP-FAIL"; exit 1; }
           echo "$out" | grep -q '"ok":true' || { echo "SMS: BAD-BODY: $out"; exit 1; }
           echo "SMS: OK $out"
