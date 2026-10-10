@@ -16,7 +16,11 @@ export async function POST(req: Request) {
 async function run(req: Request, isCronGet: boolean) {
   const secret = process.env.CRON_SECRET ?? "";
   const auth = req.headers.get("authorization") ?? "";
-  const isCron = !!secret && auth === `Bearer ${secret}`;
+  // ?secret= مدعوم أيضاً (نمط worker/run) — UptimeRobot المجاني لا يضبط هيدرات،
+  // وبدونه يستحيل تشغيل هذا المسار خارجياً إطلاقاً (كان Bearer فقط).
+  const u = new URL(req.url);
+  const q = u.searchParams.get("secret") ?? "";
+  const isCron = !!secret && (auth === `Bearer ${secret}` || (q && q === secret));
   if (!isCron && !isCronGet) {
     const { requireTeacher } = await import("@/lib/server-auth");
     const res = await requireTeacher(["teacher_admin"]);
