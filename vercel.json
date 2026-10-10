@@ -39,7 +39,7 @@
     },
     {
       "path": "/api/worker/run",
-      "schedule": "*/15 * * * *"
+      "schedule": "30 5 * * *"
     }
   ]
 }
