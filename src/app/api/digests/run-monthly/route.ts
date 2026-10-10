@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 /**
- * GET /api/digests/run-monthly — الملخص الشهري المجدول (يوم 1، 07:30، مؤمّن بـ CRON_SECRET).
+ * GET /api/digests/run-monthly — الملخص الشهري المجدول (يوم 1، 07:30 UTC = 10:30 القاهرة، مؤمّن بـ CRON_SECRET).
  * لكل سنتر نشط (50/تشغيلة): ملخص 30 يوماً لكل طالب + push — يُتخطى الموجود (unique).
  */
 export async function GET(req: Request) {

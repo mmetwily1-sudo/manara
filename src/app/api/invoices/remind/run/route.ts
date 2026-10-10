@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-/** GET /api/invoices/remind/run — التذكير اليومي المجدول (cron 08:00، مؤمّن بـ CRON_SECRET) */
+/** GET /api/invoices/remind/run — التذكير اليومي المجدول (cron 08:00 UTC = 11:00 القاهرة، مؤمّن بـ CRON_SECRET) */
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET ?? "";
   const auth = req.headers.get("authorization") ?? "";

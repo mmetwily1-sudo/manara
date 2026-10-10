@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 /**
- * GET /api/digests/run — التوليد الأسبوعي المجدول (cron السبت 07:00، مؤمّن بـ CRON_SECRET).
+ * GET /api/digests/run — التوليد الأسبوعي المجدول (cron السبت 06:30 UTC = 09:30 القاهرة، مؤمّن بـ CRON_SECRET).
  * لكل سنتر نشط (50/تشغيلة): تقارير طلابه + push — يُتخطى الموجود (unique).
  */
 export async function GET(req: Request) {
