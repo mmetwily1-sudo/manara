@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 /**
- * POST /api/sms/process — معالجة طابور SMS (cron كل 10 دقائق + يدوي المالك).
+ * POST /api/sms/process — معالجة طابور SMS (كرون يومي 45 8 UTC + يدوي المالك).
  * المزود الحالي log (يسجل فقط) — فعّل Twilio عبر SMS_DRIVER لاحقاً.
  */
 export async function GET(req: Request) {

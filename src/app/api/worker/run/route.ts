@@ -4,7 +4,8 @@ import { createClient } from "@supabase/supabase-js";
 /**
  * GET/POST /api/worker/run — منفذ المهام الخلفية.
  * المصادقة: Bearer CRON_SECRET أو ?secret= (لـ UptimeRobot المجاني الذي لا يضبط هيدرات).
- * يُستدعى كل 5 دقائق خارجياً + كورون يومي احتياطي.
+ * التشغيل: كرون Vercel كل 15 دقيقة (مصدر أساسي) + UptimeRobot خارجي كل 5 دقائق (احتياطي) —
+ * التداخل آمن (compare-and-set lease يمنع التنفيذ المزدوج)، فلا حاجة لإطفاء أحدهما.
  */
 export async function GET(req: Request) {
   return run(req);
