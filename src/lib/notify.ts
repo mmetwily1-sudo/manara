@@ -308,6 +308,14 @@ export async function notifyOwner(
       tenant_id: tenantId, user_id: ownerId, phone,
       body: body.slice(0, 300), event,
     });
+    // توثيق الإرسال ليعمل dedupe اليومي حتى في مسار SMS (يتخطى فقط لو لا صف مالك)
+    if (ownerId) {
+      await admin.from("notification_log").insert({
+        tenant_id: tenantId, user_id: ownerId, event,
+        channel: "sms", payload: {}, status: "queued",
+        dedupe_key: dedupeKey, sent_at: new Date().toISOString(),
+      }).then(() => {}, () => {});
+    }
     return { sent: true, channel: "sms_queued" };
   } catch {
     return { sent: false };

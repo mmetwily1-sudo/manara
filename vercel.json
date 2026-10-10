@@ -32,6 +32,10 @@
     {
       "path": "/api/renewals/run",
       "schedule": "15 7 * * *"
+    },
+    {
+      "path": "/api/attendance/audit/run",
+      "schedule": "30 21 * * *"
     }
   ]
 }
